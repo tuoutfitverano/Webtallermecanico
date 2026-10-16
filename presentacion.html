@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Web y gestión para talleres · Demo</title>
+  <meta name="description" content="Web profesional, cita online, portal de cliente y panel de gestión para talleres mecánicos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main>
+    <section class="pitch-hero">
+      <div class="wrap">
+        <span class="badge badge-info no-dot">Propuesta para <span data-config="nombre"></span></span>
+        <h1>Menos llamadas, menos papeles.<br><span style="color:var(--accent)">Más coches reparados.</span></h1>
+        <p>Una web profesional para tu taller con cita online, un portal donde cada cliente ve el estado de su coche, y un panel para organizar el trabajo del día.</p>
+        <div class="hero-actions" style="justify-content:center">
+          <a class="btn btn-primary btn-lg" href="taller.html">Ver el panel del taller</a>
+          <a class="btn btn-lg" href="index.html">Ver la web pública</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" style="padding-bottom:70px">
+      <div class="pitch-cards">
+        <a class="card pitch-card" href="index.html">
+          <span class="ico-box" data-icon="globe"></span>
+          <h3>1 · Web del taller</h3>
+          <ul>
+            <li>Diseño moderno, pensada para el móvil</li>
+            <li>Cita online 24 h con horas libres reales</li>
+            <li>Servicios y precios orientativos</li>
+            <li>Botones de llamada y WhatsApp</li>
+          </ul>
+          <span class="go">Abrir </span>
+        </a>
+        <a class="card pitch-card" href="cliente.html">
+          <span class="ico-box" data-icon="user"></span>
+          <h3>2 · Portal del cliente</h3>
+          <ul>
+            <li>Estado del coche en tiempo real</li>
+            <li>Aprobación del presupuesto con un toque</li>
+            <li>Historial de reparaciones y facturas</li>
+            <li>Avisos de ITV y próxima revisión</li>
+          </ul>
+          <span class="go">Abrir </span>
+        </a>
+        <a class="card pitch-card" href="taller.html">
+          <span class="ico-box" data-icon="board"></span>
+          <h3>3 · Panel del taller</h3>
+          <ul>
+            <li>Tablero de trabajos: arrastrar y soltar</li>
+            <li>Presupuestos en segundos con catálogo</li>
+            <li>Agenda con las citas de la web</li>
+            <li>Fichas de cliente y avisos por WhatsApp</li>
+          </ul>
+          <span class="go">Abrir </span>
+        </a>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Dónde se ahorra el tiempo</span>
+          <h2>Lo que gana el taller desde el primer día</h2>
+        </div>
+        <div class="gains">
+          <div class="card gain"><b>−70 %</b><strong>llamadas de “¿cómo va mi coche?”</strong><p class="small muted">El cliente lo ve en su móvil y recibe avisos cuando cambia el estado.</p></div>
+          <div class="card gain"><b>2 min</b><strong>para hacer un presupuesto</strong><p class="small muted">Catálogo de recambios y mano de obra con un clic. IVA calculado solo.</p></div>
+          <div class="card gain"><b>24 h</b><strong>reservando citas</strong><p class="small muted">La web coge citas mientras el taller trabaja. Entran directas a la agenda.</p></div>
+          <div class="card gain"><b>0</b><strong>papeles perdidos</strong><p class="small muted">Historial de cada vehículo: trabajos, km, piezas y facturas, siempre a mano.</p></div>
+        </div>
+        <p class="xs muted" style="margin-top:14px">Cifras orientativas para la presentación.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap split" style="align-items:start">
+        <div>
+          <div class="section-head">
+            <span class="kicker">Guion de la demo</span>
+            <h2>Enséñalo en 3 minutos</h2>
+            <p>Mejor en un portátil o tablet con dos ventanas lado a lado: el panel del taller y el móvil del cliente.</p>
+          </div>
+          <ol class="script">
+            <li class="card"><div><b>Abre el panel del taller</b><br><span class="muted small">Enseña el tablero: cada coche, su estado, el mecánico y la hora de entrega.</span></div></li>
+            <li class="card"><div><b>En otra ventana, entra como Laura</b><br><span class="muted small">Portal cliente → “Laura · presupuesto pendiente”. Verá su presupuesto detallado.</span></div></li>
+            <li class="card"><div><b>Laura aprueba el presupuesto</b><br><span class="muted small">En el panel salta el aviso y el coche pasa solo a “En reparación”.</span></div></li>
+            <li class="card"><div><b>Mueve el coche a “Listo”</b><br><span class="muted small">Arrastra la tarjeta. El portal de Laura cambia al momento: “¡Tu vehículo está listo!”.</span></div></li>
+            <li class="card"><div><b>Pide una cita desde la web</b><br><span class="muted small">Aparece en la Agenda. Pulsa “Recepcionar” y la orden se crea con los datos rellenados.</span></div></li>
+          </ol>
+        </div>
+        <div class="stack">
+          <div class="card card-pad">
+            <h3 style="font-size:1.15rem;margin-bottom:6px">Personaliza la demo para cada taller</h3>
+            <p class="small muted" style="margin-bottom:16px">Antes de la visita, pon el nombre y el color del taller. Toda la demo se adapta.</p>
+            <form id="brandForm" class="stack">
+              <label class="field"><span>Nombre del taller</span><input class="input" name="nombre" required></label>
+              <div class="form-grid">
+                <label class="field"><span>Teléfono</span><input class="input" name="telefono"></label>
+                <label class="field"><span>WhatsApp</span><input class="input" name="whatsapp"></label>
+                <label class="field span-2"><span>Dirección</span><input class="input" name="direccion"></label>
+                <label class="field"><span>Eslogan</span><input class="input" name="eslogan"></label>
+                <label class="field"><span>Color de marca</span><input class="input" type="color" name="color" style="padding:4px;height:44px"></label>
+              </div>
+              <div class="row" style="flex-wrap:wrap">
+                <button class="btn btn-dark" type="submit">Aplicar</button>
+                <button class="btn btn-ghost" type="button" id="brandReset">Restaurar valores de ejemplo</button>
+              </div>
+              <p class="form-hint">También por enlace: <code>presentacion.html?taller=Talleres%20Pepe&amp;color=%230a7cff</code></p>
+            </form>
+          </div>
+          <div class="card card-pad">
+            <h3 style="font-size:1.05rem;margin-bottom:8px">Accesos de prueba</h3>
+            <table class="tbl">
+              <thead><tr><th>Cliente</th><th>Matrícula</th><th>Código</th></tr></thead>
+              <tbody>
+                <tr><td>Laura · presupuesto pendiente</td><td><span class="plate">1234 KLM</span></td><td><b>2580</b></td></tr>
+                <tr><td>Carlos · en reparación</td><td><span class="plate">5678 BCD</span></td><td><b>1111</b></td></tr>
+                <tr><td>Lucía · listo para recoger</td><td><span class="plate">7788 LCV</span></td><td><b>7272</b></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="wrap"><span>Demo de servicio web para talleres</span><span>Datos de ejemplo · se guardan solo en este navegador</span></div></footer>
+
+  <script src="js/core.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      Store.load();
+      renderDemoBar('pitch');
+      applyConfig();
+      hydrateIcons();
+      $$('.go').forEach(el => el.insertAdjacentHTML('beforeend', icon('arrow')));
+      const form = $('#brandForm');
+      ['nombre', 'telefono', 'whatsapp', 'direccion', 'eslogan', 'color'].forEach(k => { form[k].value = CONFIG[k]; });
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = Object.fromEntries(new FormData(form));
+        Object.keys(f).forEach(k => { f[k] = String(f[k]).trim(); if (!f[k]) delete f[k]; });
+        saveConfig(f);
+        location.href = location.pathname;
+      });
+      $('#brandReset').addEventListener('click', () => { safeDel(localStorage, CONFIG_KEY); location.href = location.pathname; });
+    });
+  </script>
+</body>
+</html>

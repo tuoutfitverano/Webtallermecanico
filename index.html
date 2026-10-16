@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{taller} · Taller mecánico</title>
+  <meta name="description" content="Taller mecánico de confianza. Pide cita online y consulta en tiempo real el estado de tu vehículo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page-public">
+
+  <header class="site-header">
+    <div class="wrap">
+      <a href="index.html" class="brand">
+        <span class="brand-mark" data-icon="wrench"></span>
+        <span><span data-config="nombre"></span><small data-config="eslogan"></small></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="#servicios">Servicios</a>
+        <a href="#seguimiento">Seguimiento online</a>
+        <a href="#opiniones">Opiniones</a>
+        <a href="#cita">Pedir cita</a>
+        <a href="#contacto">Contacto</a>
+      </nav>
+      <div class="header-cta">
+        <a href="cliente.html" class="btn btn-sm" data-icon="user"><span class="btn-text">Mi vehículo</span></a>
+        <a href="#cita" class="btn btn-sm btn-primary">Pedir cita</a>
+      </div>
+      <button class="btn btn-ghost icon-btn menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false" data-icon="menu"></button>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <section class="hero">
+      <div class="wrap">
+        <div>
+          <span class="eyebrow" data-icon="shield">Garantía de 12 meses en todas las reparaciones</span>
+          <h1>Tu coche en buenas manos.<br><em>Y siempre sabrás cómo va.</em></h1>
+          <p class="hero-lead">Pide cita en 30 segundos, aprueba el presupuesto desde el móvil y sigue la reparación paso a paso. Sin llamadas, sin esperas, sin sorpresas en la factura.</p>
+          <div class="hero-actions">
+            <a href="#cita" class="btn btn-primary btn-lg" data-icon="calendar">Pedir cita online</a>
+            <a href="cliente.html" class="btn btn-lg" data-icon="search">Consultar mi vehículo</a>
+          </div>
+          <div class="hero-trust">
+            <div><b>+25</b>años de experiencia</div>
+            <div><b>4,9 ★</b>en reseñas de Google</div>
+            <div><b>+3.200</b>vehículos al año</div>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="live-card" id="liveCard" aria-live="polite"></div>
+          <div class="hero-float">
+            <span data-icon="chat"></span>
+            <div><b>Aviso automático</b><br><span class="muted">“Tu vehículo está listo para recoger”</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONSULTA RÁPIDA -->
+    <div class="wrap quick-track">
+      <form class="card" id="trackForm" autocomplete="off">
+        <div class="qt-title">
+          <span class="ico-box" data-icon="car"></span>
+          <div><b>¿Tu coche está en el taller?</b><span class="small muted">Consulta su estado ahora</span></div>
+        </div>
+        <label class="field"><span>Matrícula</span><input class="input input-plate" name="m" placeholder="1234 KLM" required></label>
+        <label class="field"><span>Código de cliente</span><input class="input" name="c" placeholder="4 cifras" inputmode="numeric" maxlength="6" required></label>
+        <button class="btn btn-dark" type="submit" data-icon="arrow">Ver estado</button>
+      </form>
+    </div>
+
+    <!-- SERVICIOS -->
+    <section class="section" id="servicios">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Servicios</span>
+          <h2>Todo lo que necesita tu coche, en un solo taller</h2>
+          <p>Trabajamos con todas las marcas, recambio de primera calidad y precios cerrados antes de empezar.</p>
+        </div>
+        <div class="services" id="servicesGrid"></div>
+      </div>
+    </section>
+
+    <!-- SEGUIMIENTO -->
+    <section class="section section-alt" id="seguimiento">
+      <div class="wrap split">
+        <div>
+          <div class="section-head" style="margin-bottom:0">
+            <span class="kicker">Seguimiento online</span>
+            <h2>Tu área de cliente: el taller en tu bolsillo</h2>
+            <p>Cada cliente tiene su propia página privada. Solo necesitas tu matrícula y tu código.</p>
+          </div>
+          <div class="feature-list">
+            <ul>
+              <li><span class="ico-box" data-icon="gauge"></span><div><b>Estado en tiempo real</b><span>Recibido, diagnóstico, reparación, listo… lo ves en cuanto cambia.</span></div></li>
+              <li><span class="ico-box" data-icon="clipboard"></span><div><b>Aprueba el presupuesto con un toque</b><span>Ves cada pieza y cada hora de trabajo antes de decir que sí.</span></div></li>
+              <li><span class="ico-box" data-icon="history"></span><div><b>Historial completo</b><span>Todas las reparaciones, kilómetros y facturas de tus vehículos.</span></div></li>
+              <li><span class="ico-box" data-icon="bell"></span><div><b>Recordatorios</b><span>Te avisamos de la próxima revisión y de la fecha de la ITV.</span></div></li>
+            </ul>
+          </div>
+          <div class="hero-actions"><a class="btn btn-dark" href="cliente.html" data-icon="user">Entrar a mi área de cliente</a></div>
+        </div>
+        <div>
+          <div class="phone" aria-hidden="true">
+            <div class="phone-screen">
+              <div class="phone-top">
+                <div class="phone-notch"></div>
+                <div class="row-between"><b style="font-family:var(--font-display)">Hola, Laura</b><span class="plate">1234 KLM</span></div>
+                <div class="st st-reparacion" style="margin-top:12px">
+                  <div class="status-big" style="margin-top:0"><span class="ring" data-icon="wrench"></span><div><b>En reparación</b><span class="xs muted">Entrega prevista: mañana 18:00</span></div></div>
+                  <div class="stepper"><div class="s done"></div><div class="s done"></div><div class="s done"></div><div class="s cur"></div><div class="s"></div><div class="s"></div></div>
+                </div>
+              </div>
+              <div class="phone-body">
+                <div class="mini-ev"><b>Presupuesto aprobado ✓</b><span class="muted">Hoy, 10:42 · 412,34 €</span></div>
+                <div class="mini-ev"><b>Diagnóstico terminado</b><span class="muted">Pastillas y discos delanteros al límite.</span></div>
+                <div class="mini-ev"><b>Vehículo recibido</b><span class="muted">Ayer, 9:05 · 87.450 km</span></div>
+                <div class="mini-ev" style="background:var(--ok-soft);border-color:transparent;color:var(--ok)"><b>Próxima ITV</b>en 48 días</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CÓMO FUNCIONA -->
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Así de fácil</span>
+          <h2>De la cita a la entrega, sin perder tiempo</h2>
+        </div>
+        <div class="how">
+          <div class="how-step card"><h3>Pide cita online</h3><p>Elige el día y la hora que te vengan bien. Te confirmamos por WhatsApp.</p></div>
+          <div class="how-step card"><h3>Diagnóstico gratuito</h3><p>Revisamos el vehículo y te explicamos qué tiene, sin tecnicismos.</p></div>
+          <div class="how-step card"><h3>Aprueba el presupuesto</h3><p>Lo recibes en tu móvil con todo detallado. Solo reparamos lo que apruebes.</p></div>
+          <div class="how-step card"><h3>Recógelo listo</h3><p>Te avisamos en cuanto está terminado y revisado. Pagas y te lo llevas.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OPINIONES -->
+    <section class="section section-alt" id="opiniones">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">Opiniones</span>
+          <h2>Lo que dicen nuestros clientes</h2>
+          <p class="small">Reseñas de ejemplo para la demostración.</p>
+        </div>
+        <div class="reviews">
+          <article class="review card"><div class="stars" data-stars></div><p>“Me mandaron el presupuesto al móvil, lo aprobé desde el trabajo y por la tarde ya tenía el coche. Así da gusto.”</p><footer><span class="avatar">MR</span><div><b>María R.</b><br><span class="muted">Cambio de embrague</span></div></footer></article>
+          <article class="review card"><div class="stars" data-stars></div><p>“Lo mejor es que no tienes que llamar para preguntar cómo va. Lo ves todo en la web, hasta las piezas que te cambian.”</p><footer><span class="avatar">JA</span><div><b>Jorge A.</b><br><span class="muted">Revisión 60.000 km</span></div></footer></article>
+          <article class="review card"><div class="stars" data-stars></div><p>“Me avisaron de que me tocaba la ITV y me hicieron la pre-ITV. Pasó a la primera. Taller serio y con precios claros.”</p><footer><span class="avatar">CS</span><div><b>Carmen S.</b><br><span class="muted">Pre-ITV</span></div></footer></article>
+        </div>
+      </div>
+    </section>
+
+    <!-- CITA -->
+    <section class="section" id="cita">
+      <div class="wrap booking">
+        <aside class="booking-aside">
+          <span class="kicker" style="color:var(--accent);font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.1em">Cita online 24 h</span>
+          <h3>Reserva tu hueco en menos de un minuto</h3>
+          <p>Elige servicio, día y hora. Recibirás la confirmación por WhatsApp.</p>
+          <ul>
+            <li><span data-icon="clock"></span><span data-config="horario"></span></li>
+            <li><span data-icon="pin"></span><span data-config="direccion"></span></li>
+            <li><span data-icon="phone"></span><span>¿Prefieres llamar? <a data-config-href="telefono" data-config="telefono" style="color:#fff"></a></span></li>
+            <li><span data-icon="shield"></span><span>Diagnóstico gratuito si reparas con nosotros.</span></li>
+          </ul>
+        </aside>
+
+        <div class="card card-pad" id="bookingCard">
+          <form id="bookingForm" class="stack" novalidate>
+            <div class="form-grid">
+              <label class="field"><span>Nombre y apellidos</span><input class="input" name="nombre" required autocomplete="name"></label>
+              <label class="field"><span>Teléfono (WhatsApp)</span><input class="input" name="telefono" required inputmode="tel" autocomplete="tel"></label>
+              <label class="field"><span>Matrícula</span><input class="input input-plate" name="matricula" required placeholder="1234 ABC"></label>
+              <label class="field"><span>Servicio</span><select class="select" name="servicio" id="servicioSel" required></select></label>
+              <label class="field span-2"><span>Día</span><input class="input" type="date" name="dia" id="diaInput" required></label>
+              <div class="field span-2"><span>Hora</span><div class="slots" id="slots"></div><input type="hidden" name="hora" id="horaInput"></div>
+              <label class="field span-2"><span>¿Qué le pasa al coche? <span class="muted">(opcional)</span></span><textarea class="textarea" name="nota" placeholder="Ej.: hace ruido al frenar, se enciende un testigo…"></textarea></label>
+            </div>
+            <p class="form-error hidden" id="bookingError"></p>
+            <button class="btn btn-primary btn-lg btn-block" type="submit" data-icon="calendar">Confirmar cita</button>
+            <p class="form-hint">Al reservar aceptas que te contactemos para confirmar la cita.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACTO -->
+    <section class="section section-alt" id="contacto">
+      <div class="wrap">
+        <div class="section-head"><span class="kicker">Contacto</span><h2>Estamos aquí al lado</h2></div>
+        <div class="contact">
+          <div class="card"><span data-icon="pin"></span><b>Dirección</b><span class="muted" data-config="direccion"></span></div>
+          <div class="card"><span data-icon="clock"></span><b>Horario</b><span class="muted" data-config="horario"></span></div>
+          <div class="card"><span data-icon="phone"></span><b>Teléfono</b><a data-config-href="telefono" data-config="telefono"></a></div>
+          <div class="card"><span data-icon="chat"></span><b>WhatsApp</b><a data-config-href="whatsapp" target="_blank" rel="noopener">Escríbenos</a></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <a href="index.html" class="brand"><span class="brand-mark" data-icon="wrench"></span><span data-config="nombre"></span></a>
+      <span>© <span id="year"></span> <span data-config="nombre"></span> · <a href="taller.html" style="color:#94a3b8">Acceso taller</a></span>
+    </div>
+  </footer>
+
+  <script src="js/core.js"></script>
+  <script src="js/public.js"></script>
+</body>
+</html>

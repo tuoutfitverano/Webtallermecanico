@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mi vehículo · {taller}</title>
+  <meta name="description" content="Área de cliente: estado de tu vehículo, presupuestos e historial de reparaciones.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page-app">
+  <header class="app-header">
+    <div class="wrap">
+      <a href="index.html" class="brand">
+        <span class="brand-mark" data-icon="wrench"></span>
+        <span><span data-config="nombre"></span><small>Área de cliente</small></span>
+      </a>
+      <div class="right" id="headerRight"></div>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <dialog class="modal" id="invoiceDialog">
+    <div class="modal-head"><h3 id="invoiceTitle">Factura</h3><button class="btn btn-ghost icon-btn" data-close aria-label="Cerrar" data-icon="x"></button></div>
+    <div class="modal-body" id="invoiceBody"></div>
+  </dialog>
+
+  <script src="js/core.js"></script>
+  <script src="js/cliente.js"></script>
+</body>
+</html>

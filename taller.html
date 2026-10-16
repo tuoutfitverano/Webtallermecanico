@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel del taller · {taller}</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="page-panel">
+  <header class="app-header panel-header">
+    <div class="wrap">
+      <a href="taller.html" class="brand" style="color:#fff">
+        <span class="brand-mark" data-icon="wrench"></span>
+        <span><span data-config="nombre"></span><small>Panel del taller</small></span>
+      </a>
+      <div class="right">
+        <span class="small hide-sm" id="clock" style="color:#94a3b8"></span>
+        <div class="bell" style="position:relative">
+          <button class="btn btn-ghost icon-btn" id="bellBtn" aria-label="Actividad reciente" aria-expanded="false" data-icon="bell"></button>
+          <div class="popover hidden" id="activity"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" data-goto="nueva" data-icon="plus"><span class="btn-text">Nueva orden</span></button>
+      </div>
+    </div>
+  </header>
+  <div class="panel-nav">
+    <div class="wrap">
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+    </div>
+  </div>
+
+  <main class="app-main">
+    <div class="wrap" id="view"></div>
+  </main>
+
+  <dialog class="modal" id="orderDialog">
+    <div class="modal-head" id="orderHead"></div>
+    <div class="modal-body" id="orderBody"></div>
+  </dialog>
+
+  <script src="js/core.js"></script>
+  <script src="js/taller.js"></script>
+</body>
+</html>
