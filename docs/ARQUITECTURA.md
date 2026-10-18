@@ -29,7 +29,7 @@ Este documento explica **cómo está construida la plataforma y por qué**. Est�
 | Tecnología | Versión | Por qué |
 | --- | --- | --- |
 | Astro | 7.4 | Webs muy rápidas y buenas para SEO; solo envía JavaScript donde hace falta. |
-| Tailwind CSS | 4.3 | Disponible para el futuro panel. La web pública usa `site.css`, el diseño heredado de la demo, para conservarlo sin reescribirlo. |
+| Tailwind CSS | 4.3 | Disponible para el futuro panel. La web pública usa `site.css` (estética "cristal líquido") con CSS propio. |
 | TypeScript | **6.0** | Detecta errores antes de ejecutar. Se usa la 6 y no la 7 porque la herramienta de comprobación de Astro (`@astrojs/check`) todavía no admite la 7. |
 | React | *aún no* | Solo se añadirá cuando una pantalla lo necesite de verdad (panel interactivo). Hoy no aporta nada. |
 | Supabase | CLI 2.121, PostgreSQL 17 | Base de datos, usuarios, 2FA y reglas de acceso en un solo servicio. |

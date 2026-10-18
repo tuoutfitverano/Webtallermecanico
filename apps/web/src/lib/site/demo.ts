@@ -14,6 +14,12 @@ export const DEMO_SITE: PublicSite = {
   name: 'Taller Demo',
   isDemoContent: true,
   accent: '#e4572e',
+  // Vídeos de la referencia de diseño, solo para la demostración. Una web real
+  // debe usar vídeos propios o con licencia, alojados en su propio almacenamiento.
+  videos: {
+    hero: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260619_191346_9d19d66e-86a4-47f7-8dc6-712c1788c3b2.mp4',
+    services: 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_093722_ccfc7ebf-182f-419f-8a62-2dc02db7dd9d.mp4',
+  },
   content: {
     tagline: 'Mecánica y electrónica del automóvil',
     city: 'Guadalajara',

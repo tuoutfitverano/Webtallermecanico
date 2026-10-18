@@ -56,6 +56,8 @@ values ('www.dominio-del-taller.es', 'ID', true, now());
 
 Pon `is_demo_content = false` **solo** cuando todos los datos sean reales y el taller haya autorizado su publicación.
 
+**Vídeos de fondo (opcional).** En `theme` se pueden añadir `"heroVideo"` (portada) y `"servicesVideo"` (servicios) con una dirección `https` a un MP4. Usa solo vídeos propios del taller o con licencia, alojados en un almacenamiento vuestro (por ejemplo, Cloudflare R2). Los vídeos de la demo son los de la referencia de diseño: no los uses en una web real. Si no hay vídeo, la web muestra un fondo animado.
+
 ## 6. Publicar en Cloudflare
 
 En Cloudflare → **Workers & Pages**, configura las variables. Las claves secretas, como **Secret**:

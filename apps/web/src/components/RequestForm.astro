@@ -162,14 +162,14 @@ const messageRequired = kind !== 'cita';
 
       {turnstileSiteKey && (
         <div class="field span-2">
-          <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="solicitud" data-language="es" data-size="flexible"></div>
+          <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="solicitud" data-language="es" data-size="flexible" data-theme="dark"></div>
         </div>
       )}
     </div>
 
     <div class="form-status" data-status role="status" aria-live="polite"></div>
 
-    <button class="btn btn-primary btn-lg btn-block" type="submit" data-submit>
+    <button class="btn btn-primary btn-block" type="submit" data-submit>
       <span class="spinner" aria-hidden="true"></span>
       <span data-label>{submitLabel}</span>
     </button>
@@ -179,8 +179,8 @@ const messageRequired = kind !== 'cita';
   </form>
 
   <div class="form-success" data-success hidden tabindex="-1">
-    <div class="ok-ico"><Icon name="check" /></div>
-    <h3 data-success-title>Solicitud recibida</h3>
+    <div class="ok-ico liquid-glass"><Icon name="check" /></div>
+    <h3 class="heading" data-success-title>Solicitud recibida</h3>
     <p data-success-text></p>
     <p class="muted small">Referencia: <strong data-success-ref></strong></p>
     <button class="btn" type="button" data-again>Enviar otra solicitud</button>

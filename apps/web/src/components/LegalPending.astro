@@ -9,9 +9,10 @@ const { site, title, items } = Astro.props;
 ---
 <SiteLayout site={site} title={`${title} · ${site.name}`} noindex>
   <SiteHeader site={site} />
-  <main class="section">
+  <main class="section legal-page glow">
     <div class="wrap legal">
-      <h1>{title}</h1>
+      <p class="label">// Información legal</p>
+      <h1 class="heading">{title}</h1>
       <div class="alert alert-warn" role="note">
         <span><strong>Texto pendiente.</strong> El titular de la web debe redactar esta página con su asesor legal antes de publicar la web. No es un texto legal válido.</span>
       </div>

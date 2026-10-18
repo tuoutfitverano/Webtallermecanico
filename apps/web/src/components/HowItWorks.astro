@@ -1,14 +1,26 @@
-<section class="section section-alt" id="como-trabajamos">
+---
+import BlurText from './BlurText.astro';
+const steps = [
+  { title: 'Envía tu solicitud', text: 'Cuéntanos qué necesitas desde la web, por teléfono o por WhatsApp.' },
+  { title: 'Te confirmamos', text: 'Revisamos tu solicitud y te contactamos para confirmar el día y la hora.' },
+  { title: 'Diagnóstico y presupuesto', text: 'Revisamos el vehículo y te explicamos qué necesita antes de empezar.' },
+  { title: 'Recoges tu coche', text: 'Te avisamos cuando está listo para que pases a recogerlo.' },
+];
+---
+<section class="section glow" id="como-trabajamos">
   <div class="wrap">
-    <div class="section-head">
-      <span class="kicker">Cómo trabajamos</span>
-      <h2>De la solicitud a la entrega</h2>
-    </div>
-    <div class="how">
-      <div class="how-step card"><h3>Envía tu solicitud</h3><p>Cuéntanos qué necesitas desde la web, por teléfono o por WhatsApp.</p></div>
-      <div class="how-step card"><h3>Te confirmamos</h3><p>Revisamos tu solicitud y te contactamos para confirmar el día y la hora.</p></div>
-      <div class="how-step card"><h3>Diagnóstico y presupuesto</h3><p>Revisamos el vehículo y te explicamos qué necesita antes de empezar.</p></div>
-      <div class="how-step card"><h3>Recoges tu coche</h3><p>Te avisamos cuando está listo para que pases a recogerlo.</p></div>
-    </div>
+    <header class="section-head">
+      <p class="label">// Cómo trabajamos</p>
+      <BlurText as="h2" text="De la solicitud a la entrega" class="display-sm heading" />
+    </header>
+    <ol class="steps">
+      {steps.map((s, i) => (
+        <li class="step liquid-glass reveal" data-reveal style={`--d:${i * 0.1}s`}>
+          <span class="step-num heading" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+          <h3 class="heading">{s.title}</h3>
+          <p>{s.text}</p>
+        </li>
+      ))}
+    </ol>
   </div>
 </section>

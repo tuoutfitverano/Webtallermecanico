@@ -1,6 +1,9 @@
 ---
-import '@fontsource-variable/inter';
-import '@fontsource-variable/manrope';
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '@fontsource/barlow/latin-300.css';
+import '@fontsource/barlow/latin-400.css';
+import '@fontsource/barlow/latin-500.css';
+import '@fontsource/barlow/latin-600.css';
 import '../styles/site.css';
 import type { PublicSite } from '../lib/site/content.ts';
 
@@ -18,12 +21,35 @@ const robots = noindex || site.isDemoContent ? 'noindex, nofollow' : 'index, fol
 <html lang="es" style={`--accent:${site.accent}`}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <meta name="robots" content={robots} />
-    <meta name="theme-color" content={site.accent} />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!--
+      Animaciones de entrada (desenfoque → nítido). Va en línea para no depender
+      de ningún archivo: sin JavaScript o con "reducir movimiento", todo se ve
+      directamente y nada queda oculto.
+    -->
+    <script is:inline>
+      (() => {
+        if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const root = document.documentElement;
+        root.classList.add('anim');
+        document.addEventListener('DOMContentLoaded', () => {
+          const io = new IntersectionObserver(entries => {
+            for (const e of entries) {
+              if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+            }
+          }, { threshold: 0.1 });
+          document.querySelectorAll('[data-reveal]').forEach(el => io.observe(el));
+        });
+        // Al imprimir, todo visible aunque no se haya desplazado hasta ahí.
+        addEventListener('beforeprint', () => root.classList.add('anim-done'));
+      })();
+    </script>
   </head>
   <body>
     <slot />

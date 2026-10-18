@@ -8,7 +8,7 @@ values ('d0000000-0000-0000-0000-000000000001', 'taller-demo', 'Taller Demo', 'd
 insert into public.workshop_sites (workshop_id, published, is_demo_content, theme, content)
 values (
   'd0000000-0000-0000-0000-000000000001', true, true,
-  '{"accent": "#e4572e"}',
+  '{"accent": "#e4572e", "heroVideo": "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260619_191346_9d19d66e-86a4-47f7-8dc6-712c1788c3b2.mp4", "servicesVideo": "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_093722_ccfc7ebf-182f-419f-8a62-2dc02db7dd9d.mp4"}',
   '{
   "tagline": "Mecánica y electrónica del automóvil",
   "city": "Guadalajara",

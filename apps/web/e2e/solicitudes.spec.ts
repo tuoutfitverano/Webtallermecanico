@@ -108,6 +108,8 @@ test.describe('Solicitud de cita', () => {
       await form.getByRole('button', { name: 'Enviar solicitud de cita' }).click();
       await expect(form.getByRole('alert')).toContainText('No se ha guardado');
       await expect(form.getByRole('heading', { name: 'Solicitud de cita recibida' })).toBeHidden();
+      // El panel de éxito entero (no solo su título) sigue oculto.
+      await expect(form.locator('[data-success]')).toBeHidden();
       await expect(form.getByLabel('Nombre')).toHaveValue(name); // los datos se conservan
     } finally {
       await simulateBackendDown(false);
@@ -117,6 +119,13 @@ test.describe('Solicitud de cita', () => {
     await form.getByRole('button', { name: 'Enviar solicitud de cita' }).click();
     await expect(form.getByRole('heading', { name: 'Solicitud de cita recibida' })).toBeVisible();
     expect(await rowsNamed(name)).toHaveLength(1);
+  });
+
+  test('al cargar la página ningún formulario muestra "recibido"', async ({ page }) => {
+    await page.goto('/');
+    for (const kind of ['cita', 'presupuesto', 'contacto']) {
+      await expect(page.locator(`#solicitar-${kind} [data-success]`)).toBeHidden();
+    }
   });
 
   test('valida en el navegador sin llamar al servidor', async ({ page }) => {

@@ -5,28 +5,37 @@ import { telHref } from '../lib/site/content.ts';
 interface Props { site: PublicSite }
 const { site } = Astro.props;
 const tel = telHref(site.content.phone);
+const initial = (site.name.replace(/^taller\s+/i, '').trim()[0] ?? site.name[0] ?? 'T').toLowerCase();
 ---
 <header class="site-header">
-  <div class="wrap">
+  <div class="nav-bar">
     <a href="/" class="brand" aria-label={`${site.name}, inicio`}>
-      <span class="brand-mark"><Icon name="wrench" /></span>
-      <span>{site.name}{site.content.tagline && <small>{site.content.tagline}</small>}</span>
+      <span class="brand-mark liquid-glass" aria-hidden="true">{initial}</span>
+      <span class="brand-name">{site.name}</span>
     </a>
-    <nav class="nav" id="nav" aria-label="Principal">
+
+    <nav class="nav liquid-glass" id="nav" aria-label="Principal">
       <a href="#servicios">Servicios</a>
       <a href="#como-trabajamos">Cómo trabajamos</a>
-      <a href="#solicitar">Cita y presupuesto</a>
       <a href="#contacto">Contacto</a>
+      <a href="#solicitar" class="nav-cta">Pedir cita <Icon name="arrowUpRight" /></a>
     </nav>
-    <div class="header-cta">
-      {tel && <a href={tel} class="btn btn-sm" aria-label={`Llamar al ${site.content.phone}`}><Icon name="phone" /><span class="btn-text">Llamar</span></a>}
-      <a href="#solicitar" class="btn btn-sm btn-primary">Pedir cita</a>
+
+    <div class="nav-side">
+      {tel && <a href={tel} class="round-btn liquid-glass" aria-label={`Llamar al ${site.content.phone}`}><Icon name="phone" /></a>}
+      <button class="round-btn liquid-glass menu-toggle" id="menuToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav"><Icon name="menu" /></button>
     </div>
-    <button class="btn btn-ghost icon-btn menu-toggle" id="menuToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav"><Icon name="menu" /></button>
   </div>
 </header>
 
 <script>
+  const header = document.querySelector<HTMLElement>('.site-header');
+  if (header) {
+    const onScroll = () => header.classList.toggle('is-scrolled', scrollY > 40);
+    addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
   const btn = document.getElementById('menuToggle');
   const nav = document.getElementById('nav');
   if (btn && nav) {

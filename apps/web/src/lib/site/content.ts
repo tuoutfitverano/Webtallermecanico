@@ -30,8 +30,13 @@ export const siteContentSchema = z.object({
   notice: text(300).default(''),
 });
 
+/** Vídeo de fondo opcional: solo https y alojado donde el taller tenga derecho a usarlo. */
+const videoUrl = z.url({ protocol: /^https$/ }).max(500).nullable().default(null).catch(null);
+
 export const siteThemeSchema = z.object({
-  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#e4572e'),
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#e4572e').catch('#e4572e'),
+  heroVideo: videoUrl,
+  servicesVideo: videoUrl,
 });
 
 export type SiteService = z.output<typeof serviceSchema>;
@@ -44,6 +49,8 @@ export interface PublicSite {
   name: string;
   isDemoContent: boolean;
   accent: string;
+  /** Vídeos de fondo; sin vídeo, la web usa un fondo animado. */
+  videos: { hero: string | null; services: string | null };
   content: SiteContent;
 }
 
@@ -63,13 +70,14 @@ export function parsePublicSite(raw: unknown): PublicSite | null {
   if (!parsed.success) return null;
   const { workshop, site } = parsed.data;
   const content = siteContentSchema.safeParse(site.content ?? {});
-  const theme = siteThemeSchema.safeParse(site.theme ?? {});
+  const theme = siteThemeSchema.parse(typeof site.theme === 'object' && site.theme ? site.theme : {});
   return {
     workshopId: workshop.id,
     slug: workshop.slug,
     name: workshop.name,
     isDemoContent: site.is_demo_content,
-    accent: theme.success ? theme.data.accent : '#e4572e',
+    accent: theme.accent,
+    videos: { hero: theme.heroVideo, services: theme.servicesVideo },
     content: content.success ? content.data : siteContentSchema.parse({}),
   };
 }

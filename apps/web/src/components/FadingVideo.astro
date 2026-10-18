@@ -1,0 +1,29 @@
+---
+/**
+ * Vídeo de fondo decorativo que entra y sale con un fundido.
+ * La fuente se asigna desde JavaScript: sin JS, o con "reducir movimiento" o
+ * ahorro de datos, no se descarga y queda el fondo animado de detrás.
+ */
+interface Props {
+  src: string | string[];
+  class?: string;
+  style?: string;
+}
+const { src, class: cls = '', style } = Astro.props;
+const sources = Array.isArray(src) ? src : [src];
+---
+<video
+  class={`fading-video ${cls}`}
+  style={style}
+  data-fading-video={JSON.stringify(sources)}
+  muted
+  playsinline
+  preload="none"
+  aria-hidden="true"
+  tabindex="-1"
+></video>
+
+<script>
+  import { setupFadingVideos } from '../scripts/fading-video.ts';
+  setupFadingVideos();
+</script>

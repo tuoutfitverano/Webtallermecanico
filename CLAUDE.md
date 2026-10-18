@@ -20,7 +20,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/lib/site/           Contenido del taller, resolución por dominio, demo local
   src/lib/requests/       Endpoint de solicitudes: handler (lógica pura), store, antispam
   src/lib/server/         Configuración del servidor (lee astro:env) — solo servidor
-  src/styles/site.css     Diseño portado de la demo (no reescribir a Tailwind sin motivo)
+  src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
   e2e/                    Pruebas de navegador (Playwright Test)
 packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes
 supabase/migrations/      Esquema + permisos (RLS). Nunca edites una migración ya aplicada: crea otra.
@@ -65,7 +65,10 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 
 - Código en TypeScript estricto; identificadores en inglés, textos visibles y comentarios en español.
 - Valores de dominio en español (`'cita'`, `'nueva'`, `'gasolina'`) y sincronizados entre `packages/core` y los tipos de la base de datos.
-- La web pública usa `src/styles/site.css` (diseño heredado de la demo) y fuentes alojadas en la propia web (`@fontsource-variable/*`), sin Google Fonts. Tailwind queda disponible para el futuro panel.
+- La web pública usa `src/styles/site.css` (estética "cristal líquido": fondo negro, Instrument Serif cursiva para titulares, Barlow para texto) y fuentes alojadas en la propia web (`@fontsource/*`), sin Google Fonts. Tailwind queda disponible para el futuro panel.
+- Animaciones sin librerías: `BlurText.astro` (palabra a palabra) y la clase `.reveal` + `data-reveal`. El estado oculto inicial solo se aplica con la clase `anim` en `<html>` (la pone un script en línea): sin JavaScript o con "reducir movimiento" todo se ve. Nunca ocultes contenido con CSS sin esa condición.
+- `[hidden]` siempre oculta (`display:none !important`). No lo quites: el panel de "Solicitud recibida" depende de ello.
+- Vídeos de fondo opcionales por taller en `workshop_sites.theme` (`heroVideo`, `servicesVideo`, solo `https`). `FadingVideo.astro` no los descarga sin JavaScript, con "reducir movimiento" o con ahorro de datos; entonces se ve el fondo animado. Una web real debe usar vídeos propios o con licencia.
 - React solo cuando una pantalla lo necesite de verdad (todavía no se usa).
 - Variables de entorno: `apps/web/.env` en local (plantilla en `.env.example`); en producción, secretos de Cloudflare.
 

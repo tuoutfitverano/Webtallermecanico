@@ -17,7 +17,7 @@ Cada fase termina con algo que funciona y se ha probado. No se empieza una fase 
 
 ## ✅ Fase 2 · Web del taller funcional y backend de solicitudes
 
-- Web pública del taller en Astro con el diseño de la demo, resuelta por dominio (multiempresa).
+- Web pública del taller en Astro, resuelta por dominio (multiempresa). Rediseño con estética "cristal líquido" (fondo negro, titulares en serif cursiva, animaciones de desenfoque y vídeo de fondo opcional por taller).
 - Formularios **reales** de cita, presupuesto y contacto: validación compartida navegador/servidor,
   errores claros, indicador de envío, éxito solo tras guardar, sin envíos duplicados.
 - Endpoint `POST /api/solicitudes` con comprobación de origen, campo trampa, Cloudflare Turnstile

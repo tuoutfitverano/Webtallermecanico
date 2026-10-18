@@ -1,25 +1,47 @@
 ---
 import Icon from './Icon.astro';
+import BlurText from './BlurText.astro';
+import FadingVideo from './FadingVideo.astro';
 import type { PublicSite } from '../lib/site/content.ts';
 interface Props { site: PublicSite }
 const { site } = Astro.props;
 const { services, brands } = site.content;
+
+// Icono según el servicio; los que no están en la lista llevan la llave.
+const ICON_FOR: Record<string, 'gauge' | 'chip' | 'disc' | 'tire' | 'cog' | 'alert'> = {
+  mantenimiento: 'gauge',
+  diagnosis: 'chip',
+  frenos: 'disc',
+  neumaticos: 'tire',
+  distribucion: 'cog',
+  embrague: 'disc',
+  averias: 'alert',
+};
 ---
 {services.length > 0 && (
-  <section class="section" id="servicios">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="kicker">Servicios</span>
-        <h2>Lo que hacemos por tu coche</h2>
-        {brands && <p>Trabajamos con {brands.toLowerCase()}.</p>}
-      </div>
-      <div class="services">
-        {services.map(s => (
-          <article class="service card">
-            <span class="ico-box"><Icon name="wrench" /></span>
-            <h3>{s.name}</h3>
-            {s.description && <p>{s.description}</p>}
-            <a class="service-link" href="#solicitar" data-service={s.id}>Pedir cita para este servicio <Icon name="arrow" /></a>
+  <section class="capabilities" id="servicios">
+    <div class="ambient ambient-alt" aria-hidden="true"></div>
+    {site.videos.services && <FadingVideo src={site.videos.services} class="cover-video" />}
+    <div class="section-shade" aria-hidden="true"></div>
+
+    <div class="cap-inner">
+      <header class="cap-head">
+        <p class="label">// Servicios</p>
+        <BlurText as="h2" text="Tu coche, de principio a fin" class="display heading" />
+        {brands && <p class="cap-lead reveal" data-reveal>Trabajamos con {brands.toLowerCase()}.</p>}
+      </header>
+
+      <div class="cap-grid">
+        {services.map((s, i) => (
+          <article class="cap-card liquid-glass reveal" data-reveal style={`--d:${(i % 3) * 0.1}s`}>
+            <div class="cap-top">
+              <span class="ico-square liquid-glass"><Icon name={ICON_FOR[s.id] ?? 'wrench'} /></span>
+              <a class="tag liquid-glass" href="#solicitar" data-service={s.id} aria-label={`Pedir cita: ${s.name}`}>Pedir cita <Icon name="arrowUpRight" /></a>
+            </div>
+            <div class="cap-body">
+              <h3 class="heading">{s.name}</h3>
+              {s.description && <p>{s.description}</p>}
+            </div>
           </article>
         ))}
       </div>

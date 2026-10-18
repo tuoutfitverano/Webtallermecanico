@@ -1,0 +1,18 @@
+---
+/**
+ * Texto que aparece palabra a palabra con desenfoque al entrar en pantalla.
+ * Sin JavaScript (o con "reducir movimiento") se ve directamente.
+ */
+interface Props {
+  text: string;
+  as?: 'h1' | 'h2' | 'p';
+  class?: string;
+  /** Retraso inicial en segundos. */
+  delay?: number;
+}
+const { text, as: Tag = 'h1', class: cls = '', delay = 0 } = Astro.props;
+const words = text.split(' ').filter(Boolean);
+---
+<Tag class={`blur-text ${cls}`} data-reveal>
+  {words.map((w, i) => <span class="blur-word" style={`--i:${i};--d:${delay}s`}>{w}</span>)}
+</Tag>
