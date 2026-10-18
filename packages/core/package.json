@@ -1,0 +1,21 @@
+{
+  "name": "@talleres/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lógica de negocio compartida: matrículas, vehículos y validaciones.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Identidad visual base. Cada taller sobrescribe estos valores con su marca. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand: #e4572e;
+  --color-ink: #0e1726;
+}

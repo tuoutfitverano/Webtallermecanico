@@ -1,0 +1,33 @@
+---
+// Página provisional de la Fase 0: solo comprueba que todo el conjunto
+// (Astro + Tailwind + Cloudflare + paquete compartido) funciona junto.
+import '../styles/global.css';
+import { formatPlate } from '@talleres/core';
+
+export const prerender = false;
+
+const host = Astro.url.hostname;
+const ejemplo = formatPlate('1950bxf');
+---
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Plataforma talleres · en construcción</title>
+  </head>
+  <body class="min-h-dvh bg-slate-50 text-ink antialiased">
+    <main class="mx-auto max-w-xl px-4 py-16">
+      <p class="text-sm font-semibold uppercase tracking-widest text-brand">Fase 0 · Cimientos</p>
+      <h1 class="mt-3 text-3xl font-bold tracking-tight">Plataforma para talleres en construcción</h1>
+      <p class="mt-4 text-slate-600">
+        Esta página se ha generado en el servidor para el dominio
+        <code class="rounded bg-white px-1.5 py-0.5 ring-1 ring-slate-200" data-testid="host">{host}</code>.
+      </p>
+      <p class="mt-2 text-slate-600">
+        Matrícula de ejemplo formateada por el paquete compartido:
+        <strong data-testid="plate">{ejemplo}</strong>
+      </p>
+    </main>
+  </body>
+</html>

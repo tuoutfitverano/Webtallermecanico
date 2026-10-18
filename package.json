@@ -1,0 +1,23 @@
+{
+  "name": "plataforma-talleres",
+  "private": true,
+  "description": "Plataforma multiempresa para talleres mecánicos: webs comerciales y gestión de vehículos y reparaciones.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @talleres/web",
+    "build": "npm run build --workspace @talleres/web",
+    "check": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:db": "bash scripts/test-db.sh"
+  },
+  "devDependencies": {
+    "supabase": "^2.121.0"
+  }
+}
