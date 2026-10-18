@@ -162,6 +162,7 @@ repair_order_events.customer_message ── mensajes en el historial que ve el c
 - Se reconocen los formatos españoles: actual, provincial antiguo (con su provincia), ciclomotor, remolque, especial e histórico. Una matrícula con otro formato (extranjera, diplomática…) solo se acepta si el usuario lo confirma.
 - No se corrigen letras automáticamente (por ejemplo, O por 0): podría convertir una matrícula en otra distinta.
 - El año es opcional y, si se indica, hay que decir si es de **fabricación** o de **primera matriculación**. No se inventa.
+- **Consulta por matrícula (Fase 6)**: opcional, desde el servidor, con un proveedor contratado. Ver `docs/CONSULTA_MATRICULAS.md`. El resultado queda en `vehicle_lookups` (por taller); el vehículo enlaza la consulta (`lookup_id`) y la base de datos anota campo a campo si el dato se confirmó o se cambió (`lookup_fields`).
 - `data_source` (de dónde salen los datos) y `verification_status` (si se han comprobado) **no los decide el formulario**: por defecto son "manual" y "pendiente". Solo el sistema puede marcar "proveedor externo" y solo un gestor puede verificar (queda registrado quién y cuándo).
 
 ## 9. Pruebas

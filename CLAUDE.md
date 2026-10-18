@@ -9,6 +9,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Arquitectura y decisiones: `docs/ARQUITECTURA.md`
 - Plan por fases y estado: `docs/ROADMAP.md`
 - Navegador para Claude (Playwright MCP): `docs/PLAYWRIGHT_MCP.md`
+- Consulta por matrícula (proveedor, costes, activación): `docs/CONSULTA_MATRICULAS.md`
 
 ## Estructura
 
@@ -32,6 +33,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/lib/server/portal.ts Contexto del portal: sesión y fichas vinculadas (portal_profile)
   src/layouts/PortalLayout, src/components/portal/  Plantilla y piezas del portal del cliente
   src/lib/panel/          Formatos de fecha (Europe/Madrid) y lectura del formulario de vehículos
+  src/lib/vehicle-lookup/ Consulta por matrícula: tipos, cliente de Openapi, lógica (service) y revisión — solo servidor
   src/components/panel/   Piezas del panel (estado, avisos, campos de cliente y vehículo)
   src/styles/panel.css    Estilos del panel (más denso y opaco que la web pública)
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
@@ -54,7 +56,7 @@ npm run dev          # web en http://localhost:4321 (sin .env usa la demo local)
 npm run lint         # ESLint
 npm run check        # tipos (tsc + astro check)
 npm test             # pruebas unitarias (Vitest) de core y web
-npm run build        # compilación para Cloudflare
+npm run build        # compilación para Cloudflare + comprobación de que el navegador no recibe secretos
 npm run test:db      # migraciones + permisos RLS en PostgreSQL local
 npm run test:e2e     # navegador → web → Supabase Auth real + PostgREST → PostgreSQL con RLS
 npm run test:mcp     # comprueba el servidor Playwright MCP
@@ -71,7 +73,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 3. **Validación doble.** Las reglas viven en `packages/core` y se usan en el navegador (avisar) y en el servidor (decidir). La base de datos vuelve a comprobar lo esencial.
 4. **Éxito solo si se ha guardado.** Un formulario solo muestra "recibido" cuando el servidor responde `ok` tras guardar. Sin almacenamiento configurado, responde error 503: nunca se simula un envío.
 5. **Una cita solicitada no es una cita confirmada.** Las solicitudes nacen con `status = 'nueva'` (pendiente) y los textos lo dicen.
-6. **No inventar datos.** Ni reseñas, precios, años de experiencia, certificaciones, textos legales ni datos de vehículos. Las matrículas no se consultan en servicios externos. El contenido de demostración se marca como tal (`is_demo_content`).
+6. **No inventar datos.** Ni reseñas, precios, años de experiencia, certificaciones, textos legales ni datos de vehículos. Las matrículas solo se consultan en el proveedor contratado, desde el servidor y cuando la persona pulsa «Consultar datos» (ver Fase 6); nunca se rellena un dato que el proveedor no haya devuelto. El contenido de demostración se marca como tal (`is_demo_content`).
 7. **Datos personales mínimos.** No se guarda el IP (solo una huella HMAC diaria que se borra a los 2 días). Los registros (`console.*`) llevan solo códigos de evento, nunca datos del formulario.
 8. **Migraciones.** Cambios de esquema = nueva migración en `supabase/migrations/` + pruebas en `supabase/tests/`. Revoca `execute` de `public` en cada función nueva y concede solo lo necesario. Las funciones `security definer` llevan `set search_path = ''`.
 9. **Acciones con consecuencias** (borrar datos, migraciones en producción, despliegues, rotar claves): explica el riesgo y pide confirmación antes.
@@ -120,6 +122,15 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Solo gestores cambian `customer_notes` y `show_details_to_customer` (lo impone `repair_orders_guard`).
 - Tras iniciar sesión se va a `/mi-area` (personal → `/panel`, cliente → `/portal`, resto → `/cuenta`). Un cliente en `/panel` ve `acceso-denegado` (403).
 - Los valores nuevos de un enum no se pueden usar en la misma transacción que los crea: compara `kind::text`.
+
+## Consulta por matrícula (Fase 6)
+
+- Proveedor detrás de la interfaz `VehicleLookupProvider` (`src/lib/vehicle-lookup/types.ts`); hoy, Openapi «Spanish Car Check» (`openapi.ts`). Cambiar de proveedor = otro archivo como ese + `vehicleLookupProvider()` en `config.ts`.
+- Sin `VEHICLE_LOOKUP_PROVIDER` + token + `SUPABASE_SECRET_KEY` el botón no aparece y todo es manual. El token solo se lee en `config.ts`.
+- Permisos y límites en la base de datos (`start_vehicle_lookup`, token del usuario). El resultado lo guarda SOLO el servidor (`complete_vehicle_lookup`, clave secreta): nadie puede fabricar datos "del proveedor".
+- La consulta no crea el vehículo. Lo escrito a mano no se sustituye sin marcarlo. Al guardar con `lookup_id`, la base de datos calcula `lookup_fields` (confirmado/modificado/no_usado) y el origen.
+- Respuestas reutilizables solo dentro del mismo taller (24 h). Nunca compartas resultados entre talleres.
+- En pruebas e2e el proveedor es SIMULADO (`scripts/e2e/plate-provider-mock.mjs`); no presentes esas pruebas como consultas reales.
 
 ## Formularios y solicitudes (Fase 2)
 

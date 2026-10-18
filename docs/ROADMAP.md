@@ -74,19 +74,23 @@ y administración de la plataforma, avisos/notificaciones.
 
 Pendiente: envío automático del enlace de invitación por correo (hoy se copia y se comparte a mano).
 
-## Fase 6 · Notificaciones y automatizaciones
+## ✅ Fase 6 · Datos de vehículos por matrícula (pendiente de contrato con el proveedor)
+
+- «Consultar datos» en el alta de vehículos, con proveedor intercambiable (hoy Openapi «Spanish Car Check»).
+- Revisión antes de usar los datos; nada se guarda sin «Guardar vehículo»; lo escrito a mano no se pisa sin marcarlo.
+- Registro de cada consulta, procedencia campo a campo, límites por persona y por taller, reutilización sin coste dentro del taller.
+- Pruebas: 368 comprobaciones SQL, 26 unitarias nuevas y 5 de navegador con proveedor **simulado**.
+- Pendiente: contratar Openapi, revisar sus términos, confirmar los campos con una consulta de prueba y configurar el token (`docs/CONSULTA_MATRICULAS.md`).
+
+## Fase 7 · Notificaciones y automatizaciones
 
 - Correo transaccional (confirmación de solicitud al cliente, aviso al taller, invitaciones), cambios de estado, recordatorios.
 - WhatsApp Business (plantillas aprobadas) cuando haya volumen.
 
-## Fase 7 · Administración de la plataforma y SEO
+## Fase 8 · Administración de la plataforma y SEO
 
 - Panel de alta de talleres, dominios personalizados (Cloudflare for SaaS), publicación y suspensión.
 - Páginas por servicio para SEO local, datos estructurados `AutoRepair`, sitemap, banner de cookies si se usan cookies no esenciales.
-
-## Fase 8 · Integraciones de datos de vehículos
-
-- Consultas a proveedores externos desde el servidor, con registro de origen y verificación.
 
 ## Fuera de alcance (por ahora)
 

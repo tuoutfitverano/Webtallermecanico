@@ -1,14 +1,26 @@
 ---
-/** Registrar un vehículo (datos manuales). La matrícula se normaliza y no se repite en el taller. */
+/**
+ * Registrar un vehículo. Datos manuales o, si hay un proveedor contratado,
+ * consulta por matrícula:
+ *   consultar → el servidor consulta y muestra lo que devolvió el proveedor
+ *   aplicar   → pasa al formulario SOLO los datos marcados (sin pisar lo escrito a mano)
+ *   guardar   → crea el vehículo (con la consulta enlazada, si se usó)
+ * La consulta nunca crea el vehículo por sí sola.
+ */
 import PanelLayout from '../../../layouts/PanelLayout.astro';
 import Icon from '../../../components/Icon.astro';
 import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import VehicleFields from '../../../components/panel/VehicleFields.astro';
-import { isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { vehicleLookupAvailable, vehicleLookupDeps } from '../../../lib/server/config.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
-import { readVehicleForm } from '../../../lib/panel/vehicle-form.ts';
+import { readVehicleForm, VEHICLE_FIELDS } from '../../../lib/panel/vehicle-form.ts';
+import { lookupVehicle, type LookupView } from '../../../lib/vehicle-lookup/service.ts';
+import { APPLICABLE_FIELDS, applyLookup } from '../../../lib/vehicle-lookup/review.ts';
+import type { VehicleData } from '../../../lib/vehicle-lookup/types.ts';
+import { normalizePlate } from '@talleres/core';
 
 export const prerender = false;
 
@@ -19,32 +31,76 @@ const preCustomer = Astro.url.searchParams.get('cliente');
 let values: Record<string, string> = { customer_id: isUuid(preCustomer) ? preCustomer : '' };
 let errors: Partial<Record<string, string>> = {};
 let error = '';
+let notice = '';
 let askPlate = false;
 let existing: { id: string } | null = null;
+let lookupResult: LookupView | null = null;
+let appliedFrom: string | null = null;
 
 if (panel.form && panel.workshop) {
-  const r = readVehicleForm(panel.form);
-  values = r.values;
-  if (!r.ok) {
-    errors = r.errors;
-    askPlate = r.needsPlateConfirmation;
-    error = 'Revisa los campos marcados.';
-    Astro.response.status = 422;
-  } else {
-    const { data, error: e } = await panel.supabase.from('vehicles')
-      .insert({ workshop_id: panel.workshop.id, ...r.row })
-      .select('id').single();
-    if (!e && data) return Astro.redirect(`/panel/vehiculos/${data.id}?creado=1`, 303);
-    logAuth('panel_vehicle_create_error', e?.code);
-    Astro.response.status = 400;
-    if (e?.code === '23505') {
-      const found = await panel.supabase.from('vehicles').select('id').eq('workshop_id', panel.workshop.id).eq('plate', r.row.plate).maybeSingle();
-      existing = found.data;
-      error = 'Ya hay un vehículo con esa matrícula en tu taller.';
-    } else if (e?.code === '23503') {
-      error = 'El cliente elegido no existe en tu taller.';
+  const form = panel.form;
+  const action = field(form, 'action') || 'guardar';
+  for (const k of VEHICLE_FIELDS) values[k] = field(form, k);
+  const linked = field(form, 'lookup_id');
+  appliedFrom = isUuid(linked) ? linked : null;
+
+  if (action === 'consultar') {
+    const key = field(form, 'lookup_key');
+    lookupResult = await lookupVehicle(vehicleLookupDeps(panel.supabase), {
+      workshopId: panel.workshop.id,
+      plate: values.plate ?? '',
+      allowNonStandard: field(form, 'confirm_plate') === 'on',
+      requestKey: isUuid(key) ? key : crypto.randomUUID(),
+    });
+    askPlate = !lookupResult.ok && lookupResult.code === 'confirmar_matricula';
+    // Una consulta nueva sustituye a la que se hubiera aplicado antes.
+    if (lookupResult.ok) appliedFrom = null;
+  } else if (action === 'aplicar') {
+    const candidate = field(form, 'lookup_candidate');
+    // Se vuelve a leer de la base de datos (RLS: solo consultas de este taller); el navegador no aporta datos.
+    const { data: row } = isUuid(candidate)
+      ? await panel.supabase.from('vehicle_lookups').select('id, plate, status, result').eq('id', candidate).eq('workshop_id', panel.workshop.id).maybeSingle()
+      : { data: null };
+    if (!row || row.status !== 'encontrado' || !row.result) {
+      error = 'La consulta ya no está disponible. Vuelve a pulsar «Consultar datos».';
+    } else if (row.plate !== normalizePlate(values.plate ?? '')) {
+      error = 'Has cambiado la matrícula después de consultarla. Vuelve a pulsar «Consultar datos».';
     } else {
-      error = dbErrorMessage(e);
+      const chosen = new Set(APPLICABLE_FIELDS.filter(f => field(form, `usar_${f}`) === '1'));
+      values = applyLookup(row.result as VehicleData, values, chosen);
+      appliedFrom = row.id;
+      notice = chosen.size
+        ? 'Datos del proveedor pasados al formulario. Revísalos y pulsa «Guardar vehículo».'
+        : 'No has marcado ningún dato: el formulario sigue como estaba. Al guardar se anotará la consulta como revisada.';
+    }
+  } else {
+    const r = readVehicleForm(form);
+    values = { ...r.values };
+    if (!r.ok) {
+      errors = r.errors;
+      askPlate = r.needsPlateConfirmation;
+      error = 'Revisa los campos marcados.';
+      Astro.response.status = 422;
+    } else {
+      const { data, error: e } = await panel.supabase.from('vehicles')
+        .insert({ workshop_id: panel.workshop.id, ...r.row, lookup_id: appliedFrom })
+        .select('id').single();
+      if (!e && data) return Astro.redirect(`/panel/vehiculos/${data.id}?creado=1`, 303);
+      logAuth('panel_vehicle_create_error', e?.code);
+      Astro.response.status = 400;
+      if (e?.code === '23505') {
+        const found = await panel.supabase.from('vehicles').select('id').eq('workshop_id', panel.workshop.id).eq('plate', r.row.plate).maybeSingle();
+        existing = found.data;
+        error = 'Ya hay un vehículo con esa matrícula en tu taller.';
+      } else if (e?.code === '23503') {
+        error = 'El cliente elegido no existe en tu taller.';
+      } else if (e?.code === '22023' && appliedFrom) {
+        // La consulta no es de esta matrícula o ha caducado: se puede guardar como datos manuales.
+        appliedFrom = null;
+        error = 'Los datos consultados no corresponden a esta matrícula o han caducado. Vuelve a consultar, o pulsa «Guardar vehículo» para guardarlos como datos manuales.';
+      } else {
+        error = dbErrorMessage(e);
+      }
     }
   }
 }
@@ -52,6 +108,7 @@ if (panel.form && panel.workshop) {
 const { data: customers } = panel.workshop
   ? await panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 })
   : { data: [] };
+const lookup = { available: vehicleLookupAvailable(), key: crypto.randomUUID(), result: lookupResult, appliedFrom };
 ---
 <PanelLayout panel={panel} title="Registrar vehículo" section="vehiculos">
   <a class="pnl-back" href="/panel/vehiculos"><Icon name="arrow" />Vehículos</a>
@@ -59,9 +116,12 @@ const { data: customers } = panel.workshop
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
     <section class="card">
       <Flash kind="bad" text={error}>{existing && <> <a href={`/panel/vehiculos/${existing.id}`}>Ver el vehículo existente</a>.</>}</Flash>
+      <Flash kind="ok" text={notice} />
       <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
-        <VehicleFields values={values} errors={errors} customers={(customers ?? []) as Array<{ id: string; full_name: string; phone: string | null }>} askPlateConfirmation={askPlate} />
-        <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar vehículo</span></button>
+        {/* Botón por defecto: pulsar Intro en cualquier campo guarda (no lanza una consulta de pago). */}
+        <button class="sr-only" type="submit" name="action" value="guardar" tabindex="-1" aria-hidden="true">Guardar</button>
+        <VehicleFields values={values} errors={errors} customers={(customers ?? []) as Array<{ id: string; full_name: string; phone: string | null }>} askPlateConfirmation={askPlate} lookup={lookup} />
+        <button class="btn btn-primary" type="submit" name="action" value="guardar"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar vehículo</span></button>
       </form>
       {(customers ?? []).length === 0 && <p class="hint" style="margin-top:12px">Todavía no hay clientes: puedes registrar el vehículo sin cliente y asignarlo después, o <a href="/panel/clientes/nuevo">añadir antes el cliente</a>.</p>}
     </section>

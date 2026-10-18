@@ -16,7 +16,13 @@ import {
   type DataSource, type FuelType, type RepairStatus, type VerificationStatus, type YearKind,
 } from '@talleres/core';
 
+import { LOOKUP_FIELD_LABELS } from '../../../lib/vehicle-lookup/review.ts';
+import type { VehicleData } from '../../../lib/vehicle-lookup/types.ts';
+
 export const prerender = false;
+
+const PROVIDER_NAMES: Record<string, string> = { openapi: 'Openapi (Spanish Car Check)' };
+const FIELD_STATE_LABELS = { confirmado: 'tal como lo dio el proveedor', modificado: 'cambiado a mano', no_usado: 'no se usó' } as const;
 
 const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
@@ -26,6 +32,8 @@ interface Vehicle {
   id: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null;
   customer_id: string | null; internal_notes: string | null; data_source: DataSource; verification_status: VerificationStatus; created_at: string;
   customers: { id: string; full_name: string } | null;
+  lookup_fields: Record<string, { value: string | number; state: 'confirmado' | 'modificado' | 'no_usado' }> | null;
+  vehicle_lookups: { provider: string; completed_at: string; result: VehicleData } | null;
 }
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creado') === '1' ? 'Vehículo registrado.' : '' };
 let errors: Partial<Record<string, string>> = {};
@@ -75,7 +83,7 @@ let customers: Array<{ id: string; full_name: string; phone: string | null }> = 
 if (panel.workshop && isUuid(id)) {
   const [v, o, c] = await Promise.all([
     panel.supabase.from('vehicles')
-      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, customers(id, full_name)')
+      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, customers(id, full_name), lookup_fields, vehicle_lookups(provider, completed_at, result)')
       .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
     panel.supabase.from('repair_orders').select('id, number, status, received_at, problem_description')
       .eq('vehicle_id', id).eq('workshop_id', panel.workshop.id).order('received_at', { ascending: false }).limit(50),
@@ -118,6 +126,20 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
               {vehicle.internal_notes && <><dt>Notas internas</dt><dd class="note-internal">{vehicle.internal_notes}</dd></>}
             </dl>
           </section>
+          {vehicle.vehicle_lookups && (
+            <section class="card" aria-labelledby="consulta">
+              <h2 id="consulta" class="card-title"><Icon name="search" />Datos de la consulta por matrícula</h2>
+              <p class="hint">Fuente: {PROVIDER_NAMES[vehicle.vehicle_lookups.provider] ?? vehicle.vehicle_lookups.provider} · consultado el {formatDateTime(vehicle.vehicle_lookups.completed_at)}</p>
+              <dl class="facts">
+                {Object.entries(vehicle.lookup_fields ?? {}).map(([f, info]) => (
+                  <><dt>{LOOKUP_FIELD_LABELS[f as keyof VehicleData] ?? f}</dt><dd>{f === 'fuel' ? FUEL_LABELS[info.value as FuelType] ?? info.value : info.value} · <span class:list={['muted', 'small']}>{FIELD_STATE_LABELS[info.state]}</span></dd></>
+                ))}
+                {(['version', 'power_cv', 'engine_cc', 'vin'] as const).filter(f => vehicle!.vehicle_lookups!.result[f] !== undefined).map(f => (
+                  <><dt>{LOOKUP_FIELD_LABELS[f]}</dt><dd>{vehicle!.vehicle_lookups!.result[f]}{f === 'power_cv' ? ' CV' : f === 'engine_cc' ? ' cm³' : ''}</dd></>
+                ))}
+              </dl>
+            </section>
+          )}
           <section class="card" aria-labelledby="hist">
             <h2 id="hist" class="card-title"><Icon name="history" />Historial de reparaciones</h2>
             {orders.length === 0 ? <p class="hint">{panel.isManager ? 'Sin reparaciones registradas.' : 'Sin reparaciones asignadas a ti para este vehículo.'}</p> : (

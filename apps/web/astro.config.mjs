@@ -28,6 +28,11 @@ export default defineConfig({
       REQUEST_HASH_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
       // Dominio del área privada (acceso, cuenta, invitaciones). Ver docs/PUESTA_EN_MARCHA.md.
       APP_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Consulta de datos por matrícula (Fase 6). Ver docs/CONSULTA_MATRICULAS.md.
+      VEHICLE_LOOKUP_PROVIDER: envField.string({ context: 'server', access: 'secret', optional: true }),
+      OPENAPI_AUTOMOTIVE_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
+      OPENAPI_AUTOMOTIVE_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
+      VEHICLE_LOOKUP_TIMEOUT_MS: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
     validateSecrets: false,
   },

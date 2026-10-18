@@ -217,3 +217,10 @@ a.vcard:hover { border-color: var(--p-line-2); }
   .steps-bar li { flex-direction: row; align-items: center; }
   .steps-bar .steps-dot { width: 22px; flex: none; }
 }
+
+/* ---------- Consulta por matrícula (Fase 6) ---------- */
+.lookup-review { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--p-line-2); border-radius: 14px; background: rgb(255 255 255 / .03); }
+.lookup-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lookup-info { font-size: .875rem; color: var(--fg-90); }
+.lookup-conflict { color: #fde68a; }
+.lookup-review .btn { align-self: flex-start; }

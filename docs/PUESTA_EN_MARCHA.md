@@ -33,6 +33,7 @@ Las migraciones se aplican en orden y **ninguna borra datos**:
 | `20261019090000_cuentas_equipos_invitaciones.sql` | Logotipo y contacto del taller, invitaciones, gestión del equipo, alta controlada |
 | `20261020090000_ordenes_reparacion.sql` | Órdenes de reparación, historial de cambios, búsquedas y resumen del panel |
 | `20261021090000_portal_clientes.sql` | Portal del cliente: invitaciones de clientes, mensaje para el cliente, funciones `portal_*` |
+| `20261022090000_consultas_matricula.sql` | Consultas de matrícula a un proveedor externo, límites y procedencia de los datos |
 
 `db push` modifica la base de datos de producción. Solo aplica las migraciones que falten.
 
@@ -136,6 +137,10 @@ Los privilegios de administrador **solo funcionan con 2FA** (sesión `aal2`); si
 4. Para quitarle el acceso: ficha del cliente → **Retirar el acceso…**. La ficha y las reparaciones se conservan.
 
 En cada orden decides qué ve el cliente: el **mensaje para el cliente** y la casilla **"Mostrar la diagnosis y el trabajo realizado"**. Las notas internas nunca se le muestran.
+
+### Consulta de datos por matrícula (opcional)
+
+Desactivada mientras no haya proveedor contratado: el alta de vehículos es manual. Para activarla, sigue `docs/CONSULTA_MATRICULAS.md` §7 (cuenta en Openapi, términos, prueba con su entorno de pruebas y variables `VEHICLE_LOOKUP_PROVIDER` y `OPENAPI_AUTOMOTIVE_TOKEN` como *Secret* en Cloudflare). Cada consulta nueva tiene coste.
 
 ## 7. Publicar en Cloudflare
 

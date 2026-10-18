@@ -1,0 +1,50 @@
+---
+/**
+ * Resultado de la consulta por matrícula, para revisar ANTES de usarlo.
+ * Va dentro del formulario de vehículo: "Usar los datos marcados" solo
+ * rellena el formulario; el vehículo se guarda después con "Guardar".
+ */
+import Icon from '../Icon.astro';
+import { formatDateTime } from '../../lib/panel/format.ts';
+import { reviewRows } from '../../lib/vehicle-lookup/review.ts';
+import type { LookupView } from '../../lib/vehicle-lookup/service.ts';
+import { formatPlate } from '@talleres/core';
+
+interface Props { lookup: LookupView; values: Record<string, string> }
+const { lookup, values } = Astro.props;
+const rows = lookup.ok ? reviewRows(lookup.data, values) : [];
+const conflicts = rows.filter(r => r.conflict).length;
+---
+{lookup.ok ? (
+  <section class="lookup-review" aria-labelledby="lookup-title">
+    <input type="hidden" name="lookup_candidate" value={lookup.lookupId} />
+    <h2 id="lookup-title" class="card-title"><Icon name="search" />Datos devueltos para {formatPlate(lookup.plate)}</h2>
+    <p class="hint">
+      Fuente: <strong>{lookup.providerName}</strong> · consultado el {formatDateTime(lookup.consultedAt)}
+      {lookup.reused && <> · <span>reutilizada una consulta reciente de tu taller (sin nuevo coste)</span></>}
+    </p>
+    <ul class="lookup-rows">
+      {rows.map(r => (
+        <li>
+          {r.applicable ? (
+            <label class="check">
+              <input type="checkbox" name={`usar_${r.field}`} value="1" checked={r.checked} />
+              <span><strong>{r.label}:</strong> {r.shown}
+                {r.conflict && <span class="lookup-conflict"> · Has escrito «{r.conflict}». Márcalo solo si quieres sustituirlo.</span>}
+              </span>
+            </label>
+          ) : (
+            <span class="lookup-info"><strong>{r.label}:</strong> {r.shown} <span class="muted small">(se guarda con la consulta)</span></span>
+          )}
+        </li>
+      ))}
+    </ul>
+    {conflicts > 0 && <p class="hint">{conflicts === 1 ? 'Hay un dato que no coincide' : `Hay ${conflicts} datos que no coinciden`} con lo que has escrito: se mantiene lo tuyo salvo que lo marques.</p>}
+    <p class="hint">Los datos del proveedor pueden contener errores: compruébalos con la documentación del vehículo. Lo que no aparece aquí no lo ha devuelto el proveedor y no se rellena.</p>
+    <button class="btn" type="submit" name="action" value="aplicar" formnovalidate><Icon name="check" />Usar los datos marcados</button>
+  </section>
+) : (
+  <div class={`alert ${lookup.code === 'no_encontrado' || lookup.code === 'confirmar_matricula' || lookup.code === 'matricula' ? 'alert-warn' : 'alert-bad'}`} role="alert">
+    <Icon name="alert" /><span>{lookup.message}</span>
+  </div>
+)}

@@ -22,6 +22,8 @@ PROXY_PORT=54329
 AUTH_PORT=9998
 SMTP_PORT=2525
 MAIL_PORT=2580
+PLATE_PORT=4998
+PLATE_TOKEN="token-simulado-solo-para-pruebas"
 TEST_PASSWORD="Clave-de-prueba-1"   # cumple las reglas de supabase/config.toml
 POSTGREST_VERSION=v13.0.7
 JWT_SECRET="secreto-solo-para-pruebas-e2e-0123456789abcdef"
@@ -73,12 +75,14 @@ SQL
 
 # --- Buzón de correo de pruebas + Supabase Auth ---
 # Si quedó un servidor de una ejecución anterior, las pruebas hablarían con él.
-for port in $AUTH_PORT $SMTP_PORT $MAIL_PORT $PROXY_PORT $PGRST_PORT; do
+for port in $AUTH_PORT $SMTP_PORT $MAIL_PORT $PROXY_PORT $PGRST_PORT $PLATE_PORT; do
   if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
     echo "✘ El puerto $port ya está en uso (¿quedó una prueba anterior abierta?). Ciérrala y repite." >&2; exit 1
   fi
 done
 node "$ROOT/scripts/e2e/mail-sink.mjs" $SMTP_PORT $MAIL_PORT "$ROOT/supabase/templates" & pids+=($!)
+# Proveedor de matrículas SIMULADO (nunca se llama al real en las pruebas).
+node "$ROOT/scripts/e2e/plate-provider-mock.mjs" $PLATE_PORT "$PLATE_TOKEN" & pids+=($!)
 SITE="http://demo.localhost:$WEB_PORT"
 (cd "$ROOT/.cache/auth" && \
   GOTRUE_DB_DRIVER=postgres DATABASE_URL="$(auth_db_url "$DB")" GOTRUE_DB_MIGRATIONS_PATH=./migrations \
@@ -146,6 +150,8 @@ echo "▸ Arrancando la web"
 (cd "$ROOT/apps/web" && \
   SUPABASE_URL="http://127.0.0.1:$PROXY_PORT" SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" SUPABASE_SECRET_KEY="$SERVICE_KEY" \
   REQUEST_HASH_SECRET="hash-de-pruebas" ASTRO_TELEMETRY_DISABLED=1 E2E=1 \
+  VEHICLE_LOOKUP_PROVIDER=openapi OPENAPI_AUTOMOTIVE_TOKEN="$PLATE_TOKEN" OPENAPI_AUTOMOTIVE_URL="http://127.0.0.1:$PLATE_PORT" \
+  VEHICLE_LOOKUP_TIMEOUT_MS=2000 \
   npx astro dev --port $WEB_PORT --host 127.0.0.1 --background >/dev/null 2>&1)
 ready=0
 for i in $(seq 1 60); do
@@ -170,5 +176,5 @@ echo "▸ Ejecutando pruebas de extremo a extremo"
 cd "$ROOT/apps/web"
 E2E_BASE_URL="http://demo.localhost:$WEB_PORT" E2E_API_URL="http://127.0.0.1:$WEB_PORT" E2E_REST_URL="http://127.0.0.1:$PROXY_PORT/rest/v1" \
 E2E_PROXY_URL="http://127.0.0.1:$PROXY_PORT" E2E_ANON_KEY="$ANON_KEY" E2E_SERVICE_KEY="$SERVICE_KEY" \
-E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" E2E_VIDEO="$TEST_VIDEO" \
+E2E_PLATE_MOCK_URL="http://127.0.0.1:$PLATE_PORT" E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" E2E_VIDEO="$TEST_VIDEO" \
   npx playwright test "$@"

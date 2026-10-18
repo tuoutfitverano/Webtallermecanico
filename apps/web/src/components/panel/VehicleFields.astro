@@ -1,14 +1,22 @@
 ---
-/** Campos del formulario de vehículo (alta y edición). Sin consultas externas de matrículas. */
+/**
+ * Campos del formulario de vehículo (alta y edición).
+ * En el alta (prop `lookup`), junto a la matrícula aparece "Consultar datos"
+ * si hay un proveedor configurado; si no, se explica que hay que rellenarlo a mano.
+ */
 import { FUEL_LABELS, FUEL_TYPES, YEAR_KIND_LABELS, YEAR_KINDS } from '@talleres/core';
+import LookupReview from './LookupReview.astro';
+import type { LookupView } from '../../lib/vehicle-lookup/service.ts';
 interface Props {
   values: Record<string, string>;
   errors?: Partial<Record<string, string>>;
   customers: Array<{ id: string; full_name: string; phone: string | null }>;
   /** Mostrar la casilla de "matrícula no estándar" (cuando la validación lo pide). */
   askPlateConfirmation?: boolean;
+  /** Solo en el alta: consulta por matrícula. */
+  lookup?: { available: boolean; key: string; result: LookupView | null; appliedFrom: string | null };
 }
-const { values, errors = {}, customers, askPlateConfirmation = false } = Astro.props;
+const { values, errors = {}, customers, askPlateConfirmation = false, lookup } = Astro.props;
 const err = (k: string) => errors[k];
 ---
 <div class="form-row">
@@ -19,6 +27,17 @@ const err = (k: string) => errors[k];
     {askPlateConfirmation && (
       <label class="check"><input type="checkbox" name="confirm_plate" /><span>La matrícula es correcta aunque no tenga formato español (extranjera, histórica…).</span></label>
     )}
+    {lookup && (lookup.available ? (
+      <>
+        <input type="hidden" name="lookup_key" value={lookup.key} />
+        <button class="btn btn-sm" type="submit" name="action" value="consultar" formnovalidate data-busy-label="Consultando…">
+          <span class="spinner" aria-hidden="true"></span><span data-label>Consultar datos</span>
+        </button>
+        <p class="hint">Consulta la matrícula en el proveedor de datos contratado. No se guarda nada hasta que revises los datos y pulses «Guardar vehículo».</p>
+      </>
+    ) : (
+      <p class="hint" id="lookup-off">La consulta automática por matrícula no está disponible (no hay un proveedor de datos configurado). Introduce los datos a mano.</p>
+    ))}
   </div>
   <div class={`field ${err('customerId') ? 'has-error' : ''}`}>
     <label for="customer_id">Cliente</label>
@@ -29,6 +48,8 @@ const err = (k: string) => errors[k];
     {err('customerId') && <p class="field-error">{err('customerId')}</p>}
   </div>
 </div>
+{lookup?.result && <LookupReview lookup={lookup.result} values={values} />}
+{lookup?.appliedFrom && <input type="hidden" name="lookup_id" value={lookup.appliedFrom} />}
 <div class="form-row">
   <div class={`field ${err('make') ? 'has-error' : ''}`}>
     <label for="make">Marca</label>
@@ -68,4 +89,8 @@ const err = (k: string) => errors[k];
   <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="2000" rows="3">{values.internal_notes ?? ''}</textarea>
   {err('internalNotes') && <p class="field-error">{err('internalNotes')}</p>}
 </div>
-<p class="hint">Los datos se guardan como <strong>introducidos manualmente</strong> y con verificación externa <strong>pendiente</strong>. No se consulta la matrícula en ningún servicio externo.</p>
+{lookup?.appliedFrom ? (
+  <p class="hint">Se guardará de qué consulta salen los datos y, campo a campo, si los has dejado como los dio el proveedor o los has cambiado. La verificación queda <strong>pendiente</strong>.</p>
+) : (
+  <p class="hint">Los datos se guardan como <strong>introducidos manualmente</strong> y con verificación externa <strong>pendiente</strong>.{!lookup && ' No se consulta la matrícula en ningún servicio externo.'}</p>
+)}

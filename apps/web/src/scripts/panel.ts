@@ -20,7 +20,8 @@ function init() {
         button.disabled = true;
         button.classList.add('is-busy');
         const label = button.querySelector<HTMLElement>('[data-label]');
-        if (label && form.dataset.busy) label.textContent = form.dataset.busy;
+        const busy = button.dataset.busyLabel ?? form.dataset.busy;
+        if (label && busy) label.textContent = busy;
       }, 0);
     });
   }

@@ -12,14 +12,15 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace @talleres/web",
-    "build": "npm run build --workspace @talleres/web",
+    "build": "npm run build --workspace @talleres/web && node scripts/check-client-bundle.mjs",
     "check": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:db": "bash scripts/test-db.sh",
     "test:mcp": "node scripts/check-playwright-mcp.mjs",
     "mcp:playwright": "node scripts/playwright-mcp.mjs",
     "test:e2e": "bash scripts/test-e2e.sh",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:bundle": "node scripts/check-client-bundle.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
