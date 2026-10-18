@@ -393,6 +393,11 @@ p { margin: 0; }
    Fase 2 · Web del taller con formularios funcionales
    ========================================================= */
 .block { display: block; }
+.demo-bar { position: relative; z-index: 60; background: var(--dark); color: #cbd5e1; font-size: .8rem; }
+.demo-bar .wrap { display: flex; align-items: center; gap: 4px 14px; min-height: 40px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
+.demo-bar strong { color: #fff; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.demo-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, .2); animation: pulse 2s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); } }
 .demo-bar .wrap { justify-content: flex-start; }
 .demo-bar span { color: #cbd5e1; }
 
