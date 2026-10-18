@@ -1,0 +1,117 @@
+---
+/**
+ * Detalle de una reparación para el cliente: estado explicado en lenguaje
+ * sencillo, pasos, línea temporal (solo estados y mensajes para el cliente) e
+ * información autorizada por el taller. Nunca notas internas ni nombres del
+ * personal, y sin prometer fechas.
+ */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import StatusSteps from '../../../components/portal/StatusSteps.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { isUuid } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDateTime } from '../../../lib/panel/format.ts';
+import { formatPlate, orderLabel, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+const id = Astro.params.id ?? '';
+
+interface Order {
+  id: string; number: number; workshop_name: string; workshop_phone: string | null; vehicle_id: string; plate: string; make: string; model: string;
+  status: RepairStatus; received_at: string; last_update: string; delivered_at: string | null;
+  problem_description: string; customer_notes: string | null; diagnosis: string | null; work_done: string | null;
+}
+interface Step { happened_at: string; kind: 'creada' | 'estado' | 'mensaje'; status: RepairStatus | null; message: string | null }
+let order: Order | null = null;
+let timeline: Step[] = [];
+let error = false;
+if (portal.records.length > 0 && isUuid(id)) {
+  const [o, t] = await Promise.all([
+    portal.supabase.rpc('portal_order', { p_order_id: id }),
+    portal.supabase.rpc('portal_order_timeline', { p_order_id: id }),
+  ]);
+  if (o.error || t.error) { logAuth('portal_order_error', o.error?.code ?? t.error?.code); error = true; }
+  order = ((o.data ?? []) as Order[])[0] ?? null;
+  timeline = order ? ((t.data ?? []) as Step[]) : [];
+}
+if (portal.records.length > 0 && !order && !error) Astro.response.status = 404;
+const stepTitle = (s: Step) => s.kind === 'mensaje' ? 'Mensaje del taller' : s.kind === 'creada' ? `Vehículo registrado en el taller${s.status && s.status !== 'recibido' ? ` (${REPAIR_STATUS_LABELS[s.status]})` : ''}` : s.status ? REPAIR_STATUS_LABELS[s.status] : 'Actualización';
+---
+<PortalLayout portal={portal} title={order ? orderLabel(order.number) : 'Reparación'} section="reparaciones">
+  <a class="pnl-back" href="/portal/reparaciones"><Icon name="arrow" />Mis reparaciones</a>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : error ? (
+    <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>No hemos podido cargar la reparación. Recarga la página en unos minutos.</span></div>
+  ) : !order ? (
+    <div class="empty"><strong>Reparación no encontrada.</strong><span>No existe o no está a tu nombre.</span><a class="btn" href="/portal/reparaciones">Volver a mis reparaciones</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{orderLabel(order.number)} <StatusBadge status={order.status} /></h1>
+          <p class="pnl-sub"><a href={`/portal/vehiculos/${order.vehicle_id}`}><span class="plate">{formatPlate(order.plate)}</span></a> {order.make} {order.model} · {order.workshop_name}</p>
+        </div>
+      </header>
+
+      {order.status === 'listo' && (
+        <div class="ready" role="status">
+          <Icon name="check" />
+          <div><strong>Tu vehículo está listo para recoger</strong>{order.workshop_phone && <span>Si tienes dudas, llama al taller: {order.workshop_phone}</span>}</div>
+        </div>
+      )}
+
+      <section class="explain" aria-labelledby="ahora">
+        <h2 id="ahora" class="card-title">Qué está pasando</h2>
+        <p>{REPAIR_STATUS_CUSTOMER_TEXT[order.status]}</p>
+        <StatusSteps status={order.status} />
+      </section>
+
+      <div class="grid-2" style="margin-top:16px">
+        <div class="stack">
+          {order.customer_notes && (
+            <section class="card" aria-labelledby="msg">
+              <h2 id="msg" class="card-title"><Icon name="chat" />Último mensaje del taller</h2>
+              <p class="message">{order.customer_notes}</p>
+            </section>
+          )}
+          <section class="card" aria-labelledby="info">
+            <h2 id="info" class="card-title"><Icon name="clipboard" />Tu reparación</h2>
+            <dl class="facts">
+              <dt>Motivo</dt><dd>{order.problem_description}</dd>
+              {order.diagnosis && <><dt>Diagnosis</dt><dd>{order.diagnosis}</dd></>}
+              {order.work_done && <><dt>Trabajo realizado</dt><dd>{order.work_done}</dd></>}
+              <dt>Recibido</dt><dd>{formatDateTime(order.received_at)}</dd>
+              <dt>Última novedad</dt><dd>{formatDateTime(order.last_update)}</dd>
+              {order.delivered_at && <><dt>Entregado</dt><dd>{formatDateTime(order.delivered_at)}</dd></>}
+              <dt>Taller</dt><dd>{order.workshop_name}{order.workshop_phone && <> · {order.workshop_phone}</>}</dd>
+            </dl>
+            {!order.diagnosis && !order.work_done && <p class="hint" style="margin-top:12px">Cuando el taller comparta la diagnosis o el trabajo realizado, aparecerán aquí.</p>}
+          </section>
+        </div>
+        <section class="card" aria-labelledby="hist">
+          <h2 id="hist" class="card-title"><Icon name="history" />Historial</h2>
+          {timeline.length === 0 ? <p class="hint">Todavía no hay novedades.</p> : (
+            <ol class="timeline">
+              {timeline.map(s => (
+                <li>
+                  <span class="dot" aria-hidden="true"></span>
+                  <span>
+                    <strong>{stepTitle(s)}</strong><br />
+                    <span class="when">{formatDateTime(s.happened_at)}</span>
+                    {s.message && <p class="message" style="margin-top:6px">{s.message}</p>}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p class="hint" style="margin-top:12px">El taller no indica plazos aquí salvo que te los confirme expresamente.</p>
+        </section>
+      </div>
+    </>
+  )}
+</PortalLayout>

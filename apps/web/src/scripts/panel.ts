@@ -39,6 +39,22 @@ function init() {
     select.dataset.ready = '1';
     select.addEventListener('change', () => select.form?.requestSubmit());
   }
+  // Botón "Copiar" de los enlaces de invitación (si el navegador no deja, se selecciona el texto).
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+    if (btn.dataset.ready) continue;
+    btn.dataset.ready = '1';
+    btn.addEventListener('click', async () => {
+      const input = document.getElementById(btn.dataset.copy ?? '') as HTMLInputElement | null;
+      if (!input) return;
+      try {
+        await navigator.clipboard.writeText(input.value);
+        btn.textContent = 'Copiado';
+      } catch {
+        input.select();
+        btn.textContent = 'Selecciona y copia';
+      }
+    });
+  }
 }
 
 document.addEventListener('astro:page-load', init);

@@ -1,0 +1,25 @@
+---
+/**
+ * Después de iniciar sesión: cada persona a su sitio.
+ *   · Personal de algún taller → panel del taller.
+ *   · Cliente con ficha vinculada → portal del cliente.
+ *   · Ninguna de las dos → su cuenta (con la explicación de qué falta).
+ * Solo decide a dónde ir: los permisos los aplica la base de datos.
+ */
+import { authPage, redirectToLogin } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (!page.user || !page.supabase) return redirectToLogin(Astro);
+
+const [staff, customer] = await Promise.all([
+  page.supabase.rpc('my_workshops'),
+  page.supabase.rpc('portal_profile'),
+]);
+if (staff.error || customer.error) logAuth('area_dispatch_error', staff.error?.code ?? customer.error?.code);
+if ((staff.data ?? []).length > 0) return Astro.redirect('/panel', 303);
+if ((customer.data ?? []).length > 0) return Astro.redirect('/portal', 303);
+return Astro.redirect('/cuenta', 303);
+---

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, orderLabel, orderUpdateSchema, REPAIR_STATUS_LABELS, REPAIR_STATUSES } from './workshop.ts';
+import { customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, orderLabel, orderUpdateSchema, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES } from './workshop.ts';
 
 describe('clientes', () => {
   it('acepta un cliente con solo nombre y normaliza el correo', () => {
@@ -40,6 +40,15 @@ describe('órdenes de reparación', () => {
   it('valida la edición y rechaza estados inventados', () => {
     expect(orderUpdateSchema.safeParse({ status: 'volando', problemDescription: 'Ruido' }).success).toBe(false);
     expect(orderUpdateSchema.parse({ status: 'listo', problemDescription: 'Ruido', diagnosis: '  ' }).diagnosis).toBe(null);
+  });
+  it('explica cada estado al cliente sin prometer fechas', () => {
+    for (const st of REPAIR_STATUSES) {
+      expect(REPAIR_STATUS_CUSTOMER_TEXT[st].length).toBeGreaterThan(10);
+      expect(REPAIR_STATUS_CUSTOMER_TEXT[st]).not.toMatch(/\d|mañana|hoy|días?/i);
+    }
+  });
+  it('por defecto el cliente no ve los detalles técnicos', () => {
+    expect(orderUpdateSchema.parse({ status: 'listo', problemDescription: 'Ruido' }).showDetailsToCustomer).toBe(false);
   });
   it('etiqueta las órdenes como OR-n', () => {
     expect(orderLabel(12)).toBe('OR-12');

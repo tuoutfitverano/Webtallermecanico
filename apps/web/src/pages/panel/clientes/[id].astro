@@ -1,5 +1,12 @@
 ---
-/** Ficha de cliente: datos, edición, vehículos, reparaciones y borrado con confirmación. */
+/**
+ * Ficha de cliente: datos, edición, vehículos, reparaciones, acceso al portal
+ * (invitar, anular, desvincular) y borrado con confirmación.
+ *
+ * La vinculación con una cuenta solo se hace con una invitación que acepta el
+ * propio cliente con su correo; nunca por matrícula, nombre o teléfono. Las
+ * funciones de la base de datos comprueban que quien invita es gestor.
+ */
 import PanelLayout from '../../../layouts/PanelLayout.astro';
 import Icon from '../../../components/Icon.astro';
 import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
@@ -18,11 +25,18 @@ const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
 const id = Astro.params.id ?? '';
 
-interface Customer { id: string; full_name: string; phone: string | null; email: string | null; internal_notes: string | null; created_at: string; user_id: string | null }
+interface Customer {
+  id: string; full_name: string; phone: string | null; email: string | null; internal_notes: string | null; created_at: string;
+  user_id: string | null; portal_linked_at: string | null;
+}
+interface Invitation { id: string; email: string; expires_at: string; created_at: string }
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creado') === '1' ? 'Cliente guardado.' : '' };
 let errors: Partial<Record<string, string>> = {};
 let editValues: Record<string, string> | null = null;
 let askDelete = false;
+let askUnlink = false;
+let inviteLink: { email: string; url: string } | null = null;
+let inviteEmail: string | null = null;
 
 if (panel.form && panel.workshop && isUuid(id)) {
   const action = field(panel.form, 'action');
@@ -47,6 +61,35 @@ if (panel.form && panel.workshop && isUuid(id)) {
         editValues = null;
       }
     }
+  } else if (action === 'invitar') {
+    inviteEmail = field(panel.form, 'invite_email').trim();
+    const { data, error } = await panel.supabase.rpc('create_customer_invitation', { p_customer_id: id, p_email: inviteEmail || null });
+    const created = (Array.isArray(data) ? data[0] : null) as { token: string } | null;
+    if (error || !created?.token) {
+      logAuth('panel_customer_invite_error', error?.code);
+      flash = { kind: 'bad', text: dbErrorMessage(error) };
+      Astro.response.status = 400;
+    } else {
+      logAuth('panel_customer_invite_ok');
+      inviteLink = { email: inviteEmail, url: `${panel.origin}/portal/invitacion?token=${encodeURIComponent(created.token)}` };
+      inviteEmail = null;
+    }
+  } else if (action === 'anular-invitacion') {
+    const { error } = await panel.supabase.rpc('revoke_customer_invitation', { p_invitation_id: field(panel.form, 'invitation_id') });
+    if (error) {
+      logAuth('panel_customer_invite_revoke_error', error.code);
+      flash = { kind: 'bad', text: dbErrorMessage(error) };
+      Astro.response.status = 400;
+    } else flash = { kind: 'ok', text: 'Invitación anulada. El enlace ya no funciona.' };
+  } else if (action === 'pedir-desvincular') {
+    askUnlink = true;
+  } else if (action === 'desvincular') {
+    const { error } = await panel.supabase.rpc('unlink_customer_account', { p_customer_id: id });
+    if (error) {
+      logAuth('panel_customer_unlink_error', error.code);
+      flash = { kind: 'bad', text: dbErrorMessage(error) };
+      Astro.response.status = 400;
+    } else flash = { kind: 'ok', text: 'Acceso al portal retirado. La ficha y su historial se conservan.' };
   } else if (action === 'pedir-borrar') {
     askDelete = true;
   } else if (action === 'borrar') {
@@ -66,15 +109,22 @@ if (panel.form && panel.workshop && isUuid(id)) {
 let customer: Customer | null = null;
 let vehicles: Array<{ id: string; plate: string; make: string; model: string }> = [];
 let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
+let invitations: Invitation[] = [];
 if (panel.workshop && isUuid(id)) {
-  const [c, v, o] = await Promise.all([
-    panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
+  const [c, v, o, i] = await Promise.all([
+    panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
     panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
     panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
+    // Solo los gestores pueden leer las invitaciones (RLS); a un mecánico le llega vacío.
+    panel.isManager
+      ? panel.supabase.from('customer_invitations').select('id, email, expires_at, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
+        .eq('status', 'pendiente').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
   ]);
   customer = (c.data as Customer | null) ?? null;
   vehicles = (v.data ?? []) as typeof vehicles;
   orders = (o.data ?? []) as unknown as typeof orders;
+  invitations = (i.data ?? []) as Invitation[];
 }
 if (panel.workshop && !customer) Astro.response.status = 404;
 const values = editValues ?? customer ?? {};
@@ -104,6 +154,78 @@ const values = editValues ?? customer ?? {};
               <ul class="list">{vehicles.map(v => (
                 <li><a class="row" href={`/panel/vehiculos/${v.id}`}><span class="row-main"><span class="row-title"><span class="plate">{formatPlate(v.plate)}</span>{v.make} {v.model}</span></span></a></li>
               ))}</ul>
+            )}
+          </section>
+          <section class="card" aria-labelledby="portal">
+            <h2 id="portal" class="card-title"><Icon name="shield" />Acceso al portal del cliente</h2>
+            {customer.user_id ? (
+              <>
+                <p><span class="status status-listo">Vinculada</span> El cliente entra con su cuenta y ve sus vehículos y reparaciones de este taller{customer.portal_linked_at ? ` desde el ${formatDate(customer.portal_linked_at)}` : ''}.</p>
+                <p class="hint" style="margin-top:8px">Nunca ve las notas internas, el equipo ni otros clientes. La diagnosis y el trabajo realizado, solo si lo autorizas en cada orden.</p>
+                {panel.isManager && (
+                  <div style="margin-top:12px">
+                    {askUnlink ? (
+                      <form method="post" class="confirm" data-busy="Retirando…">
+                        <input type="hidden" name="action" value="desvincular" />
+                        <strong>¿Retirar el acceso al portal de {customer.full_name}?</strong>
+                        <span class="hint">Dejará de ver sus vehículos y reparaciones de inmediato. La ficha, los vehículos y el historial se conservan, y puedes invitarle de nuevo más adelante.</span>
+                        <div class="pnl-actions">
+                          <button class="btn btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, retirar el acceso</span></button>
+                          <a class="btn" href={`/panel/clientes/${customer.id}`}>Cancelar</a>
+                        </div>
+                      </form>
+                    ) : (
+                      <form method="post"><input type="hidden" name="action" value="pedir-desvincular" /><button class="btn btn-sm btn-danger" type="submit">Retirar el acceso…</button></form>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p><span class="status status-entregado">Sin vincular</span> Este cliente todavía no tiene acceso a su portal.</p>
+                {!panel.isManager ? <p class="hint" style="margin-top:8px">Las invitaciones al portal las envía el propietario o un administrador.</p> : (
+                  <>
+                    {inviteLink && (
+                      <div class="invite-result" style="margin-top:12px">
+                        <div class="alert alert-ok" role="status">
+                          <Icon name="check" />
+                          <span>Invitación creada para <strong>{inviteLink.email || customer.email}</strong>. Envíale este enlace (por WhatsApp o correo). Solo funciona con ese correo, una vez y durante 7 días. <strong>No se volverá a mostrar.</strong></span>
+                        </div>
+                        <div class="copy-row">
+                          <input class="input mono" id="enlace-portal" value={inviteLink.url} readonly aria-label="Enlace de invitación al portal" />
+                          <button class="btn" type="button" data-copy="enlace-portal">Copiar</button>
+                        </div>
+                      </div>
+                    )}
+                    {invitations.length > 0 && (
+                      <ul class="list" style="margin-top:12px" aria-label="Invitaciones pendientes">
+                        {invitations.map(inv => (
+                          <li class="row">
+                            <span class="row-main">
+                              <span class="row-title">Invitación pendiente para {inv.email}</span>
+                              <span class="row-meta">Enviada el {formatDate(inv.created_at)} · caduca el {formatDateTime(inv.expires_at)}</span>
+                            </span>
+                            <form method="post" class="row-side" data-busy="Anulando…">
+                              <input type="hidden" name="action" value="anular-invitacion" />
+                              <input type="hidden" name="invitation_id" value={inv.id} />
+                              <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Anular</span></button>
+                            </form>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <form method="post" class="form-stack" style="margin-top:12px" data-busy="Creando…">
+                      <input type="hidden" name="action" value="invitar" />
+                      <div class="field">
+                        <label for="invite_email">Correo del cliente para entrar en el portal</label>
+                        <input class="input" id="invite_email" name="invite_email" type="email" inputmode="email" maxlength="254" required value={inviteEmail ?? customer.email ?? ''} aria-describedby="invite_hint" />
+                        <p class="hint" id="invite_hint">Se crea un enlace personal que solo funciona con este correo. {invitations.length > 0 ? 'Crear otro anula el pendiente.' : ''} No se envía ningún correo automático: compártelo tú.</p>
+                      </div>
+                      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>{invitations.length > 0 ? 'Crear un enlace nuevo' : 'Crear invitación al portal'}</span></button>
+                    </form>
+                  </>
+                )}
+              </>
             )}
           </section>
           <section class="card" aria-labelledby="rep">

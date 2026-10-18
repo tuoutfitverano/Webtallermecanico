@@ -13,7 +13,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { appOrigin } from './lib/server/config.ts';
 import { setPrivateHeaders } from './lib/server/auth.ts';
 
-const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel)(\/|$)/;
+const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado)(\/|$)/;
 
 export const onRequest = defineMiddleware(async (context, next) => {
   if (!PRIVATE_PATHS.test(context.url.pathname)) return next();

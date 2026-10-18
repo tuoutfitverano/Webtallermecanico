@@ -7,7 +7,8 @@
  * defecto. Así nadie puede usar nuestros enlaces para mandar a la gente a
  * una web falsa.
  */
-export const DEFAULT_AFTER_LOGIN = '/panel';
+// /mi-area decide: personal del taller → /panel; cliente → /portal; si no, → /cuenta.
+export const DEFAULT_AFTER_LOGIN = '/mi-area';
 
 export function safeNext(raw: unknown, origin: string, fallback = DEFAULT_AFTER_LOGIN): string {
   if (typeof raw !== 'string') return fallback;

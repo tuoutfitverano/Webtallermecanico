@@ -1,0 +1,67 @@
+---
+/** Mis reparaciones con filtros sencillos: todas, en curso, listas para recoger, finalizadas. */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
+import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+const FILTERS = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'en_curso', label: 'En curso' },
+  { id: 'listas', label: 'Listas para recoger' },
+  { id: 'finalizadas', label: 'Finalizadas' },
+] as const;
+const asked = Astro.url.searchParams.get('filtro') ?? 'todas';
+const filter = FILTERS.find(f => f.id === asked)?.id ?? 'todas';
+
+interface Order { id: string; number: number; workshop_name: string; plate: string; make: string; model: string; status: RepairStatus; received_at: string; last_update: string; problem_description: string }
+let orders: Order[] = [];
+let error = false;
+if (portal.records.length > 0) {
+  const { data, error: e } = await portal.supabase.rpc('portal_orders', { p_filter: filter });
+  if (e) { logAuth('portal_orders_error', e.code); error = true; }
+  orders = (data ?? []) as Order[];
+}
+const EMPTY: Record<string, string> = {
+  todas: 'Todavía no hay reparaciones registradas a tu nombre.',
+  en_curso: 'No tienes reparaciones en curso.',
+  listas: 'No tienes ningún vehículo listo para recoger.',
+  finalizadas: 'Todavía no hay reparaciones finalizadas.',
+};
+---
+<PortalLayout portal={portal} title="Mis reparaciones" section="reparaciones">
+  <header class="pnl-head"><div><h1 class="pnl-title">Mis reparaciones</h1></div></header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <>
+      <nav class="filter-tabs" aria-label="Filtrar reparaciones">
+        {FILTERS.map(f => <a href={f.id === 'todas' ? '/portal/reparaciones' : `/portal/reparaciones?filtro=${f.id}`} aria-current={f.id === filter ? 'page' : undefined}>{f.label}</a>)}
+      </nav>
+      {error && <Flash kind="bad" text="No hemos podido cargar tus reparaciones. Recarga la página." />}
+      <section class="card" aria-label="Lista de reparaciones">
+        {orders.length === 0 ? <div class="empty"><strong>{EMPTY[filter]}</strong></div> : (
+          <ul class="list">
+            {orders.map(o => (
+              <li><a class="row" href={`/portal/reparaciones/${o.id}`}>
+                <span class="row-main">
+                  <span class="row-title"><span class="num">{orderLabel(o.number)}</span><span class="plate">{formatPlate(o.plate)}</span>{o.make} {o.model}</span>
+                  <span class="row-meta">{o.problem_description}</span>
+                  <span class="row-meta">{o.workshop_name} · recibido el {formatDate(o.received_at)} · última novedad {formatDateTime(o.last_update)}</span>
+                </span>
+                <span class="row-side"><StatusBadge status={o.status} /></span>
+              </a></li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PortalLayout>

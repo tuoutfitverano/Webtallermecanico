@@ -23,6 +23,7 @@ let unconfirmed = false;
 
 if (Astro.url.searchParams.get('salida') === '1') notice = 'Has cerrado la sesión.';
 if (Astro.url.searchParams.get('clave') === '1') notice = 'Contraseña cambiada. Ya puedes entrar con la nueva.';
+const expired = Astro.url.searchParams.get('caducada') === '1';
 
 if (page.form) {
   email = normalizeEmail(page.form.get('email'));
@@ -67,10 +68,11 @@ const qsNext = next === DEFAULT_AFTER_LOGIN ? '' : `?next=${encodeURIComponent(n
   <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
     <p class="label">// Área de talleres</p>
     <h1 id="titulo" class="auth-title heading">Iniciar sesión</h1>
-    <p class="auth-lead">Para el personal de los talleres. Si te han invitado, entra con el correo al que llegó la invitación.</p>
+    <p class="auth-lead">Para el personal de los talleres y sus clientes. Si te han invitado, entra con el correo al que llegó la invitación.</p>
 
     {!page.supabase && <div class="alert alert-warn" role="alert"><Icon name="alert" /><span>{AUTH_UNAVAILABLE}</span></div>}
     {notice && <div class="alert alert-ok" role="status"><Icon name="check" /><span>{notice}</span></div>}
+    {expired && !page.form && <div class="alert alert-warn" role="status"><Icon name="clock" /><span>Tu sesión ha caducado. Vuelve a iniciar sesión para continuar.</span></div>}
     {error && (
       <div class="alert alert-bad" role="alert">
         <Icon name="alert" />

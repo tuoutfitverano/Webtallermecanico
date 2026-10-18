@@ -1,0 +1,29 @@
+---
+/**
+ * Acceso denegado: se muestra, por ejemplo, cuando un cliente intenta abrir
+ * el panel interno del taller. Aunque llegara a cargarse el panel, la base de
+ * datos no le devolvería ningún dato del taller.
+ */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+import { authPage } from '../lib/server/auth-page.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+Astro.response.status = 403;
+---
+<AuthLayout title="Acceso denegado" user={page.user}>
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Acceso denegado</p>
+    <h1 id="titulo" class="auth-title heading">Esta zona es solo para el taller</h1>
+    <div class="alert alert-warn" role="alert">
+      <Icon name="shield" />
+      <span>El panel de gestión es para el personal del taller. Tu cuenta tiene acceso al <strong>portal de clientes</strong>, donde puedes ver tus vehículos y reparaciones.</span>
+    </div>
+    <nav class="auth-links">
+      <a href="/portal">Ir a mi portal</a>
+      <a href="/cuenta">Mi cuenta</a>
+    </nav>
+  </section>
+</AuthLayout>

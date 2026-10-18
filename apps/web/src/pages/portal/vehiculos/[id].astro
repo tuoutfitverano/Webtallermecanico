@@ -1,0 +1,74 @@
+---
+/** Un vehículo del cliente y sus reparaciones. Si no es suyo, como si no existiera. */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { isUuid } from '../../../lib/server/panel.ts';
+import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
+import { formatPlate, FUEL_LABELS, orderLabel, YEAR_KIND_LABELS, type FuelType, type RepairStatus, type YearKind } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+const id = Astro.params.id ?? '';
+
+interface Vehicle { id: string; workshop_name: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null }
+interface Order { id: string; number: number; status: RepairStatus; received_at: string; last_update: string; problem_description: string }
+let vehicle: Vehicle | null = null;
+let orders: Order[] = [];
+if (portal.records.length > 0 && isUuid(id)) {
+  const [v, o] = await Promise.all([
+    portal.supabase.rpc('portal_vehicles'),
+    portal.supabase.rpc('portal_orders', { p_filter: 'todas', p_vehicle_id: id }),
+  ]);
+  vehicle = ((v.data ?? []) as Vehicle[]).find(x => x.id === id) ?? null;
+  orders = vehicle ? (o.data ?? []) as Order[] : [];
+}
+if (portal.records.length > 0 && !vehicle) Astro.response.status = 404;
+---
+<PortalLayout portal={portal} title={vehicle ? `${vehicle.make} ${vehicle.model}` : 'Vehículo'} section="vehiculos">
+  <a class="pnl-back" href="/portal/vehiculos"><Icon name="arrow" />Mis vehículos</a>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : !vehicle ? (
+    <div class="empty"><strong>Vehículo no encontrado.</strong><span>No existe o no está registrado a tu nombre.</span><a class="btn" href="/portal/vehiculos">Volver a mis vehículos</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{vehicle.make} {vehicle.model}</h1>
+          <p class="pnl-sub"><span class="plate">{formatPlate(vehicle.plate)}</span> · {vehicle.workshop_name}</p>
+        </div>
+      </header>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="rep">
+          <h2 id="rep" class="card-title"><Icon name="history" />Reparaciones</h2>
+          {orders.length === 0 ? <p class="hint">Este vehículo no tiene reparaciones registradas a tu nombre.</p> : (
+            <ul class="list">{orders.map(o => (
+              <li><a class="row" href={`/portal/reparaciones/${o.id}`}>
+                <span class="row-main">
+                  <span class="row-title"><span class="num">{orderLabel(o.number)}</span>Recibido el {formatDate(o.received_at)}</span>
+                  <span class="row-meta">{o.problem_description}</span>
+                  <span class="row-meta">Última novedad {formatDateTime(o.last_update)}</span>
+                </span>
+                <span class="row-side"><StatusBadge status={o.status} /></span>
+              </a></li>
+            ))}</ul>
+          )}
+        </section>
+        <section class="card" aria-labelledby="datos">
+          <h2 id="datos" class="card-title"><Icon name="car" />Datos del vehículo</h2>
+          <dl class="facts">
+            <dt>Matrícula</dt><dd>{formatPlate(vehicle.plate)}</dd>
+            <dt>Marca y modelo</dt><dd>{vehicle.make} {vehicle.model}</dd>
+            {vehicle.year && <><dt>Año</dt><dd>{vehicle.year}{vehicle.year_kind ? ` (${YEAR_KIND_LABELS[vehicle.year_kind].toLowerCase()})` : ''}</dd></>}
+            {vehicle.fuel && <><dt>Combustible</dt><dd>{FUEL_LABELS[vehicle.fuel]}</dd></>}
+            <dt>Taller</dt><dd>{vehicle.workshop_name}</dd>
+          </dl>
+          <p class="hint" style="margin-top:12px">Si algún dato no es correcto, díselo a tu taller.</p>
+        </section>
+      </div>
+    </>
+  )}
+</PortalLayout>

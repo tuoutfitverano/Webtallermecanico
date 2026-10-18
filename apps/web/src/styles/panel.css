@@ -178,3 +178,42 @@ a.row:hover { background: var(--p-surface-2); border-radius: 10px; }
 .confirm { border: 1px solid rgb(248 113 113 / .45); background: rgb(248 113 113 / .06); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
 details.danger-zone > summary { cursor: pointer; color: #fecaca; font-size: .875rem; }
 details.danger-zone[open] > summary { margin-bottom: 10px; }
+
+/* ---------- Portal del cliente ---------- */
+.pnl-tabs-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* Aviso destacado: vehículo listo para recoger */
+.ready { display: flex; gap: 14px; align-items: flex-start; padding: 18px; margin-bottom: 20px; border-radius: 14px;
+  border: 1px solid rgb(134 239 172 / .5); background: rgb(34 197 94 / .1); color: #dcfce7; }
+.ready .ico { width: 26px; height: 26px; flex: none; color: #86efac; }
+.ready strong { display: block; font-size: 1.0625rem; color: #fff; margin-bottom: 2px; }
+.ready a { color: #fff; }
+
+/* Tarjetas de vehículo */
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.vcard { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; background: var(--p-surface); border: 1px solid var(--p-line); text-decoration: none; min-width: 0; }
+a.vcard:hover { border-color: var(--p-line-2); }
+.vcard-title { font-family: var(--font-heading); font-style: italic; font-size: 1.75rem; line-height: 1; letter-spacing: -.5px; }
+
+/* Filtros como pestañas */
+.filter-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.filter-tabs a { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--p-line-2); text-decoration: none; font-size: .875rem; font-weight: 500; color: var(--p-muted); }
+.filter-tabs a[aria-current="page"] { background: var(--fg); color: #000; border-color: var(--fg); }
+
+/* Explicación del estado actual */
+.explain { padding: 16px 18px; border-radius: 14px; background: var(--p-surface-2); border: 1px solid var(--p-line); }
+.explain p { margin-top: 6px; color: var(--p-text); }
+.message { border-left: 3px solid var(--accent-soft); padding: 4px 0 4px 12px; white-space: pre-line; }
+
+/* Pasos de la reparación */
+.steps-bar { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.steps-bar li { display: flex; flex-direction: column; gap: 6px; font-size: .75rem; color: var(--p-muted); }
+.steps-bar .steps-dot { height: 6px; border-radius: 999px; background: var(--p-line-2); }
+.steps-bar .is-done .steps-dot { background: rgb(255 255 255 / .55); }
+.steps-bar .is-current .steps-dot { background: #86efac; }
+.steps-bar .is-current { color: var(--p-text); font-weight: 600; }
+@media (max-width: 640px) {
+  .steps-bar { grid-template-columns: 1fr; }
+  .steps-bar li { flex-direction: row; align-items: center; }
+  .steps-bar .steps-dot { width: 22px; flex: none; }
+}

@@ -142,6 +142,20 @@ navegador ──► POST /api/solicitudes ──► handleSubmission ──► s
 - **Privacidad**: no se guarda el IP, solo una huella HMAC que cambia cada día y se borra a los 2 días. Los registros técnicos no contienen datos del formulario. El personal no puede leer la huella ni la clave de idempotencia.
 - **Sin JavaScript** los formularios también funcionan (envío clásico y redirección con el resultado).
 
+### Portal del cliente (Fase 5)
+
+```
+customers.user_id ── la cuenta del cliente (la pone SOLO accept_customer_invitation)
+customer_invitations ── huella del código, correo, estado, caducidad (7 días)
+repair_orders.customer_notes / show_details_to_customer ── lo que el taller decide enseñar
+repair_order_events.customer_message ── mensajes en el historial que ve el cliente
+```
+
+- **Vinculación**: el gestor crea la invitación (`create_customer_invitation`); el cliente la acepta con una cuenta de **ese correo, confirmado** (`accept_customer_invitation`). El código es aleatorio (256 bits), solo se guarda su huella, es de un uso y caduca. `unlink_customer_account` retira el acceso sin borrar nada.
+- **Sin acceso a tablas**: un cliente no es miembro del taller, así que RLS no le devuelve nada de `customers`, `vehicles`, `repair_orders`… Lee solo con `portal_profile`, `portal_vehicles`, `portal_orders`, `portal_order` y `portal_order_timeline` (`security definer`, filtran por `private.portal_customer_ids()` y devuelven columnas elegidas: nunca `internal_notes`, personal asignado ni autores de cambios). Diagnosis y trabajo, solo si `show_details_to_customer`.
+- **Solo gestores** deciden qué ve el cliente (lo impone `repair_orders_guard`) y gestionan invitaciones.
+- **Rutas**: `/mi-area` reparte tras el acceso (personal → `/panel`, cliente → `/portal`, resto → `/cuenta`). `panelPage` muestra "acceso denegado" (403) a un cliente sin membresía.
+
 ## 8. Vehículos
 
 - La matrícula se guarda **normalizada** (`1950 bxf` → `1950BXF`) y es única dentro de cada taller.

@@ -32,6 +32,7 @@ Las migraciones se aplican en orden y **ninguna borra datos**:
 | `20261018160000_solicitudes_web.sql` | Solicitudes de la web (cita, presupuesto, contacto) |
 | `20261019090000_cuentas_equipos_invitaciones.sql` | Logotipo y contacto del taller, invitaciones, gestión del equipo, alta controlada |
 | `20261020090000_ordenes_reparacion.sql` | Órdenes de reparación, historial de cambios, búsquedas y resumen del panel |
+| `20261021090000_portal_clientes.sql` | Portal del cliente: invitaciones de clientes, mensaje para el cliente, funciones `portal_*` |
 
 `db push` modifica la base de datos de producción. Solo aplica las migraciones que falten.
 
@@ -126,6 +127,15 @@ select id from auth.users where email = 'tu-correo@…';
 ```
 
 Los privilegios de administrador **solo funcionan con 2FA** (sesión `aal2`); sin 2FA no ve nada de los talleres. La pantalla para activar el 2FA llegará con el panel (Fase 4).
+
+### Dar acceso al portal a un cliente
+
+1. En el panel, abre la ficha del cliente → **Acceso al portal** → **Crear invitación al portal** (usa su correo o el que indiques).
+2. Copia el enlace que aparece (solo se muestra una vez) y envíaselo por WhatsApp o correo. **La plataforma todavía no envía este correo sola.**
+3. El cliente abre el enlace, crea su cuenta (o entra) **con ese mismo correo**, lo confirma y pulsa "Aceptar". Desde entonces ve `/portal`.
+4. Para quitarle el acceso: ficha del cliente → **Retirar el acceso…**. La ficha y las reparaciones se conservan.
+
+En cada orden decides qué ve el cliente: el **mensaje para el cliente** y la casilla **"Mostrar la diagnosis y el trabajo realizado"**. Las notas internas nunca se le muestran.
 
 ## 7. Publicar en Cloudflare
 

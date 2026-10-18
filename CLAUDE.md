@@ -17,6 +17,8 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/pages/              index (web del taller), privacidad, aviso-legal, api/solicitudes.ts
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
+                          portal/ (inicio, vehiculos/, reparaciones/, datos, invitacion) — portal del cliente
+                          mi-area (reparto tras iniciar sesión), acceso-denegado (403)
   src/middleware.ts       Área privada: dominio APP_URL y cabeceras anti-caché
   src/components/         Secciones de la web y formularios (RequestForm.astro)
   src/scripts/            JavaScript del navegador (request-forms.ts)
@@ -27,6 +29,8 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/layouts/AuthLayout  Plantilla del área privada
   src/layouts/PanelLayout Plantilla del panel (barra lateral / pestañas en móvil, ClientRouter)
   src/lib/server/panel.ts Contexto del panel: sesión, talleres, taller activo validado, equipo
+  src/lib/server/portal.ts Contexto del portal: sesión y fichas vinculadas (portal_profile)
+  src/layouts/PortalLayout, src/components/portal/  Plantilla y piezas del portal del cliente
   src/lib/panel/          Formatos de fecha (Europe/Madrid) y lectura del formulario de vehículos
   src/components/panel/   Piezas del panel (estado, avisos, campos de cliente y vehículo)
   src/styles/panel.css    Estilos del panel (más denso y opaco que la web pública)
@@ -107,6 +111,15 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Formularios sin JavaScript (POST al servidor y aviso integrado); acciones destructivas en dos pasos (`pedir-borrar` → `borrar`). Nada de `alert()`/`confirm()`.
 - Fechas: se muestran en hora de Madrid (`lib/panel/format.ts`); un `datetime-local` se guarda con `localInputToDb()`.
 - En pruebas e2e la barra de desarrollo de Astro está desactivada (`E2E=1`) porque tapa las pestañas del móvil.
+
+## Portal del cliente (Fase 5)
+
+- La cuenta se vincula a una ficha **solo** con `create_customer_invitation` (gestor) + `accept_customer_invitation` (el cliente, con ese correo confirmado). Nunca por matrícula, nombre, correo o teléfono. `unlink_customer_account` retira el acceso sin borrar nada.
+- El cliente **no lee tablas**: solo funciones `portal_*` (`security definer`, columnas elegidas a mano, filtradas con `private.portal_customer_ids()`). Si añades un dato al portal, añádelo a esas funciones y a `09_portal_clientes.test.sql`; nunca des `select` en tablas a clientes.
+- Nunca al cliente: `internal_notes`, personal asignado, autores de cambios, otros clientes. Diagnosis y trabajo solo con `show_details_to_customer`. Sin fechas prometidas.
+- Solo gestores cambian `customer_notes` y `show_details_to_customer` (lo impone `repair_orders_guard`).
+- Tras iniciar sesión se va a `/mi-area` (personal → `/panel`, cliente → `/portal`, resto → `/cuenta`). Un cliente en `/panel` ve `acceso-denegado` (403).
+- Los valores nuevos de un enum no se pueden usar en la misma transacción que los crea: compara `kind::text`.
 
 ## Formularios y solicitudes (Fase 2)
 

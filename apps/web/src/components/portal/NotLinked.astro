@@ -1,0 +1,20 @@
+---
+/** Estado para una cuenta que aún no está vinculada a ninguna ficha de cliente. */
+interface Props { loadError?: boolean }
+const { loadError = false } = Astro.props;
+---
+<div class="empty">
+  {loadError ? (
+    <>
+      <strong>No hemos podido cargar tu información.</strong>
+      <span>Puede ser un problema de conexión. Recarga la página en unos minutos.</span>
+    </>
+  ) : (
+    <>
+      <strong>Tu cuenta todavía no está vinculada a ninguna ficha de cliente.</strong>
+      <span>Para ver tus vehículos y reparaciones, pide a tu taller que te envíe una <strong>invitación al portal</strong> a este correo y abre el enlace que te mande.</span>
+      <span>Por seguridad, no se puede acceder a una ficha introduciendo una matrícula, un nombre o un teléfono: la vinculación la autoriza siempre el taller.</span>
+      <a class="btn" href="/cuenta">Ir a mi cuenta</a>
+    </>
+  )}
+</div>

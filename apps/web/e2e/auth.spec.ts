@@ -195,11 +195,14 @@ test.describe('Registro, confirmación y recuperación', () => {
     await page.goto(link!);
     await expect(page).toHaveURL(/\/auth\/confirmar\?/);
     await page.getByRole('button', { name: 'Confirmar mi correo' }).click();
-    // Con la cuenta confirmada se llega al panel, que no da acceso a nada sin taller.
-    await expect(page).toHaveURL(/\/panel$/);
-    await expect(page.getByText('Tu cuenta todavía no pertenece a ningún taller.')).toBeVisible();
-    await page.goto('/cuenta');
+    // Con la cuenta confirmada, /mi-area la lleva a su cuenta (no es personal ni cliente vinculado).
+    await expect(page).toHaveURL(/\/cuenta$/);
     await expect(page.getByText('Todavía no perteneces a ningún taller')).toBeVisible();
+    // El panel no da acceso a nada sin taller, y el portal tampoco sin ficha vinculada.
+    await page.goto('/panel');
+    await expect(page.getByText('Tu cuenta todavía no pertenece a ningún taller.')).toBeVisible();
+    await page.goto('/portal');
+    await expect(page.getByText('Tu cuenta todavía no está vinculada a ninguna ficha de cliente.')).toBeVisible();
   });
 
   test('el registro valida los datos antes de crear nada', async ({ page }) => {
@@ -238,8 +241,7 @@ test.describe('Registro, confirmación y recuperación', () => {
     await login(page, email, PASSWORD);
     await expect(page.getByRole('alert')).toContainText('no son correctos');
     await login(page, email, 'Clave-nueva-1234');
-    await expect(page).toHaveURL(/\/panel$/);
-    await expect(page.getByText('Tu cuenta todavía no pertenece a ningún taller.')).toBeVisible();
+    await expect(page).toHaveURL(/\/cuenta$/);
   });
 
   test('un enlace de correo inventado o gastado no da acceso', async ({ page }) => {

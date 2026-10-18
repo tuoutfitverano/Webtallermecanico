@@ -35,9 +35,14 @@ export async function authPage(Astro: AstroGlobal): Promise<AuthPage> {
   return { supabase, user, origin: authOrigin(Astro.request, Astro.url), self: requestOrigin(Astro.request, Astro.url), isPost, form };
 }
 
-/** Respuesta para páginas que exigen sesión: redirige al acceso y vuelve luego aquí. */
+/**
+ * Respuesta para páginas que exigen sesión: redirige al acceso y vuelve luego aquí.
+ * Si el navegador traía una cookie de sesión que ya no es válida, avisa de que
+ * la sesión ha caducado (en vez de un acceso sin explicación).
+ */
 export function redirectToLogin(Astro: AstroGlobal): Response {
-  return Astro.redirect(loginUrl(currentPath(Astro.url)), 303);
+  const hadSession = /(^|;\s*)sb-[^=]*-auth-token/.test(Astro.request.headers.get('cookie') ?? '');
+  return Astro.redirect(`${loginUrl(currentPath(Astro.url))}${hadSession ? '&caducada=1' : ''}`, 303);
 }
 
 export function formText(form: FormData | null, name: string): string {

@@ -30,12 +30,12 @@ const id = Astro.params.id ?? '';
 interface Order {
   id: string; number: number; status: RepairStatus; received_at: string; problem_description: string; diagnosis: string | null;
   work_done: string | null; internal_notes: string | null; assigned_to: string | null; created_at: string; updated_at: string;
-  delivered_at: string | null; created_by: string | null;
+  delivered_at: string | null; created_by: string | null; customer_notes: string | null; show_details_to_customer: boolean;
   vehicles: { id: string; plate: string; make: string; model: string } | null;
-  customers: { id: string; full_name: string; phone: string | null; email: string | null } | null;
+  customers: { id: string; full_name: string; phone: string | null; email: string | null; user_id: string | null } | null;
 }
 interface Event {
-  id: number; kind: 'creada' | 'estado' | 'asignacion' | 'datos'; from_status: RepairStatus | null; to_status: RepairStatus | null;
+  id: number; kind: 'creada' | 'estado' | 'asignacion' | 'datos' | 'mensaje'; customer_message: string | null; from_status: RepairStatus | null; to_status: RepairStatus | null;
   from_assignee: string | null; to_assignee: string | null; changed_fields: string[] | null; actor: string | null; created_at: string;
 }
 
@@ -43,7 +43,7 @@ let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.
 let errors: Partial<Record<string, string>> = {};
 let draft: Record<string, string> | null = null;
 
-const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, vehicles(id, plate, make, model), customers(id, full_name, phone, email)';
+const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
 const ctx = panel;
 async function loadOrder() {
   if (!ctx.workshop || !isUuid(id)) return null;
@@ -58,18 +58,24 @@ if (panel.form && panel.workshop && order) {
   let update: Record<string, unknown> | null = null;
   if (action === 'estado') {
     const status = field(panel.form, 'status');
+    // Mensaje opcional para el cliente junto al cambio de estado (solo gestores).
+    const message = panel.isManager ? field(panel.form, 'customer_message').trim() : '';
     if (!isRepairStatus(status)) flash = { kind: 'bad', text: 'Estado no válido.' };
-    else update = { status };
+    else if (message.length > 2000) flash = { kind: 'bad', text: 'El mensaje para el cliente admite como máximo 2000 caracteres.' };
+    else update = message ? { status, customer_notes: message } : { status };
   } else if (action === 'guardar') {
     draft = {
       assigned_to: field(panel.form, 'assigned_to'), problem_description: field(panel.form, 'problem_description'),
       diagnosis: field(panel.form, 'diagnosis'), work_done: field(panel.form, 'work_done'), internal_notes: field(panel.form, 'internal_notes'),
+      customer_notes: field(panel.form, 'customer_notes'), show_details: field(panel.form, 'show_details') === '1' ? '1' : '',
     };
     const parsed = orderUpdateSchema.safeParse({
       status: order.status,
       assignedTo: panel.isManager ? draft.assigned_to : order.assigned_to,
       problemDescription: panel.isManager ? draft.problem_description : order.problem_description,
       diagnosis: draft.diagnosis, workDone: draft.work_done, internalNotes: draft.internal_notes,
+      customerNotes: panel.isManager ? draft.customer_notes : order.customer_notes,
+      showDetailsToCustomer: panel.isManager ? draft.show_details === '1' : order.show_details_to_customer,
     });
     if (!parsed.success) {
       errors = fieldErrors(parsed.error);
@@ -78,8 +84,13 @@ if (panel.form && panel.workshop && order) {
     } else {
       const d = parsed.data;
       update = { diagnosis: d.diagnosis, work_done: d.workDone, internal_notes: d.internalNotes };
-      // Solo gestores: asignación y descripción (la base de datos lo exige igualmente).
-      if (panel.isManager) Object.assign(update, { assigned_to: d.assignedTo, problem_description: d.problemDescription });
+      // Solo gestores: asignación, descripción y lo que ve el cliente (la base de datos lo exige igualmente).
+      if (panel.isManager) {
+        Object.assign(update, {
+          assigned_to: d.assignedTo, problem_description: d.problemDescription,
+          customer_notes: d.customerNotes, show_details_to_customer: d.showDetailsToCustomer,
+        });
+      }
     }
   }
   if (update) {
@@ -105,7 +116,7 @@ let events: Event[] = [];
 let team: Awaited<ReturnType<typeof loadTeam>> = [];
 if (order) {
   const [e, t] = await Promise.all([
-    panel.supabase.from('repair_order_events').select('id, kind, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
+    panel.supabase.from('repair_order_events').select('id, kind, customer_message, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
     loadTeam(panel),
   ]);
   events = (e.data ?? []) as Event[];
@@ -116,6 +127,7 @@ if (panel.workshop && !order) Astro.response.status = 404;
 const v: Record<string, string> = draft ?? (order ? {
   assigned_to: order.assigned_to ?? '', problem_description: order.problem_description, diagnosis: order.diagnosis ?? '',
   work_done: order.work_done ?? '', internal_notes: order.internal_notes ?? '',
+  customer_notes: order.customer_notes ?? '', show_details: order.show_details_to_customer ? '1' : '',
 } : {});
 const who = (u: string | null) => memberName(team, u, panel.user.id);
 const describe = (e: Event): string => {
@@ -123,6 +135,7 @@ const describe = (e: Event): string => {
     case 'creada': return `Orden creada${e.to_assignee ? ` y asignada a ${who(e.to_assignee)}` : ''}`;
     case 'estado': return `Estado: ${e.from_status ? REPAIR_STATUS_LABELS[e.from_status] : '—'} → ${e.to_status ? REPAIR_STATUS_LABELS[e.to_status] : '—'}`;
     case 'asignacion': return e.to_assignee ? `Asignada a ${who(e.to_assignee)}` : 'Asignación retirada';
+    case 'mensaje': return 'Mensaje para el cliente';
     default: return `Cambió: ${(e.changed_fields ?? []).map(f => FIELD_LABELS[f] ?? f).join(', ')}`;
   }
 };
@@ -151,6 +164,12 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
         <h2 id="estado-t" class="card-title">Estado</h2>
         <form method="post" class="status-picker" data-busy="Guardando…">
           <input type="hidden" name="action" value="estado" />
+          {panel.isManager && (
+            <div class="field" style="flex-basis:100%">
+              <label for="customer_message">Mensaje para el cliente con el cambio de estado <span class="muted small">(opcional, lo verá en su portal)</span></label>
+              <textarea class="textarea" id="customer_message" name="customer_message" maxlength="2000" rows="2" placeholder="Ej.: Ya tenemos la pieza; empezamos con la reparación."></textarea>
+            </div>
+          )}
           {statusOptions.map(s => (
             <button class="btn btn-sm" type="submit" name="status" value={s} aria-pressed={s === order!.status ? 'true' : 'false'} disabled={s === order!.status}>{REPAIR_STATUS_LABELS[s]}</button>
           ))}
@@ -162,7 +181,14 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
         <form method="post" class="stack" data-busy="Guardando…" novalidate>
           <input type="hidden" name="action" value="guardar" />
           <section class="card" aria-labelledby="cliente-t">
-            <h2 id="cliente-t" class="card-title">Información de la reparación <span class="muted small">(podrá verla el cliente)</span></h2>
+            <h2 id="cliente-t" class="card-title">Información de la reparación</h2>
+            <p class="hint" style="margin-bottom:12px">
+              {!order.customers?.user_id
+                ? 'El cliente todavía no tiene acceso al portal.'
+                : order.show_details_to_customer
+                  ? 'El cliente ve en su portal la descripción, la diagnosis y el trabajo realizado.'
+                  : 'El cliente ve en su portal la descripción del problema; la diagnosis y el trabajo realizado, solo si lo autorizas.'}
+            </p>
             <div class="form-stack">
               <div class={`field ${errors.problemDescription ? 'has-error' : ''}`}>
                 <label for="problem_description">Descripción del problema</label>
@@ -180,6 +206,25 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
                 <textarea class="textarea" id="work_done" name="work_done" maxlength="4000" rows="3">{v.work_done}</textarea>
               </div>
             </div>
+          </section>
+          <section class="card" aria-labelledby="portal-t">
+            <h2 id="portal-t" class="card-title"><Icon name="chat" />Para el cliente <span class="muted small">(portal)</span></h2>
+            {panel.isManager ? (
+              <div class="form-stack">
+                <div class={`field ${errors.customerNotes ? 'has-error' : ''}`}>
+                  <label for="customer_notes">Mensaje para el cliente</label>
+                  <textarea class="textarea" id="customer_notes" name="customer_notes" maxlength="2000" rows="3" aria-describedby="customer_notes_hint">{v.customer_notes}</textarea>
+                  <p class="hint" id="customer_notes_hint">Lo verá tal cual en su portal y queda en su historial. No prometas fechas que no puedas cumplir.</p>
+                  {errors.customerNotes && <p class="field-error">{errors.customerNotes}</p>}
+                </div>
+                <label class="check"><input type="checkbox" name="show_details" value="1" checked={v.show_details === '1'} /> Mostrar la diagnosis y el trabajo realizado al cliente</label>
+              </div>
+            ) : (
+              <>
+                {order.customer_notes ? <p class="message">{order.customer_notes}</p> : <p class="hint">Sin mensaje para el cliente.</p>}
+                <p class="hint" style="margin-top:8px">Lo que ve el cliente lo deciden el propietario o un administrador.</p>
+              </>
+            )}
           </section>
           <section class="card note-internal" aria-labelledby="internas-t">
             <h2 id="internas-t" class="card-title">Notas internas <span class="muted small">(solo para el taller)</span></h2>
@@ -216,7 +261,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             {events.length === 0 ? <p class="hint">Sin cambios registrados.</p> : (
               <ol class="timeline">
                 {events.map(e => (
-                  <li><span class="dot" aria-hidden="true"></span><span><span>{describe(e)}</span><br /><span class="when">{who(e.actor)} · {formatDateTime(e.created_at)}</span></span></li>
+                  <li><span class="dot" aria-hidden="true"></span><span><span>{describe(e)}</span>{e.customer_message && <><br /><span class="muted small">Al cliente: «{e.customer_message}»</span></>}<br /><span class="when">{who(e.actor)} · {formatDateTime(e.created_at)}</span></span></li>
                 ))}
               </ol>
             )}

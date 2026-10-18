@@ -1,0 +1,89 @@
+---
+/** Inicio del portal: saludo, avisos de recogida, resumen real de vehículos y reparaciones. */
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import Icon from '../../components/Icon.astro';
+import StatusBadge from '../../components/panel/StatusBadge.astro';
+import Flash from '../../components/panel/Flash.astro';
+import NotLinked from '../../components/portal/NotLinked.astro';
+import { firstName, portalPage } from '../../lib/server/portal.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDateTime } from '../../lib/panel/format.ts';
+import { formatPlate, orderLabel, REPAIR_STATUS_CUSTOMER_TEXT, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+interface Vehicle { id: string; plate: string; make: string; model: string; workshop_name: string; active_status: RepairStatus | null }
+interface Order { id: string; number: number; workshop_name: string; plate: string; make: string; model: string; status: RepairStatus; received_at: string; last_update: string }
+
+let vehicles: Vehicle[] = [];
+let orders: Order[] = [];
+let error = false;
+if (portal.records.length > 0) {
+  const [v, o] = await Promise.all([portal.supabase.rpc('portal_vehicles'), portal.supabase.rpc('portal_orders', { p_filter: 'todas' })]);
+  if (v.error || o.error) { logAuth('portal_home_error', v.error?.code ?? o.error?.code); error = true; }
+  vehicles = (v.data ?? []) as Vehicle[];
+  orders = (o.data ?? []) as Order[];
+}
+const ready = orders.filter(o => o.status === 'listo');
+// Mismos grupos que los filtros de "Mis reparaciones": en curso, listas para recoger y finalizadas.
+const active = orders.filter(o => o.status !== 'listo' && o.status !== 'entregado');
+const done = orders.filter(o => o.status === 'entregado');
+const latest = [...orders].sort((a, b) => b.last_update.localeCompare(a.last_update))[0];
+const name = firstName(portal.records);
+const welcome = Astro.url.searchParams.get('bienvenida') === '1';
+const phoneOf = (workshop: string) => portal.records.find(r => r.workshop_name === workshop)?.workshop_phone;
+---
+<PortalLayout portal={portal} title="Inicio" section="inicio">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Hola{name ? `, ${name}` : ''}</h1>
+      <p class="pnl-sub">Aquí puedes seguir el estado de tus vehículos en el taller.</p>
+    </div>
+  </header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <>
+      <Flash kind="ok" text={welcome ? 'Tu cuenta ya está vinculada. Bienvenido a tu portal.' : ''} />
+      {error && <Flash kind="bad" text="No hemos podido cargar todos tus datos. Recarga la página en unos minutos." />}
+
+      {ready.map(o => (
+        <div class="ready" role="status">
+          <Icon name="check" />
+          <div>
+            <strong>Tu {o.make} {o.model} ({formatPlate(o.plate)}) está listo para recoger</strong>
+            <span>En {o.workshop_name}{phoneOf(o.workshop_name) ? ` · Tel. ${phoneOf(o.workshop_name)}` : ''}. </span>
+            <a href={`/portal/reparaciones/${o.id}`}>Ver la reparación</a>
+          </div>
+        </div>
+      ))}
+
+      <section class="kpis" aria-label="Resumen">
+        <a class="kpi" href="/portal/vehiculos"><span class="kpi-value">{vehicles.length}</span><span class="kpi-label">{vehicles.length === 1 ? 'Vehículo registrado' : 'Vehículos registrados'}</span></a>
+        <a class="kpi" href="/portal/reparaciones?filtro=en_curso"><span class="kpi-value">{active.length}</span><span class="kpi-label">{active.length === 1 ? 'Reparación en curso' : 'Reparaciones en curso'}</span></a>
+        <a class="kpi" href="/portal/reparaciones?filtro=listas"><span class="kpi-value">{ready.length}</span><span class="kpi-label">Listos para recoger</span></a>
+        <a class="kpi" href="/portal/reparaciones?filtro=finalizadas"><span class="kpi-value">{done.length}</span><span class="kpi-label">Reparaciones finalizadas</span></a>
+      </section>
+
+      <section class="card" aria-labelledby="ultima">
+        <h2 id="ultima" class="card-title"><Icon name="history" />Tu reparación más reciente</h2>
+        {!latest ? (
+          <div class="empty">
+            <strong>{vehicles.length ? 'Todavía no hay reparaciones registradas.' : 'Todavía no tienes vehículos registrados en el taller.'}</strong>
+            <span>Cuando el taller registre una reparación de tu vehículo, podrás seguirla aquí.</span>
+          </div>
+        ) : (
+          <a class="row" href={`/portal/reparaciones/${latest.id}`}>
+            <span class="row-main">
+              <span class="row-title"><span class="num">{orderLabel(latest.number)}</span><span class="plate">{formatPlate(latest.plate)}</span>{latest.make} {latest.model}</span>
+              <span class="row-meta">{REPAIR_STATUS_CUSTOMER_TEXT[latest.status]}</span>
+              <span class="row-meta">{latest.workshop_name} · última novedad {formatDateTime(latest.last_update)}</span>
+            </span>
+            <span class="row-side"><StatusBadge status={latest.status} /></span>
+          </a>
+        )}
+      </section>
+    </>
+  )}
+</PortalLayout>

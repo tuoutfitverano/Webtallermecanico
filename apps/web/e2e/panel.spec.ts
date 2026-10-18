@@ -181,7 +181,7 @@ test.describe('Panel · propietaria', () => {
     await expect(page.getByRole('status')).toContainText('Estado actualizado.');
     await expect(page.locator('.timeline')).toContainText('Estado: Vehículo recibido → En diagnosis');
 
-    await page.getByLabel('Diagnosis').fill('Pastillas delanteras al límite');
+    await page.getByLabel('Diagnosis', { exact: true }).fill('Pastillas delanteras al límite');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
     await expect(page.getByRole('status')).toContainText('Cambios guardados.');
     await expect(page.locator('.timeline')).toContainText('Cambió: diagnosis');
@@ -282,7 +282,7 @@ test.describe('Panel · mecánico', () => {
     await page.goto(mine.orderUrl);
     await expect(page.getByRole('button', { name: 'Entregado' })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Mecánico asignado' })).toHaveCount(0);
-    await page.getByLabel('Diagnosis').fill('Discos rayados');
+    await page.getByLabel('Diagnosis', { exact: true }).fill('Discos rayados');
     await page.getByRole('textbox', { name: 'Notas internas' }).fill('Pedir discos al proveedor');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
     await expect(page.getByRole('status')).toContainText('Cambios guardados.');

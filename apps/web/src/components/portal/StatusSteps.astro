@@ -1,0 +1,15 @@
+---
+/** Pasos de una reparación (orden fijo) con el actual resaltado. No indica fechas ni plazos. */
+import { REPAIR_STATUS_LABELS, REPAIR_STATUSES, type RepairStatus } from '@talleres/core';
+interface Props { status: RepairStatus }
+const { status } = Astro.props;
+const current = REPAIR_STATUSES.indexOf(status);
+---
+<ol class="steps-bar" aria-label="Progreso de la reparación">
+  {REPAIR_STATUSES.map((s, i) => (
+    <li class:list={[{ 'is-done': i < current, 'is-current': i === current }]} aria-current={i === current ? 'step' : undefined}>
+      <span class="steps-dot" aria-hidden="true"></span>
+      <span class="steps-label">{REPAIR_STATUS_LABELS[s]}</span>
+    </li>
+  ))}
+</ol>

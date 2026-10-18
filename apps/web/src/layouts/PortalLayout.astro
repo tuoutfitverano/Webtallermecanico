@@ -1,0 +1,97 @@
+---
+/**
+ * Plantilla del portal del cliente: misma identidad visual que el panel,
+ * pero con solo cuatro secciones y textos pensados para quien no es mecánico.
+ */
+import { ClientRouter } from 'astro:transitions';
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '@fontsource/barlow/latin-300.css';
+import '@fontsource/barlow/latin-400.css';
+import '@fontsource/barlow/latin-500.css';
+import '@fontsource/barlow/latin-600.css';
+import '../styles/site.css';
+import '../styles/panel.css';
+import Icon from '../components/Icon.astro';
+import type { Portal } from '../lib/server/portal.ts';
+
+export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'datos';
+interface Props {
+  portal: Portal;
+  title: string;
+  section?: PortalSection;
+}
+const { portal, title, section } = Astro.props;
+const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'user' }> = [
+  { id: 'inicio', href: '/portal', label: 'Inicio', icon: 'home' },
+  { id: 'vehiculos', href: '/portal/vehiculos', label: 'Mis vehículos', icon: 'car' },
+  { id: 'reparaciones', href: '/portal/reparaciones', label: 'Reparaciones', icon: 'clipboard' },
+  { id: 'datos', href: '/portal/datos', label: 'Mis datos', icon: 'user' },
+];
+const linked = portal.records.length > 0;
+const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_name : portal.records.length > 1 ? `${portal.records.length} talleres` : '';
+---
+<!doctype html>
+<html lang="es" transition:animate="none">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title} · Mi portal</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#0a0a0b" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <ClientRouter fallback="none" />
+  </head>
+  <body class="pnl-body portal-body">
+    <a class="pnl-skip" href="#contenido">Saltar al contenido</a>
+
+    <aside class="pnl-side" aria-label="Menú del portal">
+      <a href="/portal" class="pnl-brand">
+        <span class="brand-mark liquid-glass" aria-hidden="true">t</span>
+        <span class="pnl-brand-text">Mi portal</span>
+      </a>
+      {linked && (
+        <nav class="pnl-nav" aria-label="Secciones">
+          {nav.map(n => (
+            <a href={n.href} class:list={['pnl-nav-link', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
+              <Icon name={n.icon} /><span>{n.label}</span>
+            </a>
+          ))}
+        </nav>
+      )}
+      <div class="pnl-side-foot">
+        <a href="/cuenta" class="pnl-side-link"><Icon name="shield" /><span>Mi cuenta</span></a>
+      </div>
+    </aside>
+
+    <div class="pnl-main">
+      <header class="pnl-top">
+        <div class="pnl-top-workshop">
+          <span class="pnl-workshop-name">{workshopLabel || 'Mi portal'}</span>
+          {linked && <span class="pnl-role">Cliente</span>}
+        </div>
+        <form method="post" action="/salir" class="pnl-top-user" data-astro-reload>
+          <span class="pnl-user" title={portal.user.email}>{portal.user.email}</span>
+          <button class="btn btn-sm" type="submit" aria-label="Cerrar sesión"><Icon name="logout" /><span class="pnl-hide-sm">Salir</span></button>
+        </form>
+      </header>
+      <main id="contenido" class="pnl-content" tabindex="-1">
+        <slot />
+      </main>
+    </div>
+
+    {linked && (
+      <nav class="pnl-tabs pnl-tabs-4" aria-label="Secciones">
+        {nav.map(n => (
+          <a href={n.href} class:list={['pnl-tab', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
+            <Icon name={n.icon} /><span>{n.label}</span>
+          </a>
+        ))}
+      </nav>
+    )}
+
+    <script>
+      import '../scripts/panel.ts';
+    </script>
+  </body>
+</html>

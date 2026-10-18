@@ -41,6 +41,19 @@ export const REPAIR_STATUS_LABELS: Readonly<Record<RepairStatus, string>> = {
   listo: 'Listo para recoger',
   entregado: 'Entregado',
 };
+/**
+ * Explicación sencilla de cada estado para el cliente (portal). Solo describe
+ * el estado; nunca promete fechas que el taller no haya confirmado.
+ */
+export const REPAIR_STATUS_CUSTOMER_TEXT: Readonly<Record<RepairStatus, string>> = {
+  recibido: 'El taller ha recibido tu vehículo. El siguiente paso es revisarlo.',
+  diagnosis: 'El taller está revisando tu vehículo para saber qué necesita.',
+  esperando_recambios: 'El taller está esperando las piezas necesarias para continuar.',
+  en_reparacion: 'El taller está trabajando en tu vehículo.',
+  listo: 'Tu vehículo está listo. Puedes pasar a recogerlo en el horario del taller.',
+  entregado: 'Vehículo entregado. La reparación ha terminado.',
+};
+
 export function isRepairStatus(v: unknown): v is RepairStatus {
   return typeof v === 'string' && (REPAIR_STATUSES as readonly string[]).includes(v);
 }
@@ -72,6 +85,10 @@ export const orderUpdateSchema = z.object({
   diagnosis: optText(4000),
   workDone: optText(4000),
   internalNotes: optText(4000),
+  /** Mensaje para el cliente (portal). */
+  customerNotes: optText(2000),
+  /** Si el cliente ve la diagnosis y el trabajo realizado. */
+  showDetailsToCustomer: z.boolean().default(false),
 });
 export type OrderUpdateData = z.output<typeof orderUpdateSchema>;
 

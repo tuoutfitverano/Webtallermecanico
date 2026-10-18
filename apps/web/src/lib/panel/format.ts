@@ -39,4 +39,6 @@ export const FIELD_LABELS: Readonly<Record<string, string>> = {
   vehicle_id: 'vehículo',
   customer_id: 'cliente',
   received_at: 'fecha de recepción',
+  show_details_to_customer: 'detalles visibles para el cliente',
+  customer_notes: 'mensaje para el cliente (borrado)',
 };

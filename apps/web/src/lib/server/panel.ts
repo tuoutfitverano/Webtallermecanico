@@ -41,6 +41,8 @@ export interface Panel {
   isOwner: boolean;
   isPost: boolean;
   form: FormData | null;
+  /** Origen para los enlaces que se comparten (invitaciones): APP_URL en producción. */
+  origin: string;
   /** Error al cargar los talleres (sin conexión con la base de datos, etc.). */
   loadError: boolean;
 }
@@ -57,6 +59,12 @@ export async function panelPage(Astro: AstroGlobal): Promise<Panel | Response> {
   if (error) logAuth('panel_workshops_error', error.code);
   const workshops: PanelWorkshop[] = ((data ?? []) as Array<{ workshop_id: string; name: string; slug: string; status: string; role: MemberRole }>)
     .map(w => ({ id: w.workshop_id, name: w.name, slug: w.slug, status: w.status, role: w.role }));
+
+  // Un cliente (sin ser personal de ningún taller) no entra en el panel: página de acceso denegado.
+  if (!error && workshops.length === 0) {
+    const { data: records } = await page.supabase.rpc('portal_profile');
+    if ((records ?? []).length > 0) return Astro.rewrite('/acceso-denegado');
+  }
 
   // ?taller=<id> cambia de taller (si es uno de los suyos); si no, la cookie; si no, el primero.
   const asked = Astro.url.searchParams.get('taller');
@@ -77,6 +85,7 @@ export async function panelPage(Astro: AstroGlobal): Promise<Panel | Response> {
     isOwner,
     isPost: page.isPost,
     form: page.form,
+    origin: page.origin,
     loadError: Boolean(error),
   };
 }

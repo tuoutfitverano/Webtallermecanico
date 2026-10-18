@@ -60,9 +60,19 @@ URLs de Auth, plantillas de correo, SMTP propio, primer taller).
 Pendiente para fases siguientes: bandeja de solicitudes web dentro del panel, 2FA obligatorio para propietarios
 y administración de la plataforma, avisos/notificaciones.
 
-## Fase 5 · Portal del cliente
+## ✅ Fase 5 · Portal del cliente
 
-- Invitación del cliente a su portal: solo sus vehículos y el estado e información autorizada de sus reparaciones (nunca notas internas).
+- Portal en `/portal`: inicio (saludo, avisos "listo para recoger", resumen, última reparación), mis vehículos, mis reparaciones
+  con filtros (todas, en curso, listas, finalizadas), detalle con pasos, mensajes del taller e historial, y mis datos.
+- Vinculación cuenta ↔ ficha **solo por invitación del taller** (enlace personal de un solo uso, 7 días, ligado al correo,
+  guardado como huella SHA-256). Nunca por matrícula, nombre, correo o teléfono.
+- Panel: tarjeta "Acceso al portal" en la ficha del cliente (invitar, ver invitaciones pendientes, anular, retirar el acceso
+  sin borrar ficha ni historial). En cada orden: mensaje para el cliente y casilla para mostrarle diagnosis y trabajo.
+- Los clientes no tienen acceso a ninguna tabla: solo a funciones `portal_*` con columnas elegidas a mano.
+- `/mi-area` lleva a cada uno a su sitio tras iniciar sesión; un cliente que abre `/panel` recibe "acceso denegado" (403).
+- Pruebas: 322 comprobaciones SQL y 80 pruebas de navegador (14 del portal).
+
+Pendiente: envío automático del enlace de invitación por correo (hoy se copia y se comparte a mano).
 
 ## Fase 6 · Notificaciones y automatizaciones
 
