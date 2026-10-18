@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, envField } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -10,5 +10,20 @@ export default defineConfig({
   adapter: cloudflare(),
   vite: {
     plugins: [tailwindcss()],
+  },
+  // Variables de entorno. Todas se leen en el SERVIDOR en tiempo de ejecución
+  // (access: 'secret'), así se pueden cambiar en Cloudflare sin recompilar y
+  // ninguna acaba dentro del JavaScript del navegador. La clave publicable de
+  // Turnstile se pasa a la página desde el servidor.
+  env: {
+    schema: {
+      SUPABASE_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
+      SUPABASE_PUBLISHABLE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      SUPABASE_SECRET_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      TURNSTILE_SITE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      TURNSTILE_SECRET_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      REQUEST_HASH_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
+    },
+    validateSecrets: false,
   },
 });

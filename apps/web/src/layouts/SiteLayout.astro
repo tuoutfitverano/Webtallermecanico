@@ -1,0 +1,31 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource-variable/manrope';
+import '../styles/site.css';
+import type { PublicSite } from '../lib/site/content.ts';
+
+interface Props {
+  site: PublicSite;
+  title: string;
+  description?: string;
+  noindex?: boolean;
+}
+const { site, title, description = site.content.intro, noindex = false } = Astro.props;
+// Una web de demostración no debe aparecer en buscadores.
+const robots = noindex || site.isDemoContent ? 'noindex, nofollow' : 'index, follow';
+---
+<!doctype html>
+<html lang="es" style={`--accent:${site.accent}`}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+    <meta name="robots" content={robots} />
+    <meta name="theme-color" content={site.accent} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

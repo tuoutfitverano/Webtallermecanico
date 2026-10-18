@@ -1,0 +1,188 @@
+---
+/**
+ * Un formulario de solicitud: cita, presupuesto o contacto.
+ * Funciona con JavaScript (envío asíncrono con estados) y, como reserva,
+ * sin él (envío clásico al mismo endpoint).
+ */
+import {
+  CONTACT_CHANNEL_LABELS,
+  CONTACT_CHANNELS,
+  CONTACT_TOPIC_LABELS,
+  CONTACT_TOPICS,
+  LIMITS,
+  OTHER_SERVICE,
+  TIME_SLOT_LABELS,
+  TIME_SLOTS,
+  type RequestKind,
+} from '@talleres/core';
+import Icon from './Icon.astro';
+import type { SiteService } from '../lib/site/content.ts';
+
+interface Props {
+  kind: RequestKind;
+  services: SiteService[];
+  turnstileSiteKey: string | null;
+  hidden?: boolean;
+}
+const { kind, services, turnstileSiteKey, hidden = false } = Astro.props;
+const id = (field: string) => `${kind}-${field}`;
+const err = (field: string) => `${kind}-err-${field}`;
+const isContact = kind === 'contacto';
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+const maxDate = (() => {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + LIMITS.maxDaysAhead);
+  return d.toISOString().slice(0, 10);
+})();
+const submitLabel = { cita: 'Enviar solicitud de cita', presupuesto: 'Pedir presupuesto', contacto: 'Enviar mensaje' }[kind];
+const messageLabel = { cita: 'Descripción del problema', presupuesto: 'Describe qué le pasa al vehículo', contacto: 'Mensaje' }[kind];
+const messageRequired = kind !== 'cita';
+---
+<div class="req-panel" id={`solicitar-${kind}`} role="tabpanel" aria-labelledby={`tab-${kind}`} hidden={hidden}>
+  <form
+    class="req-form"
+    method="post"
+    action="/api/solicitudes"
+    novalidate
+    data-req-form
+    data-kind={kind}
+    data-services={JSON.stringify(services.map(s => s.id))}
+  >
+    <input type="hidden" name="kind" value={kind} />
+    <input type="hidden" name="idempotencyKey" value={crypto.randomUUID()} />
+    <input type="hidden" name="sourcePath" value="/" />
+
+    <!-- Campo trampa para bots: las personas no lo ven ni lo rellenan. -->
+    <div class="hp" aria-hidden="true">
+      <label for={id('website')}>No rellenes este campo</label>
+      <input id={id('website')} name="website" type="text" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <div class="form-grid">
+      <div class="field span-2" data-field="name">
+        <label for={id('name')}><span>Nombre</span> <abbr title="obligatorio">*</abbr></label>
+        <input class="input" id={id('name')} name="name" required maxlength={LIMITS.name.max} autocomplete="name" aria-describedby={err('name')} />
+        <p class="field-error" id={err('name')} hidden></p>
+      </div>
+
+      <fieldset class="field span-2 contact-group" data-field="contact" aria-describedby={err('contact')}>
+        <legend>Cómo te contactamos <span class="muted">(teléfono o correo)</span> <abbr title="obligatorio">*</abbr></legend>
+        <div class="form-grid">
+          <div class="field" data-field="phone">
+            <label for={id('phone')}>Teléfono</label>
+            <input class="input" id={id('phone')} name="phone" type="tel" inputmode="tel" maxlength="30" autocomplete="tel" aria-describedby={`${err('phone')} ${err('contact')}`} />
+            <p class="field-error" id={err('phone')} hidden></p>
+          </div>
+          <div class="field" data-field="email">
+            <label for={id('email')}>Correo electrónico</label>
+            <input class="input" id={id('email')} name="email" type="email" inputmode="email" maxlength={LIMITS.email} autocomplete="email" aria-describedby={`${err('email')} ${err('contact')}`} />
+            <p class="field-error" id={err('email')} hidden></p>
+          </div>
+          <div class="field span-2" data-field="preferredContact">
+            <label for={id('preferredContact')}>Prefiero que me contactéis por <span class="muted">(opcional)</span></label>
+            <select class="select" id={id('preferredContact')} name="preferredContact" aria-describedby={err('preferredContact')}>
+              <option value="">Me da igual</option>
+              {CONTACT_CHANNELS.map(c => <option value={c}>{CONTACT_CHANNEL_LABELS[c]}</option>)}
+            </select>
+            <p class="field-error" id={err('preferredContact')} hidden></p>
+          </div>
+        </div>
+        <p class="field-error" id={err('contact')} hidden></p>
+      </fieldset>
+
+      {isContact ? (
+        <div class="field span-2" data-field="topic">
+          <label for={id('topic')}><span>Motivo del contacto</span> <abbr title="obligatorio">*</abbr></label>
+          <select class="select" id={id('topic')} name="topic" required aria-describedby={err('topic')}>
+            <option value="">Selecciona…</option>
+            {CONTACT_TOPICS.map(t => <option value={t}>{CONTACT_TOPIC_LABELS[t]}</option>)}
+          </select>
+          <p class="field-error" id={err('topic')} hidden></p>
+        </div>
+      ) : (
+        <>
+          <div class="field span-2" data-field="service">
+            <label for={id('service')}><span>Servicio</span> <abbr title="obligatorio">*</abbr></label>
+            <select class="select" id={id('service')} name="service" required aria-describedby={err('service')}>
+              <option value="">Selecciona…</option>
+              {services.map(s => <option value={s.id}>{s.name}</option>)}
+              <option value={OTHER_SERVICE}>Otro / no lo sé</option>
+            </select>
+            <p class="field-error" id={err('service')} hidden></p>
+          </div>
+          <div class="field" data-field="plate">
+            <label for={id('plate')}>Matrícula <span class="muted">(opcional)</span></label>
+            <input class="input input-plate" id={id('plate')} name="plate" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="1234 ABC" aria-describedby={err('plate')} />
+            <p class="field-error" id={err('plate')} hidden></p>
+          </div>
+          <div class="field" data-field="make">
+            <label for={id('make')}>Marca <span class="muted">(opcional)</span></label>
+            <input class="input" id={id('make')} name="make" maxlength={LIMITS.make} autocomplete="off" placeholder="Ej.: Seat" aria-describedby={err('make')} />
+            <p class="field-error" id={err('make')} hidden></p>
+          </div>
+          <div class="field span-2" data-field="model">
+            <label for={id('model')}>Modelo <span class="muted">(opcional)</span></label>
+            <input class="input" id={id('model')} name="model" maxlength={LIMITS.model} autocomplete="off" placeholder="Ej.: León 1.5 TSI" aria-describedby={err('model')} />
+            <p class="field-error" id={err('model')} hidden></p>
+          </div>
+        </>
+      )}
+
+      {kind === 'cita' && (
+        <>
+          <div class="field" data-field="preferredDate">
+            <label for={id('preferredDate')}>Fecha preferida <span class="muted">(opcional)</span></label>
+            <input class="input" id={id('preferredDate')} name="preferredDate" type="date" min={today} max={maxDate} aria-describedby={err('preferredDate')} />
+            <p class="field-error" id={err('preferredDate')} hidden></p>
+          </div>
+          <div class="field" data-field="preferredTime">
+            <label for={id('preferredTime')}>Franja preferida <span class="muted">(opcional)</span></label>
+            <select class="select" id={id('preferredTime')} name="preferredTime" aria-describedby={err('preferredTime')}>
+              <option value="">Me da igual</option>
+              {TIME_SLOTS.filter(t => t !== 'indiferente').map(t => <option value={t}>{TIME_SLOT_LABELS[t]}</option>)}
+            </select>
+            <p class="field-error" id={err('preferredTime')} hidden></p>
+          </div>
+        </>
+      )}
+
+      <div class="field span-2" data-field="message">
+        <label for={id('message')}><span>{messageLabel}</span> {messageRequired ? <abbr title="obligatorio">*</abbr> : <span class="muted">(opcional)</span>}</label>
+        <textarea class="textarea" id={id('message')} name="message" maxlength={LIMITS.message.max} required={messageRequired} placeholder={isContact ? '¿En qué podemos ayudarte?' : 'Ej.: hace ruido al frenar, se enciende un testigo…'} aria-describedby={err('message')}></textarea>
+        <p class="field-error" id={err('message')} hidden></p>
+      </div>
+
+      <div class="field span-2" data-field="privacyAccepted">
+        <label class="check">
+          <input type="checkbox" name="privacyAccepted" required aria-describedby={err('privacyAccepted')} />
+          <span>He leído la <a href="/privacidad" target="_blank">política de privacidad</a> y acepto que usen mis datos para responder a esta solicitud. <abbr title="obligatorio">*</abbr></span>
+        </label>
+        <p class="field-error" id={err('privacyAccepted')} hidden></p>
+      </div>
+
+      {turnstileSiteKey && (
+        <div class="field span-2">
+          <div class="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="solicitud" data-language="es" data-size="flexible"></div>
+        </div>
+      )}
+    </div>
+
+    <div class="form-status" data-status role="status" aria-live="polite"></div>
+
+    <button class="btn btn-primary btn-lg btn-block" type="submit" data-submit>
+      <span class="spinner" aria-hidden="true"></span>
+      <span data-label>{submitLabel}</span>
+    </button>
+    {kind === 'cita' && (
+      <p class="form-hint"><Icon name="alert" /> Es una <strong>solicitud</strong>: la cita no queda reservada hasta que el taller te la confirme.</p>
+    )}
+  </form>
+
+  <div class="form-success" data-success hidden tabindex="-1">
+    <div class="ok-ico"><Icon name="check" /></div>
+    <h3 data-success-title>Solicitud recibida</h3>
+    <p data-success-text></p>
+    <p class="muted small">Referencia: <strong data-success-ref></strong></p>
+    <button class="btn" type="button" data-again>Enviar otra solicitud</button>
+  </div>
+</div>

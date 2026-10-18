@@ -22,14 +22,14 @@ Este documento explica **cómo está construida la plataforma y por qué**. Est�
 | **Backend** | Código de servidor de Astro en Cloudflare + funciones de PostgreSQL | Operaciones que necesitan secretos o comprobaciones (formularios, antispam, integraciones). |
 | **Base de datos** | `supabase/migrations` | Tablas, relaciones y, sobre todo, **los permisos**. |
 | **Integraciones** | Fases posteriores (Edge Functions o servidor) | Email, WhatsApp, proveedores de datos de vehículos. Nunca desde el navegador. |
-| **Configuración** | `.dev.vars` (local), panel de Cloudflare y de Supabase (producción) | Claves y secretos. **Nunca en Git.** |
+| **Configuración** | `apps/web/.env` (local, plantilla en `.env.example`), secretos de Cloudflare y panel de Supabase (producción) | Claves y secretos. **Nunca en Git.** Se leen con `astro:env/server` solo en el servidor. |
 
 ## 3. Tecnologías elegidas (comprobadas el 18-10-2026)
 
 | Tecnología | Versión | Por qué |
 | --- | --- | --- |
 | Astro | 7.4 | Webs muy rápidas y buenas para SEO; solo envía JavaScript donde hace falta. |
-| Tailwind CSS | 4.3 | Estilos consistentes y fáciles de adaptar a la marca de cada taller. |
+| Tailwind CSS | 4.3 | Disponible para el futuro panel. La web pública usa `site.css`, el diseño heredado de la demo, para conservarlo sin reescribirlo. |
 | TypeScript | **6.0** | Detecta errores antes de ejecutar. Se usa la 6 y no la 7 porque la herramienta de comprobación de Astro (`@astrojs/check`) todavía no admite la 7. |
 | React | *aún no* | Solo se añadirá cuando una pantalla lo necesite de verdad (panel interactivo). Hoy no aporta nada. |
 | Supabase | CLI 2.121, PostgreSQL 17 | Base de datos, usuarios, 2FA y reglas de acceso en un solo servicio. |
@@ -75,9 +75,25 @@ Una misma persona puede ser mecánico en un taller y cliente en otro: los permis
 
 ## 5. Webs de los talleres
 
-Una única aplicación Astro decide qué taller mostrar según el **dominio** de la visita (`get_public_site(hostname)`). El contenido y la marca de cada taller (nombre, logotipo, colores, servicios, contacto…) se guardan en `workshop_sites`. El campo `is_demo_content` obliga a la web a avisar cuando los datos son de demostración.
+Una única aplicación Astro decide qué taller mostrar según el **dominio** de la visita (`get_public_site(hostname)`, con la clave publicable). El contenido y la marca de cada taller (nombre, color, servicios, teléfono, horario, dirección…) se guardan en `workshop_sites` y se validan al leerlos (`src/lib/site/content.ts`). El campo `is_demo_content` obliga a la web a avisar de que los datos son de demostración y a no aparecer en buscadores.
 
-Para probar en local se usa `demo.localhost`, que siempre apunta a tu propio ordenador.
+Para probar en local se usa `demo.localhost`, que siempre apunta a tu propio ordenador. Sin Supabase configurado, `npm run dev` muestra una demo local (`src/lib/site/demo.ts`) cuyos formularios responden "no disponible".
+
+### Solicitudes desde la web (contacto, cita, presupuesto)
+
+```
+navegador ──► POST /api/solicitudes ──► handleSubmission ──► submit_web_request() ──► web_requests
+ valida con     (servidor Astro)          · mismo origen        (clave secreta)          estado 'nueva'
+ packages/core                            · campo trampa         · idempotencia           RLS: solo gestores
+ + bloquea                                · validación           · límite de envíos         del taller la ven
+ doble envío                              · Turnstile            · validación final
+```
+
+- **Éxito solo si se guardó**: el navegador muestra "recibido" únicamente con una respuesta `ok` del servidor, que solo llega después de que la base de datos devuelva el id.
+- **Sin duplicados**: cada formulario lleva una clave de idempotencia; el mismo envío repetido devuelve el mismo id.
+- **Antispam por capas**: comprobación de origen, campo trampa invisible, Cloudflare Turnstile (obligatorio en producción) y límite de 5 envíos cada 10 minutos por visitante y 60 por hora por taller, aplicado en la base de datos.
+- **Privacidad**: no se guarda el IP, solo una huella HMAC que cambia cada día y se borra a los 2 días. Los registros técnicos no contienen datos del formulario. El personal no puede leer la huella ni la clave de idempotencia.
+- **Sin JavaScript** los formularios también funcionan (envío clásico y redirección con el resultado).
 
 ## 6. Vehículos
 

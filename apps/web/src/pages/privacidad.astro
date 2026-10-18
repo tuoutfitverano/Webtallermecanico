@@ -1,0 +1,19 @@
+---
+import LegalPending from '../components/LegalPending.astro';
+import { siteForHost } from '../lib/server/config.ts';
+export const prerender = false;
+const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
+if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
+---
+<LegalPending
+  site={site}
+  title="Política de privacidad"
+  items={[
+    'Quién es el responsable del tratamiento y cómo contactarle.',
+    'Qué datos se recogen en los formularios (nombre, teléfono o correo, datos opcionales del vehículo y del mensaje) y para qué se usan: responder a la solicitud.',
+    'La base legal del tratamiento.',
+    'Cuánto tiempo se conservan los datos.',
+    'Quién trata los datos por cuenta del taller (por ejemplo, el proveedor de alojamiento y de base de datos) y si hay transferencias fuera de la UE.',
+    'Cómo ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad, y el derecho a reclamar ante la AEPD.',
+  ]}
+/>

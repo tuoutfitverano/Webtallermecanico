@@ -1,0 +1,13 @@
+---
+import type { PublicSite } from '../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+---
+{site.isDemoContent && (
+  <div class="demo-bar" role="note">
+    <div class="wrap">
+      <strong><span class="demo-dot" aria-hidden="true"></span>Web de demostración</strong>
+      <span>{site.content.notice || 'Los datos de este taller son ficticios.'}</span>
+    </div>
+  </div>
+)}

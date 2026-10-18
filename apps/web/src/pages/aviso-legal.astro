@@ -1,0 +1,17 @@
+---
+import LegalPending from '../components/LegalPending.astro';
+import { siteForHost } from '../lib/server/config.ts';
+export const prerender = false;
+const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
+if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
+---
+<LegalPending
+  site={site}
+  title="Aviso legal"
+  items={[
+    'Nombre o razón social del titular, NIF y domicilio.',
+    'Datos de contacto, incluido un correo electrónico.',
+    'Datos de inscripción registral, si corresponde.',
+    'Condiciones de uso de la web.',
+  ]}
+/>

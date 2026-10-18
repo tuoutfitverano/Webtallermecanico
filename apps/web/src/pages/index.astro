@@ -1,33 +1,51 @@
 ---
-// Página provisional de la Fase 0: solo comprueba que todo el conjunto
-// (Astro + Tailwind + Cloudflare + paquete compartido) funciona junto.
-import '../styles/global.css';
-import { formatPlate } from '@talleres/core';
+/**
+ * Web pública del taller. Se genera en cada visita según el dominio, para que
+ * una sola aplicación sirva a todos los talleres.
+ */
+import SiteLayout from '../layouts/SiteLayout.astro';
+import DemoNotice from '../components/DemoNotice.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import Hero from '../components/Hero.astro';
+import Services from '../components/Services.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import RequestForms from '../components/RequestForms.astro';
+import ContactInfo from '../components/ContactInfo.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { siteForHost, turnstileSiteKey } from '../lib/server/config.ts';
 
 export const prerender = false;
 
-const host = Astro.url.hostname;
-const ejemplo = formatPlate('1950bxf');
+let site;
+try {
+  site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host);
+} catch {
+  return new Response('La web no está disponible en este momento. Inténtalo de nuevo en unos minutos.', {
+    status: 503,
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '60' },
+  });
+}
+if (!site) {
+  return new Response('Esta web no existe o no está publicada.', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+}
+
+const q = Astro.url.searchParams;
+const noJsResult = q.get('solicitud') === 'ok'
+  ? { ok: true, ref: (q.get('ref') ?? '').replace(/[^A-Z0-9]/g, '').slice(0, 8) }
+  : q.get('solicitud') === 'error' ? { ok: false } : null;
+
+Astro.response.headers.set('cache-control', 'no-store');
+const title = [site.name, site.content.tagline || 'Taller mecánico', site.content.city].filter(Boolean).join(' · ');
 ---
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex" />
-    <title>Plataforma talleres · en construcción</title>
-  </head>
-  <body class="min-h-dvh bg-slate-50 text-ink antialiased">
-    <main class="mx-auto max-w-xl px-4 py-16">
-      <p class="text-sm font-semibold uppercase tracking-widest text-brand">Fase 0 · Cimientos</p>
-      <h1 class="mt-3 text-3xl font-bold tracking-tight">Plataforma para talleres en construcción</h1>
-      <p class="mt-4 text-slate-600">
-        Esta página se ha generado en el servidor para el dominio
-        <code class="rounded bg-white px-1.5 py-0.5 ring-1 ring-slate-200" data-testid="host">{host}</code>.
-      </p>
-      <p class="mt-2 text-slate-600">
-        Matrícula de ejemplo formateada por el paquete compartido:
-        <strong data-testid="plate">{ejemplo}</strong>
-      </p>
-    </main>
-  </body>
-</html>
+<SiteLayout site={site} title={title}>
+  <DemoNotice site={site} />
+  <SiteHeader site={site} />
+  <main>
+    <Hero site={site} />
+    <Services site={site} />
+    <HowItWorks />
+    <RequestForms site={site} turnstileSiteKey={turnstileSiteKey()} noJsResult={noJsResult} />
+    <ContactInfo site={site} />
+  </main>
+  <SiteFooter site={site} />
+</SiteLayout>

@@ -31,3 +31,6 @@ playwright/.auth/
 
 # Ajustes locales de Claude Code (cada persona los suyos)
 .claude/settings.local.json
+
+# Descargas de herramientas para pruebas (PostgREST)
+.cache/

@@ -1,0 +1,23 @@
+---
+import Icon from './Icon.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+import { telHref, whatsappHref } from '../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const c = site.content;
+const tel = telHref(c.phone);
+const wa = whatsappHref(c.whatsapp);
+const maps = c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : '';
+---
+<section class="section section-alt" id="contacto">
+  <div class="wrap">
+    <div class="section-head"><span class="kicker">Contacto</span><h2>Dónde estamos</h2></div>
+    <div class="contact">
+      {c.address && <div class="card"><Icon name="pin" /><b>Dirección</b><span class="muted">{c.address}</span>{maps && <a href={maps} target="_blank" rel="noopener">Cómo llegar</a>}</div>}
+      {c.hours.length > 0 && <div class="card"><Icon name="clock" /><b>Horario</b>{c.hours.map(h => <span class="muted">{h}</span>)}</div>}
+      {tel && <div class="card"><Icon name="phone" /><b>Teléfono</b><a href={tel}>{c.phone}</a></div>}
+      {wa && <div class="card"><Icon name="chat" /><b>WhatsApp</b><a href={wa} target="_blank" rel="noopener">Escríbenos</a></div>}
+      {c.email && <div class="card"><Icon name="mail" /><b>Correo</b><a href={`mailto:${c.email}`}>{c.email}</a></div>}
+    </div>
+  </div>
+</section>

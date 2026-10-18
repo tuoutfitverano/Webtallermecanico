@@ -17,10 +17,17 @@
     "test": "npm run test --workspaces --if-present",
     "test:db": "bash scripts/test-db.sh",
     "test:mcp": "node scripts/check-playwright-mcp.mjs",
-    "mcp:playwright": "node scripts/playwright-mcp.mjs"
+    "mcp:playwright": "node scripts/playwright-mcp.mjs",
+    "test:e2e": "bash scripts/test-e2e.sh",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.64.1",
-    "supabase": "^2.121.0"
+    "eslint": "10.13.0",
+    "eslint-plugin-astro": "3.2.1",
+    "globals": "17.13.0",
+    "supabase": "^2.121.0",
+    "typescript-eslint": "8.71.2"
   }
 }

@@ -1,0 +1,33 @@
+---
+import Icon from './Icon.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+import { telHref, whatsappHref } from '../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const c = site.content;
+const tel = telHref(c.phone);
+const wa = whatsappHref(c.whatsapp, `Hola ${site.name}, quería hacer una consulta.`);
+---
+<section class="hero">
+  <div class="wrap">
+    <div>
+      {c.city && <span class="eyebrow"><Icon name="pin" />Taller multimarca en {c.city}</span>}
+      <h1>Tu coche en buenas manos.<br /><em>Pide cita en un minuto.</em></h1>
+      {c.intro && <p class="hero-lead">{c.intro}</p>}
+      <div class="hero-actions">
+        <a href="#solicitar" class="btn btn-primary btn-lg"><Icon name="calendar" />Solicitar cita</a>
+        <a href="#solicitar-presupuesto" class="btn btn-lg" data-open-tab="presupuesto"><Icon name="clipboard" />Pedir presupuesto</a>
+      </div>
+    </div>
+
+    <aside class="hero-card" aria-label="Contacto rápido">
+      <h2>¿Hablamos?</h2>
+      <ul>
+        {tel && <li><Icon name="phone" /><a href={tel}>{c.phone}</a></li>}
+        {wa && <li><Icon name="chat" /><a href={wa} target="_blank" rel="noopener">Escríbenos por WhatsApp</a></li>}
+        {c.hours.length > 0 && <li><Icon name="clock" /><span>{c.hours.map(h => <span class="block">{h}</span>)}</span></li>}
+        {c.address && <li><Icon name="pin" /><span>{c.address}</span></li>}
+      </ul>
+    </aside>
+  </div>
+</section>

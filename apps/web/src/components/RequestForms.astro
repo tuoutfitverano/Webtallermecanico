@@ -1,0 +1,64 @@
+---
+import RequestForm from './RequestForm.astro';
+import Icon from './Icon.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+import { telHref } from '../lib/site/content.ts';
+
+interface Props {
+  site: PublicSite;
+  turnstileSiteKey: string | null;
+  /** Resultado de un envío sin JavaScript (?solicitud=ok|error). */
+  noJsResult: { ok: boolean; ref?: string } | null;
+}
+const { site, turnstileSiteKey, noJsResult } = Astro.props;
+const tabs = [
+  { kind: 'cita', label: 'Pedir cita' },
+  { kind: 'presupuesto', label: 'Pedir presupuesto' },
+  { kind: 'contacto', label: 'Contacto' },
+] as const;
+const tel = telHref(site.content.phone);
+---
+<section class="section" id="solicitar">
+  <div class="wrap booking">
+    <aside class="booking-aside">
+      <span class="aside-kicker">Cita, presupuesto o consulta</span>
+      <h3>Cuéntanos qué necesitas</h3>
+      <p>Te respondemos para confirmar. Solo te pedimos los datos imprescindibles para contestarte.</p>
+      <ul>
+        <li><Icon name="calendar" /><span>Una solicitud de cita <strong>no es una reserva</strong>: el taller te llamará o escribirá para confirmarla.</span></li>
+        <li><Icon name="shield" /><span>No consultamos tu matrícula en ningún servicio externo: solo la usamos para identificar tu coche.</span></li>
+        {tel && <li><Icon name="phone" /><span>¿Prefieres llamar? <a href={tel}>{site.content.phone}</a></span></li>}
+      </ul>
+    </aside>
+
+    <div class="card card-pad req" data-req>
+      {noJsResult && (
+        <div class={`alert ${noJsResult.ok ? 'alert-ok' : 'alert-bad'}`} role="status">
+          <Icon name={noJsResult.ok ? 'check' : 'alert'} />
+          <span>
+            {noJsResult.ok
+              ? <>Solicitud recibida. Referencia <strong>{noJsResult.ref}</strong>. Te contactaremos para confirmarla.</>
+              : <>No hemos podido enviar tu solicitud y no se ha guardado. Revisa los datos e inténtalo de nuevo{tel && <>, o llámanos al <a href={tel}>{site.content.phone}</a></>}.</>}
+          </span>
+        </div>
+      )}
+      <div class="req-tabs" role="tablist" aria-label="Tipo de solicitud">
+        {tabs.map((t, i) => (
+          <button type="button" class={`req-tab ${i === 0 ? 'is-on' : ''}`} role="tab" id={`tab-${t.kind}`} aria-controls={`solicitar-${t.kind}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1} data-tab={t.kind}>{t.label}</button>
+        ))}
+      </div>
+      {tabs.map((t, i) => (
+        <RequestForm kind={t.kind} services={site.content.services} turnstileSiteKey={turnstileSiteKey} hidden={i !== 0} />
+      ))}
+    </div>
+  </div>
+</section>
+
+<!-- Sin JavaScript se ven los tres formularios seguidos (sin pestañas). -->
+<noscript><style>.req-panel[hidden]{display:block!important;margin-top:28px}.req-tabs{display:none!important}</style></noscript>
+
+{turnstileSiteKey && <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+
+<script>
+  import '../scripts/request-forms.ts';
+</script>

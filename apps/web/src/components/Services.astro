@@ -1,0 +1,28 @@
+---
+import Icon from './Icon.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const { services, brands } = site.content;
+---
+{services.length > 0 && (
+  <section class="section" id="servicios">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">Servicios</span>
+        <h2>Lo que hacemos por tu coche</h2>
+        {brands && <p>Trabajamos con {brands.toLowerCase()}.</p>}
+      </div>
+      <div class="services">
+        {services.map(s => (
+          <article class="service card">
+            <span class="ico-box"><Icon name="wrench" /></span>
+            <h3>{s.name}</h3>
+            {s.description && <p>{s.description}</p>}
+            <a class="service-link" href="#solicitar" data-service={s.id}>Pedir cita para este servicio <Icon name="arrow" /></a>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+)}

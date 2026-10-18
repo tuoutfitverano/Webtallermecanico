@@ -2,6 +2,7 @@
 
 Webs comerciales y herramientas de gestión (vehículos, clientes, empleados y reparaciones) para talleres multimarca. Es una sola plataforma multiempresa: cada taller tiene su marca, su dominio y sus datos, siempre separados de los demás.
 
+- **Instrucciones para Claude y convenciones:** [CLAUDE.md](CLAUDE.md)
 - **Arquitectura y decisiones:** [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)
 - **Plan por fases:** [docs/ROADMAP.md](docs/ROADMAP.md)
 - **Navegador para Claude (Playwright MCP):** [docs/PLAYWRIGHT_MCP.md](docs/PLAYWRIGHT_MCP.md)
@@ -35,10 +36,12 @@ npm run dev          # web en http://localhost:4321
 npm test             # pruebas de la lógica compartida
 npm run check        # comprobación de tipos
 npm run build        # compilar para Cloudflare
+npm run lint         # revisión de estilo y errores (ESLint)
 npm run test:db      # pruebas de base de datos y permisos
+npm run test:e2e     # formularios en navegador contra una base de datos real
 npm run test:mcp     # comprueba que el navegador de Claude (Playwright MCP) funciona
 ```
 
 ## Secretos
 
-Copia `apps/web/.dev.vars.example` como `apps/web/.dev.vars` y rellénalo. Ese archivo no se sube a Git. La clave secreta de Supabase **nunca** debe llegar al navegador.
+Copia `apps/web/.env.example` como `apps/web/.env` y rellénalo. Ese archivo no se sube a Git. La clave secreta de Supabase **nunca** debe llegar al navegador. Pasos para ponerlo en marcha: [docs/PUESTA_EN_MARCHA.md](docs/PUESTA_EN_MARCHA.md).

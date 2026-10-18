@@ -1,0 +1,42 @@
+---
+import Icon from './Icon.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+import { telHref } from '../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const tel = telHref(site.content.phone);
+---
+<header class="site-header">
+  <div class="wrap">
+    <a href="/" class="brand" aria-label={`${site.name}, inicio`}>
+      <span class="brand-mark"><Icon name="wrench" /></span>
+      <span>{site.name}{site.content.tagline && <small>{site.content.tagline}</small>}</span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Principal">
+      <a href="#servicios">Servicios</a>
+      <a href="#como-trabajamos">Cómo trabajamos</a>
+      <a href="#solicitar">Cita y presupuesto</a>
+      <a href="#contacto">Contacto</a>
+    </nav>
+    <div class="header-cta">
+      {tel && <a href={tel} class="btn btn-sm" aria-label={`Llamar al ${site.content.phone}`}><Icon name="phone" /><span class="btn-text">Llamar</span></a>}
+      <a href="#solicitar" class="btn btn-sm btn-primary">Pedir cita</a>
+    </div>
+    <button class="btn btn-ghost icon-btn menu-toggle" id="menuToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav"><Icon name="menu" /></button>
+  </div>
+</header>
+
+<script>
+  const btn = document.getElementById('menuToggle');
+  const nav = document.getElementById('nav');
+  if (btn && nav) {
+    const set = (open: boolean) => {
+      nav.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', String(open));
+      btn.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+    };
+    btn.addEventListener('click', () => set(!nav.classList.contains('is-open')));
+    nav.addEventListener('click', e => { if ((e.target as Element).closest('a')) set(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') set(false); });
+  }
+</script>

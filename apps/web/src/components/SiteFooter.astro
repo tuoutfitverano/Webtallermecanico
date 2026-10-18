@@ -1,0 +1,16 @@
+---
+import Icon from './Icon.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+---
+<footer class="site-footer">
+  <div class="wrap">
+    <a href="/" class="brand"><span class="brand-mark"><Icon name="wrench" /></span>{site.name}</a>
+    <nav class="footer-links" aria-label="Información legal">
+      <a href="/aviso-legal">Aviso legal</a>
+      <a href="/privacidad">Política de privacidad</a>
+    </nav>
+    <span>© {new Date().getFullYear()} {site.name}</span>
+  </div>
+</footer>
