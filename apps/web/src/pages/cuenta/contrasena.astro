@@ -1,0 +1,67 @@
+---
+/** Elegir una contraseña nueva (con sesión; también tras el enlace de recuperación). */
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { authPage, formText, redirectToLogin } from '../../lib/server/auth-page.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { authErrorMessage } from '../../lib/auth/messages.ts';
+import { passwordProblem, PASSWORD_MIN } from '../../lib/auth/validate.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+if (!page.user || !page.supabase) return redirectToLogin(Astro);
+
+let error = '';
+let done = false;
+if (page.form) {
+  const password = formText(page.form, 'password');
+  const password2 = formText(page.form, 'password2');
+  const problem = passwordProblem(password);
+  if (problem) error = problem;
+  else if (password !== password2) error = 'Las contraseñas no coinciden.';
+  if (error) {
+    Astro.response.status = 422;
+  } else {
+    const { error: e } = await page.supabase.auth.updateUser({ password });
+    if (e) {
+      logAuth('auth_password_error', e.code);
+      error = authErrorMessage(e);
+      Astro.response.status = e.status === 429 ? 429 : 400;
+    } else {
+      logAuth('auth_password_ok');
+      done = true;
+    }
+  }
+}
+---
+<AuthLayout title="Cambiar la contraseña" user={page.user}>
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Tu cuenta</p>
+    <h1 id="titulo" class="auth-title heading">Cambiar la contraseña</h1>
+    {done ? (
+      <>
+        <div class="alert alert-ok" role="status"><Icon name="check" /><span>Contraseña cambiada.</span></div>
+        <nav class="auth-links"><a href="/cuenta">Ir a mi cuenta</a></nav>
+      </>
+    ) : (
+      <>
+        {error && <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>}
+        <form method="post" class="auth-form" data-busy="Guardando…" novalidate>
+          <input type="email" name="username" autocomplete="username" value={page.user.email} hidden readonly />
+          <div class="field">
+            <label for="password">Contraseña nueva <span class="muted">(mínimo {PASSWORD_MIN} caracteres, con mayúsculas, minúsculas y números)</span></label>
+            <input class="input" id="password" name="password" type="password" autocomplete="new-password" required minlength={PASSWORD_MIN} maxlength="72" autofocus />
+          </div>
+          <div class="field">
+            <label for="password2">Repite la contraseña nueva</label>
+            <input class="input" id="password2" name="password2" type="password" autocomplete="new-password" required maxlength="72" />
+          </div>
+          <button class="btn btn-primary btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar contraseña</span></button>
+        </form>
+        <nav class="auth-links"><a href="/cuenta">Cancelar</a></nav>
+      </>
+    )}
+  </section>
+</AuthLayout>

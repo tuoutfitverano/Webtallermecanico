@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Prueba las migraciones y los permisos (RLS) en un PostgreSQL local.
 #
-# Crea una base de datos temporal, aplica una imitación mínima de Supabase,
-# todas las migraciones y ejecuta cada archivo de supabase/tests/*.test.sql.
+# Crea una base de datos temporal, aplica los roles de Supabase, el esquema
+# auth REAL (migraciones oficiales de Supabase Auth), todas nuestras
+# migraciones y ejecuta cada archivo de supabase/tests/*.test.sql.
 # Cada prueba se ejecuta dentro de una transacción que se deshace al final.
 #
 # Variables opcionales: PGHOST, PGPORT, PGUSER (superusuario), TEST_DB.
@@ -26,9 +27,13 @@ fi
 "${PSQL[@]}" -d postgres -c "drop database if exists $DB" -c "create database $DB" >/dev/null 2>&1
 
 run_file() { "${PSQL[@]}" -d "$DB" -f "$1"; }
+# shellcheck source=lib/supabase-auth.sh
+source "$ROOT/scripts/lib/supabase-auth.sh"
 
 echo "▸ Preparando base de datos de prueba ($DB)"
-run_file "$ROOT/supabase/tests/_harness/supabase_stub.sql" >/dev/null
+run_file "$ROOT/supabase/tests/_harness/supabase_roles.sql" >/dev/null
+echo "▸ Esquema auth (Supabase Auth $AUTH_VERSION)"
+auth_migrate "$DB"
 for f in "$ROOT"/supabase/migrations/*.sql; do
   echo "▸ Migración $(basename "$f")"
   run_file "$f" >/dev/null

@@ -1,0 +1,31 @@
+---
+/**
+ * Cerrar sesión. Solo por POST (un enlace o una imagen de otra web no puede
+ * cerrar la sesión de nadie). scope 'local': cierra esta sesión, no las de
+ * otros dispositivos.
+ */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import { authPage } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost) {
+  if (!page.form) return new Response('Origen no permitido.', { status: 403 });
+  if (page.supabase) {
+    const { error } = await page.supabase.auth.signOut({ scope: 'local' });
+    logAuth(error ? 'auth_logout_error' : 'auth_logout_ok', error?.code);
+  }
+  return Astro.redirect('/acceso?salida=1', 303);
+}
+if (!page.user) return Astro.redirect('/acceso', 303);
+---
+<AuthLayout title="Cerrar sesión" user={page.user}>
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <h1 id="titulo" class="auth-title heading">Cerrar sesión</h1>
+    <form method="post" class="auth-form" data-busy="Cerrando…">
+      <button class="btn btn-primary btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cerrar sesión</span></button>
+    </form>
+  </section>
+</AuthLayout>

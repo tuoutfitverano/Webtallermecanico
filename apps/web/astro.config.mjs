@@ -23,6 +23,8 @@ export default defineConfig({
       TURNSTILE_SITE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       TURNSTILE_SECRET_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
       REQUEST_HASH_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Dominio del área privada (acceso, cuenta, invitaciones). Ver docs/PUESTA_EN_MARCHA.md.
+      APP_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
     validateSecrets: false,
   },

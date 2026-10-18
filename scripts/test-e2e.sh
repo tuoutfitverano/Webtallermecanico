@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Prueba de extremo a extremo de los formularios con una base de datos REAL:
+# Prueba de extremo a extremo con las piezas REALES de Supabase:
 #
-#   navegador (Playwright) → web Astro → /api/solicitudes → supabase-js
-#   → API REST (PostgREST, la misma pieza que usa Supabase) → PostgreSQL con RLS
+#   navegador (Playwright) → web Astro → supabase-js / @supabase/ssr
+#   → pasarela tipo Supabase → API REST (PostgREST) + Supabase Auth (GoTrue)
+#   → PostgreSQL con RLS
 #
-# No necesita Docker. Usa PostgreSQL local, descarga PostgREST si hace falta
-# (a .cache/) y genera claves de PRUEBA que solo valen aquí.
+# Los correos que envía Supabase Auth (confirmación, recuperación) llegan a
+# un buzón de pruebas local (scripts/e2e/mail-sink.mjs).
 #
-# Variables opcionales: PGHOST, PGPORT, PGUSER, PGPASSWORD, POSTGREST_BIN.
+# No necesita Docker. Usa PostgreSQL local, descarga PostgREST y Supabase Auth
+# si hace falta (a .cache/) y genera claves de PRUEBA que solo valen aquí.
+#
+# Variables opcionales: PGHOST, PGPORT, PGUSER, PGPASSWORD, POSTGREST_BIN, AUTH_BIN.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,6 +19,10 @@ DB=talleres_e2e
 WEB_PORT=4329
 PGRST_PORT=3001
 PROXY_PORT=54329
+AUTH_PORT=9998
+SMTP_PORT=2525
+MAIL_PORT=2580
+TEST_PASSWORD="Clave-de-prueba-1"   # cumple las reglas de supabase/config.toml
 POSTGREST_VERSION=v13.0.7
 JWT_SECRET="secreto-solo-para-pruebas-e2e-0123456789abcdef"
 AUTH_PASS="authenticator-e2e"
@@ -46,7 +54,10 @@ trap cleanup EXIT
 # --- Base de datos: imitación de Supabase + migraciones + datos de demo ---
 echo "▸ Preparando base de datos $DB"
 "${PSQL[@]}" -d postgres -c "drop database if exists $DB" -c "create database $DB" >/dev/null 2>&1
-"${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/tests/_harness/supabase_stub.sql" >/dev/null
+"${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/tests/_harness/supabase_roles.sql" >/dev/null
+# shellcheck source=lib/supabase-auth.sh
+source "$ROOT/scripts/lib/supabase-auth.sh"
+auth_migrate "$DB"
 for f in "$ROOT"/supabase/migrations/*.sql; do "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null; done
 "${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/seed.sql" >/dev/null
 "${PSQL[@]}" -d postgres >/dev/null <<SQL
@@ -60,16 +71,70 @@ end \$\$;
 grant anon, authenticated, service_role to authenticator;
 SQL
 
+# --- Buzón de correo de pruebas + Supabase Auth ---
+# Si quedó un servidor de una ejecución anterior, las pruebas hablarían con él.
+for port in $AUTH_PORT $SMTP_PORT $MAIL_PORT $PROXY_PORT $PGRST_PORT; do
+  if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+    echo "✘ El puerto $port ya está en uso (¿quedó una prueba anterior abierta?). Ciérrala y repite." >&2; exit 1
+  fi
+done
+node "$ROOT/scripts/e2e/mail-sink.mjs" $SMTP_PORT $MAIL_PORT "$ROOT/supabase/templates" & pids+=($!)
+SITE="http://demo.localhost:$WEB_PORT"
+(cd "$ROOT/.cache/auth" && \
+  GOTRUE_DB_DRIVER=postgres DATABASE_URL="$(auth_db_url "$DB")" GOTRUE_DB_MIGRATIONS_PATH=./migrations \
+  GOTRUE_API_HOST=127.0.0.1 PORT=$AUTH_PORT API_EXTERNAL_URL="http://127.0.0.1:$PROXY_PORT" \
+  GOTRUE_SITE_URL="$SITE" GOTRUE_URI_ALLOW_LIST="$SITE/**" \
+  GOTRUE_JWT_SECRET="$JWT_SECRET" GOTRUE_JWT_EXP=3600 GOTRUE_JWT_AUD=authenticated \
+  GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated GOTRUE_JWT_ADMIN_ROLES=service_role \
+  GOTRUE_EXTERNAL_EMAIL_ENABLED=true GOTRUE_MAILER_AUTOCONFIRM=false GOTRUE_DISABLE_SIGNUP=false \
+  GOTRUE_PASSWORD_MIN_LENGTH=10 \
+  GOTRUE_PASSWORD_REQUIRED_CHARACTERS="abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789" \
+  GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_REAUTHENTICATION=true \
+  GOTRUE_SMTP_HOST=127.0.0.1 GOTRUE_SMTP_PORT=$SMTP_PORT GOTRUE_SMTP_ADMIN_EMAIL=no-responder@talleres.test \
+  GOTRUE_SMTP_SENDER_NAME="Área de talleres" GOTRUE_SMTP_MAX_FREQUENCY=1s \
+  GOTRUE_MAILER_URLPATHS_CONFIRMATION=/auth/v1/verify GOTRUE_MAILER_URLPATHS_RECOVERY=/auth/v1/verify \
+  GOTRUE_MAILER_URLPATHS_INVITE=/auth/v1/verify GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/auth/v1/verify \
+  GOTRUE_MAILER_TEMPLATES_CONFIRMATION="http://127.0.0.1:$MAIL_PORT/templates/confirmation.html" \
+  GOTRUE_MAILER_SUBJECTS_CONFIRMATION="Confirma tu correo · Área de talleres" \
+  GOTRUE_RATE_LIMIT_EMAIL_SENT=1000 GOTRUE_RATE_LIMIT_VERIFY=1000 GOTRUE_RATE_LIMIT_TOKEN_REFRESH=1000 \
+  GOTRUE_LOG_LEVEL=warn \
+  exec ./auth serve >"$ROOT/.cache/auth/serve.log" 2>&1) & pids+=($!)
+
 # --- API REST (PostgREST) + pasarela tipo Supabase ---
 PGRST_DB_URI="postgres://authenticator:$AUTH_PASS@${PGHOST:-127.0.0.1}:${PGPORT:-5432}/$DB" \
 PGRST_DB_SCHEMAS=public PGRST_DB_ANON_ROLE=anon PGRST_JWT_SECRET="$JWT_SECRET" \
 PGRST_SERVER_HOST=127.0.0.1 PGRST_SERVER_PORT=$PGRST_PORT PGRST_LOG_LEVEL=crit \
   "$PGRST" >/dev/null 2>&1 & pids+=($!)
-node "$ROOT/scripts/e2e/rest-proxy.mjs" $PROXY_PORT "http://127.0.0.1:$PGRST_PORT" & pids+=($!)
+node "$ROOT/scripts/e2e/rest-proxy.mjs" $PROXY_PORT "http://127.0.0.1:$PGRST_PORT" "http://127.0.0.1:$AUTH_PORT" & pids+=($!)
 for i in $(seq 1 30); do curl -sf -o /dev/null "http://127.0.0.1:$PGRST_PORT/" && break; sleep 0.5; done
+auth_ready=0
+for i in $(seq 1 40); do curl -sf -o /dev/null "http://127.0.0.1:$AUTH_PORT/health" && { auth_ready=1; break; }; sleep 0.5; done
+if [ "$auth_ready" != 1 ]; then
+  echo "✘ Supabase Auth no arranca. Registro:" >&2; tail -30 "$ROOT/.cache/auth/serve.log" >&2; exit 1
+fi
 
 ANON_KEY="$(node "$ROOT/scripts/e2e/jwt.mjs" "$JWT_SECRET" anon)"
 SERVICE_KEY="$(node "$ROOT/scripts/e2e/jwt.mjs" "$JWT_SECRET" service_role)"
+
+# --- Cuentas y talleres de prueba (API de administración de Supabase Auth) ---
+create_user() { # correo nombre
+  curl -sf -o /dev/null -X POST "http://127.0.0.1:$PROXY_PORT/auth/v1/admin/users" \
+    -H "apikey: $SERVICE_KEY" -H "authorization: Bearer $SERVICE_KEY" -H "content-type: application/json" \
+    -d "{\"email\":\"$1\",\"password\":\"$TEST_PASSWORD\",\"email_confirm\":true,\"user_metadata\":{\"full_name\":\"$2\"}}" \
+    || { echo "✘ No se pudo crear la cuenta de prueba $1" >&2; tail -20 "$ROOT/.cache/auth/serve.log" >&2; exit 1; }
+}
+create_user propietaria@e2e.test "Paula Propietaria"
+create_user mecanico@e2e.test "Marcos Mecánico"
+create_user otro@e2e.test "Óscar Otro Taller"
+"${PSQL[@]}" -d "$DB" >/dev/null <<'SQL'
+-- Taller demo: propietaria y mecánico. Otro taller con sus propios datos.
+select private.add_workshop_owner('d0000000-0000-0000-0000-000000000001', 'propietaria@e2e.test');
+insert into public.workshop_members (workshop_id, user_id, role)
+  select 'd0000000-0000-0000-0000-000000000001', id, 'mecanico' from auth.users where email = 'mecanico@e2e.test';
+select private.create_workshop('taller-otro', 'Taller Otro', 'otro@e2e.test');
+insert into public.vehicles (workshop_id, plate, make, model)
+  select id, '9999ZZZ', 'Renault', 'Clio' from public.workshops where slug = 'taller-otro';
+SQL
 
 # --- Web Astro con las claves de prueba ---
 echo "▸ Arrancando la web"
@@ -93,4 +158,5 @@ echo "▸ Ejecutando pruebas de extremo a extremo"
 cd "$ROOT/apps/web"
 E2E_BASE_URL="http://demo.localhost:$WEB_PORT" E2E_API_URL="http://127.0.0.1:$WEB_PORT" E2E_REST_URL="http://127.0.0.1:$PROXY_PORT/rest/v1" \
 E2E_PROXY_URL="http://127.0.0.1:$PROXY_PORT" E2E_ANON_KEY="$ANON_KEY" E2E_SERVICE_KEY="$SERVICE_KEY" \
+E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" \
   npx playwright test "$@"

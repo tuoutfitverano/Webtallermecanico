@@ -1,0 +1,106 @@
+---
+/** Inicio de sesión con correo y contraseña (Supabase Auth). */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+import { authPage, formText } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+import { safeNext } from '../lib/auth/redirect.ts';
+import { authErrorMessage, AUTH_UNAVAILABLE } from '../lib/auth/messages.ts';
+import { isEmail, normalizeEmail } from '../lib/auth/validate.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+
+const next = safeNext(page.isPost ? formText(page.form, 'next') : Astro.url.searchParams.get('next'), page.self);
+if (page.user && !page.isPost) return Astro.redirect(next, 303);
+
+let email = '';
+let error = '';
+let notice = '';
+let unconfirmed = false;
+
+if (Astro.url.searchParams.get('salida') === '1') notice = 'Has cerrado la sesión.';
+if (Astro.url.searchParams.get('clave') === '1') notice = 'Contraseña cambiada. Ya puedes entrar con la nueva.';
+
+if (page.form) {
+  email = normalizeEmail(page.form.get('email'));
+  const action = formText(page.form, 'action');
+  if (!page.supabase) {
+    error = AUTH_UNAVAILABLE;
+  } else if (!isEmail(email)) {
+    error = 'Escribe un correo electrónico válido.';
+  } else if (action === 'reenviar') {
+    // Reenviar el correo de confirmación. No revela si la cuenta existe.
+    const { error: e } = await page.supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${page.origin}/auth/confirmar?next=${encodeURIComponent(next)}` },
+    });
+    if (e && e.code !== 'user_not_found') {
+      logAuth('auth_resend_error', e.code);
+      error = authErrorMessage(e);
+    } else {
+      notice = 'Si la cuenta existe y está pendiente de confirmar, te hemos enviado otro correo.';
+    }
+  } else {
+    const password = formText(page.form, 'password');
+    if (!password) {
+      error = 'Escribe tu contraseña.';
+    } else {
+      const { error: e } = await page.supabase.auth.signInWithPassword({ email, password });
+      if (!e) {
+        logAuth('auth_login_ok');
+        return Astro.redirect(next, 303);
+      }
+      logAuth('auth_login_error', e.code);
+      error = authErrorMessage(e);
+      unconfirmed = e.code === 'email_not_confirmed';
+      Astro.response.status = e.status === 429 ? 429 : 400;
+    }
+  }
+}
+const qsNext = next === '/cuenta' ? '' : `?next=${encodeURIComponent(next)}`;
+---
+<AuthLayout title="Iniciar sesión">
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Área de talleres</p>
+    <h1 id="titulo" class="auth-title heading">Iniciar sesión</h1>
+    <p class="auth-lead">Para el personal de los talleres. Si te han invitado, entra con el correo al que llegó la invitación.</p>
+
+    {!page.supabase && <div class="alert alert-warn" role="alert"><Icon name="alert" /><span>{AUTH_UNAVAILABLE}</span></div>}
+    {notice && <div class="alert alert-ok" role="status"><Icon name="check" /><span>{notice}</span></div>}
+    {error && (
+      <div class="alert alert-bad" role="alert">
+        <Icon name="alert" />
+        <span>{error}</span>
+      </div>
+    )}
+
+    <form method="post" class="auth-form" data-busy="Entrando…" novalidate>
+      <input type="hidden" name="next" value={next} />
+      <div class="field">
+        <label for="email">Correo electrónico</label>
+        <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" value={email} autofocus={!email} />
+      </div>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input class="input" id="password" name="password" type="password" autocomplete="current-password" required maxlength="200" autofocus={Boolean(email)} />
+      </div>
+      <button class="btn btn-primary btn-block" type="submit" name="action" value="entrar">
+        <span class="spinner" aria-hidden="true"></span><span data-label>Entrar</span>
+      </button>
+      {unconfirmed && (
+        <button class="btn btn-block" type="submit" name="action" value="reenviar" formnovalidate>
+          <span class="spinner" aria-hidden="true"></span><span data-label>Reenviar el correo de confirmación</span>
+        </button>
+      )}
+    </form>
+
+    <nav class="auth-links" aria-label="Otras opciones">
+      <a href={`/recuperar${qsNext}`}>¿Has olvidado la contraseña?</a>
+      <a href={`/registro${qsNext}`}>Crear una cuenta</a>
+    </nav>
+  </section>
+</AuthLayout>

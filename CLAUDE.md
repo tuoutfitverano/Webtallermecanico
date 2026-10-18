@@ -15,18 +15,23 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 ```
 apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego panel y portal)
   src/pages/              index (web del taller), privacidad, aviso-legal, api/solicitudes.ts
+                          acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
+  src/middleware.ts       Área privada: dominio APP_URL y cabeceras anti-caché
   src/components/         Secciones de la web y formularios (RequestForm.astro)
   src/scripts/            JavaScript del navegador (request-forms.ts)
   src/lib/site/           Contenido del taller, resolución por dominio, demo local
   src/lib/requests/       Endpoint de solicitudes: handler (lógica pura), store, antispam
-  src/lib/server/         Configuración del servidor (lee astro:env) — solo servidor
+  src/lib/server/         Configuración del servidor (lee astro:env), sesión (auth.ts, auth-page.ts) — solo servidor
+  src/lib/auth/           Redirección segura (?next=), mensajes de error, validación de acceso
+  src/layouts/AuthLayout  Plantilla del área privada
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
   e2e/                    Pruebas de navegador (Playwright Test)
 packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes
 supabase/migrations/      Esquema + permisos (RLS). Nunca edites una migración ya aplicada: crea otra.
-supabase/tests/           Pruebas SQL de permisos por rol
+supabase/tests/           Pruebas SQL de permisos por rol (con el esquema auth REAL de Supabase Auth)
+supabase/templates/       Plantillas de correo de Supabase Auth (confirmación, recuperación)
 supabase/seed.sql         Datos de DEMOSTRACIÓN (taller demo en demo.localhost)
-scripts/                  test-db.sh, test-e2e.sh, lanzador de Playwright MCP
+scripts/                  test-db.sh, test-e2e.sh, lib/supabase-auth.sh, e2e/ (pasarela, buzón SMTP, JWT), Playwright MCP
 demo/                     Prototipo comercial estático antiguo (no tocar salvo petición)
 atrium-mtl/               Proyecto independiente (portada ATRIUM MTL)
 ```
@@ -41,7 +46,7 @@ npm run check        # tipos (tsc + astro check)
 npm test             # pruebas unitarias (Vitest) de core y web
 npm run build        # compilación para Cloudflare
 npm run test:db      # migraciones + permisos RLS en PostgreSQL local
-npm run test:e2e     # navegador → web → API REST (PostgREST) → PostgreSQL con RLS
+npm run test:e2e     # navegador → web → Supabase Auth real + PostgREST → PostgreSQL con RLS
 npm run test:mcp     # comprueba el servidor Playwright MCP
 ```
 
@@ -71,6 +76,18 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Vídeos de fondo opcionales por taller en `workshop_sites.theme` (`heroVideo`, `servicesVideo`, solo `https`). `FadingVideo.astro` no los descarga sin JavaScript, con "reducir movimiento" o con ahorro de datos; entonces se ve el fondo animado. Una web real debe usar vídeos propios o con licencia.
 - React solo cuando una pantalla lo necesite de verdad (todavía no se usa).
 - Variables de entorno: `apps/web/.env` en local (plantilla en `.env.example`); en producción, secretos de Cloudflare.
+
+## Acceso, cuentas y equipos (Fase 3)
+
+- **Supabase Auth** con `@supabase/ssr`: sesión en cookies, un cliente NUEVO por petición (`createAuthClient`), usuario validado con `getClaims()`. **Nunca** `getSession()` en el servidor.
+- El área privada usa la **clave publicable + el token del usuario**: RLS decide. No uses la clave secreta para leer o escribir datos de usuarios.
+- Páginas con POST: `authPage(Astro)`; si `isPost && !form` → 403 (origen distinto). Redirecciones solo con `safeNext()`.
+- Roles del taller: `propietario` (owner), `administrador` (manager), `mecanico` (mechanic). Los privilegios **nunca** se leen de `user_metadata` ni del perfil.
+- Equipo e invitaciones solo mediante funciones (`create_workshop_invitation`, `accept_workshop_invitation`, `set_member_role`, `set_member_active`, `workshop_team`, `my_workshops`). En SQL, compara roles con `IS NOT DISTINCT FROM` (con `=` un rol NULL deja pasar a cualquiera).
+- Alta de talleres: `private.create_workshop(...)` desde el SQL Editor; la API no la ve. Ver `docs/PUESTA_EN_MARCHA.md`.
+- Contraseñas: mínimo 10 con mayúsculas, minúsculas y números (igual en `validate.ts` y `supabase/config.toml`).
+- En pruebas e2e los correos llegan a `scripts/e2e/mail-sink.mjs`; `test-e2e.sh` usa `exec` para que la limpieza mate los servidores (si un puerto está ocupado, aborta).
+- `Referrer-Policy: same-origin` en el área privada (con `no-referrer` el navegador envía `Origin: null` y los formularios se rechazan).
 
 ## Formularios y solicitudes (Fase 2)
 

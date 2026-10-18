@@ -1,0 +1,131 @@
+---
+/**
+ * Crear una cuenta. Una cuenta por sí sola NO da acceso a ningún taller:
+ * hace falta una invitación (o que la plataforma dé de alta el taller).
+ */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+import { authPage, formText } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+import { safeNext } from '../lib/auth/redirect.ts';
+import { authErrorMessage, AUTH_UNAVAILABLE } from '../lib/auth/messages.ts';
+import { isEmail, normalizeEmail, passwordProblem, PASSWORD_MIN, text } from '../lib/auth/validate.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+
+const next = safeNext(page.isPost ? formText(page.form, 'next') : Astro.url.searchParams.get('next'), page.self);
+if (page.user && !page.isPost) return Astro.redirect(next, 303);
+
+const errors: Record<string, string> = {};
+let error = '';
+let sent = false;
+let fullName = '';
+let email = '';
+
+if (page.form) {
+  fullName = text(page.form.get('full_name'), 120);
+  email = normalizeEmail(page.form.get('email'));
+  const password = formText(page.form, 'password');
+  const password2 = formText(page.form, 'password2');
+  if (fullName.length < 2) errors.full_name = 'Escribe tu nombre.';
+  if (!isEmail(email)) errors.email = 'Escribe un correo electrónico válido.';
+  const pw = passwordProblem(password);
+  if (pw) errors.password = pw;
+  else if (password !== password2) errors.password2 = 'Las contraseñas no coinciden.';
+  if (page.form.get('privacy') !== 'on') errors.privacy = 'Necesitamos que aceptes la política de privacidad.';
+
+  if (!page.supabase) {
+    error = AUTH_UNAVAILABLE;
+  } else if (Object.keys(errors).length === 0) {
+    const { data, error: e } = await page.supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${page.origin}/auth/confirmar?next=${encodeURIComponent(next)}`,
+        // El nombre va al perfil. Estos datos los puede cambiar el usuario:
+        // nunca se usan para dar permisos.
+        data: { full_name: fullName },
+      },
+    });
+    if (e) {
+      logAuth('auth_signup_error', e.code);
+      error = authErrorMessage(e);
+      Astro.response.status = e.status === 429 ? 429 : 400;
+    } else if (data.session) {
+      // Proyecto sin confirmación de correo: ya hay sesión.
+      logAuth('auth_signup_ok_session');
+      return Astro.redirect(next, 303);
+    } else {
+      // Con confirmación activada. Supabase no revela si el correo ya existía.
+      logAuth('auth_signup_ok_confirm');
+      sent = true;
+    }
+  } else {
+    error = 'Revisa los campos marcados.';
+    Astro.response.status = 422;
+  }
+}
+const qsNext = next === '/cuenta' ? '' : `?next=${encodeURIComponent(next)}`;
+---
+<AuthLayout title="Crear una cuenta">
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Área de talleres</p>
+    <h1 id="titulo" class="auth-title heading">{sent ? 'Revisa tu correo' : 'Crear una cuenta'}</h1>
+
+    {sent ? (
+      <>
+        <div class="alert alert-ok" role="status">
+          <Icon name="mail" />
+          <span>Si el correo <strong>{email}</strong> no tenía ya una cuenta, te hemos enviado un enlace para confirmarlo. Ábrelo desde este mismo dispositivo para continuar.</span>
+        </div>
+        <p class="auth-lead">¿No llega? Revisa la carpeta de spam. Si ya tenías cuenta, <a href={`/acceso${qsNext}`}>inicia sesión</a> o <a href={`/recuperar${qsNext}`}>recupera tu contraseña</a>.</p>
+      </>
+    ) : (
+      <>
+        <p class="auth-lead">Crear una cuenta no da acceso a ningún taller por sí sola: el taller te tiene que invitar.</p>
+        {!page.supabase && <div class="alert alert-warn" role="alert"><Icon name="alert" /><span>{AUTH_UNAVAILABLE}</span></div>}
+        {error && <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>}
+
+        <form method="post" class="auth-form" data-busy="Creando la cuenta…" novalidate>
+          <input type="hidden" name="next" value={next} />
+          <div class={`field ${errors.full_name ? 'has-error' : ''}`}>
+            <label for="full_name">Nombre y apellidos</label>
+            <input class="input" id="full_name" name="full_name" autocomplete="name" required maxlength="120" value={fullName} aria-invalid={errors.full_name ? 'true' : undefined} aria-describedby={errors.full_name ? 'full_name-err' : undefined} />
+            {errors.full_name && <p class="field-error" id="full_name-err">{errors.full_name}</p>}
+          </div>
+          <div class={`field ${errors.email ? 'has-error' : ''}`}>
+            <label for="email">Correo electrónico</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" value={email} aria-invalid={errors.email ? 'true' : undefined} aria-describedby={errors.email ? 'email-err' : undefined} />
+            {errors.email && <p class="field-error" id="email-err">{errors.email}</p>}
+          </div>
+          <div class={`field ${errors.password ? 'has-error' : ''}`}>
+            <label for="password">Contraseña <span class="muted">(mínimo {PASSWORD_MIN} caracteres, con mayúsculas, minúsculas y números)</span></label>
+            <input class="input" id="password" name="password" type="password" autocomplete="new-password" required minlength={PASSWORD_MIN} maxlength="72" aria-invalid={errors.password ? 'true' : undefined} aria-describedby={errors.password ? 'password-err' : undefined} />
+            {errors.password && <p class="field-error" id="password-err">{errors.password}</p>}
+          </div>
+          <div class={`field ${errors.password2 ? 'has-error' : ''}`}>
+            <label for="password2">Repite la contraseña</label>
+            <input class="input" id="password2" name="password2" type="password" autocomplete="new-password" required maxlength="72" aria-invalid={errors.password2 ? 'true' : undefined} aria-describedby={errors.password2 ? 'password2-err' : undefined} />
+            {errors.password2 && <p class="field-error" id="password2-err">{errors.password2}</p>}
+          </div>
+          <div class={`field ${errors.privacy ? 'has-error' : ''}`}>
+            <label class="check">
+              <input type="checkbox" name="privacy" required aria-describedby={errors.privacy ? 'privacy-err' : undefined} />
+              <span>He leído la <a href="/privacidad-cuenta" target="_blank">política de privacidad</a> y acepto que se usen mis datos para gestionar mi cuenta.</span>
+            </label>
+            {errors.privacy && <p class="field-error" id="privacy-err">{errors.privacy}</p>}
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">
+            <span class="spinner" aria-hidden="true"></span><span data-label>Crear cuenta</span>
+          </button>
+        </form>
+        <nav class="auth-links" aria-label="Otras opciones">
+          <a href={`/acceso${qsNext}`}>Ya tengo cuenta</a>
+        </nav>
+      </>
+    )}
+  </section>
+</AuthLayout>

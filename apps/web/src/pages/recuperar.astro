@@ -1,0 +1,70 @@
+---
+/** Pedir un enlace para cambiar la contraseña. No revela si la cuenta existe. */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+import { authPage } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+import { authErrorMessage, AUTH_UNAVAILABLE } from '../lib/auth/messages.ts';
+import { isEmail, normalizeEmail } from '../lib/auth/validate.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+
+let email = '';
+let error = '';
+let sent = false;
+
+if (page.form) {
+  email = normalizeEmail(page.form.get('email'));
+  if (!page.supabase) {
+    error = AUTH_UNAVAILABLE;
+  } else if (!isEmail(email)) {
+    error = 'Escribe un correo electrónico válido.';
+    Astro.response.status = 422;
+  } else {
+    const { error: e } = await page.supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${page.origin}/auth/confirmar?next=${encodeURIComponent('/cuenta/contrasena')}`,
+    });
+    if (e) {
+      logAuth('auth_recover_error', e.code);
+      error = authErrorMessage(e);
+      Astro.response.status = e.status === 429 ? 429 : 400;
+    } else {
+      logAuth('auth_recover_sent');
+      sent = true;
+    }
+  }
+}
+---
+<AuthLayout title="Recuperar la contraseña">
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Área de talleres</p>
+    <h1 id="titulo" class="auth-title heading">Recuperar la contraseña</h1>
+    {sent ? (
+      <div class="alert alert-ok" role="status">
+        <Icon name="mail" />
+        <span>Si existe una cuenta con <strong>{email}</strong>, te hemos enviado un enlace para elegir una contraseña nueva. Ábrelo desde este mismo dispositivo. Caduca en poco tiempo.</span>
+      </div>
+    ) : (
+      <>
+        <p class="auth-lead">Escribe el correo de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva.</p>
+        {!page.supabase && <div class="alert alert-warn" role="alert"><Icon name="alert" /><span>{AUTH_UNAVAILABLE}</span></div>}
+        {error && <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>}
+        <form method="post" class="auth-form" data-busy="Enviando…" novalidate>
+          <div class="field">
+            <label for="email">Correo electrónico</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" value={email} autofocus />
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">
+            <span class="spinner" aria-hidden="true"></span><span data-label>Enviar enlace</span>
+          </button>
+        </form>
+      </>
+    )}
+    <nav class="auth-links" aria-label="Otras opciones">
+      <a href="/acceso">Volver a iniciar sesión</a>
+    </nav>
+  </section>
+</AuthLayout>

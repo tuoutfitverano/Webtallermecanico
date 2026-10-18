@@ -45,6 +45,30 @@ export function siteForHost(host: string): Promise<PublicSite | null> {
   return resolveSite(host, { supabase: getPublicClient(), dev: isDev });
 }
 
+/** URL y clave publicable para el inicio de sesión, o null si falta configurarlo. */
+export function authEnv(): { url: string; publishableKey: string } | null {
+  const url = env('SUPABASE_URL');
+  const publishableKey = env('SUPABASE_PUBLISHABLE_KEY');
+  return url && publishableKey ? { url, publishableKey } : null;
+}
+
+/**
+ * Dominio del área privada (p. ej. https://app.tudominio.es). Si está definido,
+ * el acceso y la cuenta solo funcionan ahí y los enlaces de los correos
+ * apuntan ahí. Sin definir (desarrollo), se usa el dominio de la visita.
+ */
+export function appOrigin(): string | null {
+  const raw = env('APP_URL');
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.endsWith('.localhost');
+    return url.protocol === 'https:' || local ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Clave pública de Turnstile para pintar el widget, o null si no está configurado. */
 export function turnstileSiteKey(): string | null {
   return env('TURNSTILE_SITE_KEY') || null;

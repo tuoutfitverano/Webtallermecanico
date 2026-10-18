@@ -1,13 +1,17 @@
 -- Datos de prueba: dos talleres que NUNCA deben ver los datos del otro.
 -- Se cargan como superusuario dentro de cada prueba (que termina en ROLLBACK).
-insert into auth.users (id, email) values
-  ('00000000-0000-0000-0000-0000000000ad', 'admin@plataforma.test'),
-  ('00000000-0000-0000-0000-0000000000a1', 'propietaria@alcarria.test'),
-  ('00000000-0000-0000-0000-0000000000a2', 'mecanico@alcarria.test'),
-  ('00000000-0000-0000-0000-0000000000b1', 'propietario@chamberi.test'),
-  ('00000000-0000-0000-0000-0000000000c1', 'cliente1@correo.test'),
-  ('00000000-0000-0000-0000-0000000000c2', 'cliente2@correo.test'),
-  ('00000000-0000-0000-0000-0000000000ff', 'ajeno@correo.test');
+-- Cuentas de prueba en la tabla REAL auth.users de Supabase Auth.
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000ad', 'admin@plataforma.test', now(), '{"full_name":"Admin Plataforma"}'),
+  ('00000000-0000-0000-0000-0000000000a1', 'propietaria@alcarria.test', now(), '{"full_name":"Ana Propietaria"}'),
+  ('00000000-0000-0000-0000-0000000000a2', 'mecanico@alcarria.test', now(), '{"full_name":"Mario Mecánico"}'),
+  ('00000000-0000-0000-0000-0000000000a3', 'gestora@alcarria.test', now(), '{"full_name":"Gema Gestora"}'),
+  ('00000000-0000-0000-0000-0000000000b1', 'propietario@chamberi.test', now(), '{"full_name":"Bruno Propietario"}'),
+  ('00000000-0000-0000-0000-0000000000c1', 'cliente1@correo.test', now(), '{}'),
+  ('00000000-0000-0000-0000-0000000000c2', 'cliente2@correo.test', now(), '{}'),
+  ('00000000-0000-0000-0000-0000000000ff', 'ajeno@correo.test', now(), '{"full_name":"Persona Ajena"}'),
+  -- Se registró pero todavía no ha confirmado su correo.
+  ('00000000-0000-0000-0000-0000000000ee', 'sin-confirmar@correo.test', null, '{}');
 
 insert into public.platform_admins (user_id) values ('00000000-0000-0000-0000-0000000000ad');
 
@@ -18,6 +22,7 @@ insert into public.workshops (id, slug, name, status) values
 insert into public.workshop_members (workshop_id, user_id, role) values
   ('aaaaaaaa-0000-0000-0000-000000000000', '00000000-0000-0000-0000-0000000000a1', 'propietario'),
   ('aaaaaaaa-0000-0000-0000-000000000000', '00000000-0000-0000-0000-0000000000a2', 'mecanico'),
+  ('aaaaaaaa-0000-0000-0000-000000000000', '00000000-0000-0000-0000-0000000000a3', 'administrador'),
   ('bbbbbbbb-0000-0000-0000-000000000000', '00000000-0000-0000-0000-0000000000b1', 'propietario');
 
 insert into public.customers (id, workshop_id, full_name, phone, user_id, internal_notes) values

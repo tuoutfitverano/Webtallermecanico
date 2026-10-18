@@ -1,0 +1,82 @@
+---
+/**
+ * Aceptar una invitación a un taller. Exige sesión: si no la hay, manda a
+ * iniciar sesión (o crear la cuenta) y vuelve aquí. El taller y el rol los
+ * decide la base de datos a partir del código, nunca el navegador.
+ */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+import { authPage, formText, redirectToLogin } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+import { dbErrorMessage } from '../lib/auth/messages.ts';
+import { ROLE_LABELS, type MemberRole } from '../lib/auth/validate.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+
+const token = (page.isPost ? formText(page.form, 'token') : Astro.url.searchParams.get('token') ?? '').trim().slice(0, 200);
+if (!page.user || !page.supabase) {
+  // Sin sesión: al registrarse o entrar, se vuelve a esta misma invitación.
+  return redirectToLogin(Astro);
+}
+const { supabase, user } = page;
+
+let error = '';
+if (page.form && token) {
+  const { error: e } = await supabase.rpc('accept_workshop_invitation', { p_token: token });
+  if (!e) {
+    logAuth('invite_accept_ok');
+    return Astro.redirect('/cuenta?bienvenida=1', 303);
+  }
+  logAuth('invite_accept_error', e.code);
+  error = dbErrorMessage(e);
+  Astro.response.status = 400;
+}
+
+interface InvitationView { workshop_name: string; role: MemberRole; email_hint: string; email_matches: boolean; expires_at: string; state: string }
+let invitation: InvitationView | null = null;
+if (token) {
+  const { data, error: e } = await supabase.rpc('get_workshop_invitation', { p_token: token });
+  if (e) logAuth('invite_view_error', e.code);
+  invitation = (Array.isArray(data) ? data[0] : null) ?? null;
+}
+
+const STATES: Record<string, string> = {
+  aceptada: 'Esta invitación ya se ha usado.',
+  revocada: 'Esta invitación se ha anulado. Pide una nueva al taller.',
+  caducada: 'Esta invitación ha caducado. Pide una nueva al taller.',
+  taller_suspendido: 'El taller no está disponible en este momento.',
+};
+const blocked = !invitation ? 'El enlace de invitación no es válido. Comprueba que lo has copiado entero.' : STATES[invitation.state] ?? '';
+---
+<AuthLayout title="Invitación" user={user}>
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Invitación</p>
+    {invitation && !blocked ? (
+      <>
+        <h1 id="titulo" class="auth-title heading">Únete a {invitation.workshop_name}</h1>
+        <p class="auth-lead">Te invitan como <strong>{ROLE_LABELS[invitation.role]}</strong>.</p>
+        {error && <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>}
+        {invitation.email_matches ? (
+          <form method="post" class="auth-form" data-busy="Uniéndote…">
+            <input type="hidden" name="token" value={token} />
+            <button class="btn btn-primary btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Aceptar la invitación</span></button>
+          </form>
+        ) : (
+          <div class="alert alert-warn" role="alert">
+            <Icon name="alert" />
+            <span>Esta invitación es para <strong>{invitation.email_hint}</strong> y has entrado como <strong>{user.email}</strong>. Cierra la sesión y entra (o crea la cuenta) con el correo invitado.</span>
+          </div>
+        )}
+      </>
+    ) : (
+      <>
+        <h1 id="titulo" class="auth-title heading">Invitación no disponible</h1>
+        <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{blocked || error}</span></div>
+      </>
+    )}
+    <nav class="auth-links"><a href="/cuenta">Ir a mi cuenta</a></nav>
+  </section>
+</AuthLayout>

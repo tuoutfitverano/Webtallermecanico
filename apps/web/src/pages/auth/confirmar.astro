@@ -1,0 +1,99 @@
+---
+/**
+ * Destino de los enlaces de los correos (confirmar cuenta, recuperar contraseña).
+ *
+ * Acepta los dos formatos de Supabase Auth:
+ *   · ?token_hash=…&type=…  (plantillas de correo recomendadas para SSR)
+ *   · ?code=…               (flujo PKCE con las plantillas por defecto)
+ *
+ * Al abrir el enlace se muestra un botón y el código se usa al pulsarlo (POST):
+ * algunos programas de correo "visitan" los enlaces para analizarlos y, si se
+ * usara al abrir, el enlace llegaría ya gastado a la persona.
+ */
+import type { EmailOtpType } from '@supabase/supabase-js';
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { authPage } from '../../lib/server/auth-page.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { safeNext } from '../../lib/auth/redirect.ts';
+import { authErrorMessage, AUTH_UNAVAILABLE } from '../../lib/auth/messages.ts';
+
+export const prerender = false;
+
+const OTP_TYPES: readonly EmailOtpType[] = ['signup', 'email', 'recovery', 'invite', 'magiclink', 'email_change'];
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+
+const source = page.isPost ? new URLSearchParams([...page.form!.entries()].filter(([, v]) => typeof v === 'string') as [string, string][]) : Astro.url.searchParams;
+const tokenHash = (source.get('token_hash') ?? '').slice(0, 512);
+const rawType = source.get('type') ?? '';
+const type = OTP_TYPES.includes(rawType as EmailOtpType) ? (rawType as EmailOtpType) : null;
+const code = (source.get('code') ?? '').slice(0, 512);
+
+// La plantilla de correo pone en `next` la dirección de vuelta que pidió la web
+// ({{ .RedirectTo }}), que a su vez es "/auth/confirmar?next=<destino>":
+// se desenvuelve para quedarse con el destino real.
+let rawNext = source.get('next');
+try {
+  const nested = rawNext ? new URL(rawNext, page.self) : null;
+  if (nested && nested.origin === new URL(page.self).origin && nested.pathname === '/auth/confirmar') {
+    rawNext = nested.searchParams.get('next');
+  }
+} catch {
+  rawNext = null;
+}
+const wantsNewPassword = (rawNext ?? '').startsWith('/cuenta/contrasena');
+const isRecovery = type === 'recovery' || (!type && wantsNewPassword);
+const next = safeNext(rawNext, page.self, isRecovery ? '/cuenta/contrasena' : '/cuenta');
+
+// Supabase devuelve aquí los errores del enlace (?error=…&error_code=…).
+const linkError = Astro.url.searchParams.get('error_code') ?? Astro.url.searchParams.get('error');
+let error = linkError ? authErrorMessage({ code: linkError === 'access_denied' ? 'otp_expired' : linkError }) : '';
+const hasToken = Boolean((tokenHash && type) || code);
+if (!error && !hasToken) error = 'Este enlace no es válido. Pide uno nuevo.';
+
+if (page.form && hasToken && !linkError) {
+  if (!page.supabase) {
+    error = AUTH_UNAVAILABLE;
+  } else {
+    const { error: e } = tokenHash && type
+      ? await page.supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+      : await page.supabase.auth.exchangeCodeForSession(code);
+    if (!e) {
+      logAuth('auth_link_ok', type ?? 'code');
+      return Astro.redirect(next, 303);
+    }
+    logAuth('auth_link_error', e.code);
+    error = authErrorMessage(e);
+    Astro.response.status = 400;
+  }
+}
+const title = isRecovery ? 'Cambiar la contraseña' : 'Confirmar tu correo';
+---
+<AuthLayout title={title}>
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Área de talleres</p>
+    <h1 id="titulo" class="auth-title heading">{title}</h1>
+    {error ? (
+      <>
+        <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>
+        <nav class="auth-links" aria-label="Qué hacer ahora">
+          <a href="/recuperar">Pedir un enlace para cambiar la contraseña</a>
+          <a href="/acceso">Iniciar sesión (y reenviar la confirmación)</a>
+        </nav>
+      </>
+    ) : (
+      <form method="post" class="auth-form" data-busy="Comprobando…">
+        {tokenHash && <input type="hidden" name="token_hash" value={tokenHash} />}
+        {type && <input type="hidden" name="type" value={type} />}
+        {code && <input type="hidden" name="code" value={code} />}
+        <input type="hidden" name="next" value={next} />
+        <p class="auth-lead">{isRecovery ? 'Pulsa para continuar y elegir una contraseña nueva.' : 'Pulsa para confirmar tu correo y entrar.'}</p>
+        <button class="btn btn-primary btn-block" type="submit">
+          <span class="spinner" aria-hidden="true"></span><span data-label>{isRecovery ? 'Continuar' : 'Confirmar mi correo'}</span>
+        </button>
+      </form>
+    )}
+  </section>
+</AuthLayout>

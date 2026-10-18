@@ -1,0 +1,222 @@
+---
+/**
+ * Mi cuenta: perfil, talleres a los que pertenezco y, para propietarios y
+ * administradores, el equipo y las invitaciones.
+ *
+ * Todas las lecturas y escrituras van con el token del usuario: la base de
+ * datos (RLS y funciones) decide qué puede ver y hacer. El id del taller que
+ * llega en un formulario NO se da por bueno: la función lo comprueba.
+ */
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { authPage, formText, redirectToLogin } from '../../lib/server/auth-page.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../lib/auth/messages.ts';
+import { INVITABLE_ROLES, isEmail, isMemberRole, normalizeEmail, ROLE_LABELS, text, type MemberRole } from '../../lib/auth/validate.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+if (!page.user || !page.supabase) return redirectToLogin(Astro);
+const { supabase, user } = page;
+
+interface Workshop { workshop_id: string; name: string; slug: string; status: string; role: MemberRole }
+interface Member { user_id: string; full_name: string | null; email: string | null; role: MemberRole; active: boolean }
+interface Invitation { id: string; email: string; role: MemberRole; expires_at: string }
+
+const flash: { kind: 'ok' | 'bad'; text: string; workshopId?: string } = { kind: 'ok', text: '' };
+let inviteLink: { workshopId: string; url: string; email: string } | null = null;
+
+if (page.form) {
+  const action = formText(page.form, 'action');
+  if (action === 'perfil') {
+    const fullName = text(page.form.get('full_name'), 120);
+    const phone = text(page.form.get('phone'), 30);
+    const { error } = await supabase.from('profiles')
+      .update({ full_name: fullName || null, phone: phone || null })
+      .eq('id', user.id);
+    if (error) logAuth('account_profile_error', error.code);
+    Object.assign(flash, error ? { kind: 'bad', text: dbErrorMessage(error) } : { kind: 'ok', text: 'Datos guardados.' });
+  } else if (action === 'invitar') {
+    const workshopId = formText(page.form, 'workshop_id');
+    const email = normalizeEmail(page.form.get('email'));
+    const role = formText(page.form, 'role');
+    if (!isEmail(email) || !isMemberRole(role)) {
+      Object.assign(flash, { kind: 'bad', text: 'Escribe un correo válido y elige un rol.', workshopId });
+    } else {
+      const { data, error } = await supabase.rpc('create_workshop_invitation', { p_workshop_id: workshopId, p_email: email, p_role: role });
+      const created = Array.isArray(data) ? data[0] : null;
+      if (error || !created?.token) {
+        logAuth('account_invite_error', error?.code);
+        Object.assign(flash, { kind: 'bad', text: dbErrorMessage(error), workshopId });
+      } else {
+        logAuth('account_invite_ok');
+        inviteLink = { workshopId, email, url: `${page.origin}/invitacion?token=${encodeURIComponent(created.token)}` };
+      }
+    }
+  } else if (action === 'anular') {
+    const workshopId = formText(page.form, 'workshop_id');
+    const { error } = await supabase.rpc('revoke_workshop_invitation', { p_invitation_id: formText(page.form, 'invitation_id') });
+    if (error) logAuth('account_revoke_error', error.code);
+    Object.assign(flash, error ? { kind: 'bad', text: dbErrorMessage(error), workshopId } : { kind: 'ok', text: 'Invitación anulada.', workshopId });
+  }
+  if (flash.kind === 'bad') Astro.response.status = 400;
+}
+
+const [{ data: profile }, { data: workshopsData, error: workshopsError }] = await Promise.all([
+  supabase.from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle(),
+  supabase.rpc('my_workshops'),
+]);
+if (workshopsError) logAuth('account_workshops_error', workshopsError.code);
+const workshops = (workshopsData ?? []) as Workshop[];
+
+const manages = (w: Workshop) => w.role === 'propietario' || w.role === 'administrador';
+const teams = new Map<string, { members: Member[]; invitations: Invitation[] }>();
+await Promise.all(workshops.filter(manages).map(async w => {
+  const [{ data: members }, { data: invitations }] = await Promise.all([
+    supabase.rpc('workshop_team', { p_workshop_id: w.workshop_id }),
+    supabase.from('workshop_invitations').select('id, email, role, expires_at')
+      .eq('workshop_id', w.workshop_id).eq('status', 'pendiente').gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false }),
+  ]);
+  teams.set(w.workshop_id, { members: (members ?? []) as Member[], invitations: (invitations ?? []) as Invitation[] });
+}));
+
+const welcome = Astro.url.searchParams.get('bienvenida') === '1';
+const date = (iso: string) => new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium', timeZone: 'Europe/Madrid' }).format(new Date(iso));
+const invitableFor = (w: Workshop): readonly MemberRole[] => (w.role === 'propietario' ? INVITABLE_ROLES : ['mecanico']);
+---
+<AuthLayout title="Mi cuenta" user={user} wide>
+  <header class="account-head">
+    <p class="label">// Tu cuenta</p>
+    <h1 class="account-title heading">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1>
+  </header>
+
+  {welcome && <div class="alert alert-ok" role="status"><Icon name="check" /><span>Invitación aceptada. Ya formas parte del equipo.</span></div>}
+  {flash.text && !flash.workshopId && (
+    <div class={`alert ${flash.kind === 'ok' ? 'alert-ok' : 'alert-bad'}`} role={flash.kind === 'ok' ? 'status' : 'alert'}>
+      <Icon name={flash.kind === 'ok' ? 'check' : 'alert'} /><span>{flash.text}</span>
+    </div>
+  )}
+
+  <div class="account-grid">
+    <section class="panel liquid-glass" aria-labelledby="perfil-t">
+      <h2 id="perfil-t" class="panel-title heading">Tus datos</h2>
+      <p class="muted small">Correo: <strong class="mono">{user.email}</strong></p>
+      <form method="post" class="auth-form" data-busy="Guardando…">
+        <input type="hidden" name="action" value="perfil" />
+        <div class="field">
+          <label for="full_name">Nombre y apellidos</label>
+          <input class="input" id="full_name" name="full_name" autocomplete="name" maxlength="120" value={profile?.full_name ?? ''} />
+        </div>
+        <div class="field">
+          <label for="phone">Teléfono <span class="muted">(opcional)</span></label>
+          <input class="input" id="phone" name="phone" type="tel" autocomplete="tel" maxlength="30" value={profile?.phone ?? ''} />
+        </div>
+        <button class="btn btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar</span></button>
+      </form>
+      <nav class="auth-links"><a href="/cuenta/contrasena">Cambiar la contraseña</a></nav>
+    </section>
+
+    <section class="panel liquid-glass" aria-labelledby="talleres-t">
+      <h2 id="talleres-t" class="panel-title heading">Tus talleres</h2>
+      {workshopsError ? (
+        <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>No hemos podido cargar tus talleres. Recarga la página.</span></div>
+      ) : workshops.length === 0 ? (
+        <p class="muted">Todavía no perteneces a ningún taller. Si te han invitado, abre el enlace de la invitación con este correo. Para dar de alta un taller nuevo, contacta con la plataforma.</p>
+      ) : (
+        <ul class="workshop-list">
+          {workshops.map(w => (
+            <li>
+              <span class="workshop-name">{w.name}</span>
+              <span class="role-pill liquid-glass">{ROLE_LABELS[w.role]}</span>
+              {w.status === 'suspendido' && <span class="muted small">Suspendido</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+
+  {workshops.filter(manages).map(w => {
+    const team = teams.get(w.workshop_id) ?? { members: [], invitations: [] };
+    const here = flash.workshopId === w.workshop_id;
+    return (
+      <section class="panel liquid-glass team" aria-labelledby={`equipo-${w.workshop_id}`}>
+        <h2 id={`equipo-${w.workshop_id}`} class="panel-title heading">Equipo de {w.name}</h2>
+
+        {here && flash.text && (
+          <div class={`alert ${flash.kind === 'ok' ? 'alert-ok' : 'alert-bad'}`} role={flash.kind === 'ok' ? 'status' : 'alert'}>
+            <Icon name={flash.kind === 'ok' ? 'check' : 'alert'} /><span>{flash.text}</span>
+          </div>
+        )}
+
+        <div class="table-scroll">
+          <table class="team-table">
+            <thead><tr><th scope="col">Persona</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Estado</th></tr></thead>
+            <tbody>
+              {team.members.map(m => (
+                <tr>
+                  <td>{m.full_name ?? 'Sin nombre'}{m.user_id === user.id && <span class="muted"> (tú)</span>}</td>
+                  <td class="mono">{m.email ?? '—'}</td>
+                  <td>{ROLE_LABELS[m.role]}</td>
+                  <td>{m.active ? 'Activo' : 'Desactivado'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="panel-sub">Invitar a alguien</h3>
+        {inviteLink?.workshopId === w.workshop_id ? (
+          <div class="invite-result">
+            <div class="alert alert-ok" role="status">
+              <Icon name="check" />
+              <span>Invitación creada para <strong>{inviteLink.email}</strong>. Envíale este enlace (por WhatsApp o correo). Solo funciona con ese correo, una vez y durante 7 días. <strong>No se volverá a mostrar.</strong></span>
+            </div>
+            <div class="copy-row">
+              <input class="input mono" id={`link-${w.workshop_id}`} value={inviteLink.url} readonly aria-label="Enlace de invitación" />
+              <button class="btn" type="button" data-copy={`link-${w.workshop_id}`}>Copiar</button>
+            </div>
+          </div>
+        ) : null}
+        <form method="post" class="invite-form" data-busy="Creando…">
+          <input type="hidden" name="action" value="invitar" />
+          <input type="hidden" name="workshop_id" value={w.workshop_id} />
+          <div class="field">
+            <label for={`inv-email-${w.workshop_id}`}>Correo de la persona</label>
+            <input class="input" id={`inv-email-${w.workshop_id}`} name="email" type="email" inputmode="email" required maxlength="254" />
+          </div>
+          <div class="field">
+            <label for={`inv-role-${w.workshop_id}`}>Rol</label>
+            <select class="select" id={`inv-role-${w.workshop_id}`} name="role" required>
+              {invitableFor(w).map(r => <option value={r}>{ROLE_LABELS[r]}</option>)}
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear invitación</span></button>
+        </form>
+
+        {team.invitations.length > 0 && (
+          <>
+            <h3 class="panel-sub">Invitaciones pendientes</h3>
+            <ul class="invite-list">
+              {team.invitations.map(i => (
+                <li>
+                  <span class="mono">{i.email}</span>
+                  <span class="muted small">{ROLE_LABELS[i.role]} · caduca el {date(i.expires_at)}</span>
+                  <form method="post" data-busy="Anulando…">
+                    <input type="hidden" name="action" value="anular" />
+                    <input type="hidden" name="workshop_id" value={w.workshop_id} />
+                    <input type="hidden" name="invitation_id" value={i.id} />
+                    <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Anular</span></button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+    );
+  })}
+</AuthLayout>

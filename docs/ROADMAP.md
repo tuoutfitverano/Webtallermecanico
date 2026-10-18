@@ -29,28 +29,45 @@ Cada fase termina con algo que funciona y se ha probado. No se empieza una fase 
 Pendiente de esta fase que requiere tu acción: crear el proyecto de Supabase, aplicar las migraciones,
 configurar Turnstile y las variables en Cloudflare, y redactar los textos legales.
 
-## Fase 3 · Acceso y panel del taller
+## ✅ Fase 3 · Base de datos, autenticación y arquitectura multitaller
 
-- Inicio de sesión del personal, invitaciones a empleados y 2FA para propietarios.
+- Supabase Auth (correo + contraseña) con sesión en cookies gestionada en el servidor (`@supabase/ssr`, flujo PKCE).
+- Pantallas: iniciar sesión, crear cuenta, confirmar correo, recuperar y cambiar contraseña, cerrar sesión, mi cuenta.
+- Redirecciones seguras (solo rutas del propio sitio), protección CSRF, cabeceras anti-caché.
+- Talleres con logotipo y contacto; perfiles (solo nombre y teléfono editables); membresías con roles
+  `propietario` / `administrador` / `mecanico` (owner / manager / mechanic) y estado activo.
+- Invitaciones validadas en la base de datos: código de un solo uso, ligado al correo, caduca en 7 días;
+  nadie puede invitar como propietario ni invitar en un taller ajeno.
+- Alta controlada de talleres y propietarios (función privada solo para el SQL Editor).
+- Pruebas: 189 comprobaciones SQL de permisos con el esquema `auth` real de Supabase, y pruebas de navegador
+  con el servidor real de Supabase Auth (registro, confirmación por correo, recuperación, invitación, aislamiento por API).
+
+Pendiente que requiere tu acción: ver `docs/PUESTA_EN_MARCHA.md` (proyecto de Supabase, migraciones,
+URLs de Auth, plantillas de correo, SMTP propio, primer taller).
+
+## Fase 4 · Panel de gestión del taller
+
 - Bandeja de solicitudes web (nueva → en gestión → aceptada/rechazada) y avisos de nuevas solicitudes.
-- Fichas de clientes y formulario de vehículos (usa `packages/core`).
+- Gestión del equipo en pantalla: cambiar rol, desactivar y reactivar (las funciones de base de datos ya existen y están probadas).
+- Fichas de clientes y vehículos (usa `packages/core`).
+- 2FA obligatorio para propietarios y administración de la plataforma.
 
-## Fase 4 · Órdenes de reparación y portal del cliente
+## Fase 5 · Órdenes de reparación y portal del cliente
 
-- Órdenes con estados, asignación de mecánicos y notas internas separadas.
+- Órdenes con estados, historial de cambios, asignación de mecánicos y notas internas separadas.
 - Invitación del cliente a su portal: solo sus vehículos y reparaciones autorizadas.
 
-## Fase 5 · Notificaciones y automatizaciones
+## Fase 6 · Notificaciones y automatizaciones
 
-- Correo transaccional (confirmación de solicitud al cliente, aviso al taller), cambios de estado, recordatorios.
+- Correo transaccional (confirmación de solicitud al cliente, aviso al taller, invitaciones), cambios de estado, recordatorios.
 - WhatsApp Business (plantillas aprobadas) cuando haya volumen.
 
-## Fase 6 · Administración de la plataforma y SEO
+## Fase 7 · Administración de la plataforma y SEO
 
-- Alta de talleres, dominios personalizados (Cloudflare for SaaS), publicación y suspensión.
+- Panel de alta de talleres, dominios personalizados (Cloudflare for SaaS), publicación y suspensión.
 - Páginas por servicio para SEO local, datos estructurados `AutoRepair`, sitemap, banner de cookies si se usan cookies no esenciales.
 
-## Fase 7 · Integraciones de datos de vehículos
+## Fase 8 · Integraciones de datos de vehículos
 
 - Consultas a proveedores externos desde el servidor, con registro de origen y verificación.
 

@@ -590,6 +590,69 @@ abbr[title] { text-decoration: none; color: var(--accent-soft); }
 .footer-links { display: flex; flex-wrap: wrap; gap: 6px 20px; }
 .footer-links a { color: var(--fg-80); text-underline-offset: 4px; }
 
+/* ---------- Área privada (acceso, cuenta, invitaciones) ---------- */
+.auth-body { position: relative; min-height: 100vh; min-height: 100svh; overflow-x: clip; }
+.auth-body > .ambient { position: fixed; opacity: .55; }
+.auth-top {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: 16px; padding-left: var(--gutter); padding-right: var(--gutter-r);
+}
+.auth-top .brand-name { text-shadow: none; }
+.auth-top-user { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.auth-top-email { font-size: .8125rem; color: var(--fg-60); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.btn-sm { min-height: 36px; padding: 6px 14px; font-size: .875rem; }
+
+.auth-main {
+  position: relative; z-index: 2;
+  width: 100%; max-width: 480px; margin-inline: auto;
+  padding: 40px var(--gutter-r) 64px var(--gutter);
+  display: flex; flex-direction: column; gap: 20px;
+}
+.auth-main.is-wide { max-width: 1080px; }
+.auth-card { padding: 32px 28px; border-radius: 1.5rem; background: rgb(255 255 255 / .025); }
+@media (max-width: 480px) { .auth-card { padding: 24px 18px; } }
+.auth-card .label { margin-bottom: 12px; }
+.auth-title { font-size: 2.75rem; line-height: .95; letter-spacing: -1.5px; margin-bottom: 14px; }
+.auth-lead { color: var(--fg-80); font-weight: 300; margin-bottom: 20px; }
+.auth-lead a, .auth-card .alert a { color: var(--fg); text-underline-offset: 3px; }
+.auth-form { display: flex; flex-direction: column; gap: 16px; }
+.auth-form .btn-block { margin-top: 4px; }
+.auth-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 20px; font-size: .875rem; }
+.auth-links a { color: var(--fg-80); text-underline-offset: 4px; }
+.auth-links a:hover { color: var(--fg); }
+.auth-card .alert { margin-bottom: 16px; }
+.auth-card.legal ul { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 8px; color: var(--fg-80); font-weight: 300; }
+
+.account-head { margin-top: 8px; }
+.account-head .label { margin-bottom: 8px; }
+.account-title { font-size: 3rem; line-height: 1; letter-spacing: -2px; }
+.account-grid { display: grid; gap: 20px; }
+@media (min-width: 860px) { .account-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.panel { padding: 24px; border-radius: var(--radius); min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.panel-title { font-size: 1.875rem; line-height: 1; letter-spacing: -.5px; }
+.panel-sub { font-size: 1rem; font-weight: 500; margin-top: 10px; }
+.panel .auth-links { margin-top: 4px; }
+.mono { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.workshop-list, .invite-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.workshop-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.workshop-name { font-family: var(--font-heading); font-style: italic; font-size: 1.5rem; letter-spacing: -.5px; }
+.role-pill { padding: 3px 12px; border-radius: 999px; font-size: .75rem; color: var(--fg-90); }
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.team-table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: .875rem; }
+.team-table th, .team-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+.team-table th { font-weight: 500; color: var(--fg-60); font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; }
+.team-table tr:last-child td { border-bottom: 0; }
+
+.invite-form { display: grid; gap: 12px; align-items: end; }
+@media (min-width: 720px) { .invite-form { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; } }
+.copy-row { display: flex; gap: 8px; }
+.copy-row .input { flex: 1; min-width: 0; font-size: .875rem; }
+.invite-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.invite-list li form { margin-left: auto; }
+
 /* ---------- Accesibilidad e impresión ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

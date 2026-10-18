@@ -1,0 +1,54 @@
+---
+/**
+ * Plantilla del área privada (acceso, registro, cuenta, invitaciones).
+ * Misma estética que la web pública, sin datos de ningún taller.
+ */
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '@fontsource/barlow/latin-300.css';
+import '@fontsource/barlow/latin-400.css';
+import '@fontsource/barlow/latin-500.css';
+import '@fontsource/barlow/latin-600.css';
+import '../styles/site.css';
+import type { SessionUser } from '../lib/server/auth.ts';
+
+interface Props {
+  title: string;
+  user?: SessionUser | null;
+  /** Ancho de la columna: estrecho para formularios, ancho para la cuenta. */
+  wide?: boolean;
+}
+const { title, user = null, wide = false } = Astro.props;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title} · Área de talleres</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="auth-body">
+    <div class="ambient" aria-hidden="true"></div>
+    <header class="auth-top">
+      <a href={user ? '/cuenta' : '/acceso'} class="brand">
+        <span class="brand-mark liquid-glass" aria-hidden="true">t</span>
+        <span class="brand-name">Área de talleres</span>
+      </a>
+      {user && (
+        <form method="post" action="/salir" class="auth-top-user">
+          <span class="auth-top-email" title={user.email}>{user.email}</span>
+          <button class="btn btn-sm" type="submit">Salir</button>
+        </form>
+      )}
+    </header>
+    <main class={`auth-main ${wide ? 'is-wide' : ''}`}>
+      <slot />
+    </main>
+    <script>
+      import '../scripts/auth-forms.ts';
+    </script>
+  </body>
+</html>

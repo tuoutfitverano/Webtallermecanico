@@ -1,0 +1,22 @@
+---
+/** Privacidad de las cuentas del área privada: texto pendiente (no se inventa). */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+export const prerender = false;
+const items = [
+  'Quién es el responsable de las cuentas de usuario de la plataforma y cómo contactarle.',
+  'Qué datos se guardan (correo, nombre, teléfono opcional, talleres y rol) y para qué: identificarte y darte acceso a tu taller.',
+  'Qué proveedores los tratan (Supabase para la base de datos y el inicio de sesión; Cloudflare para la web) y dónde.',
+  'Cuánto tiempo se conservan y cómo borrar la cuenta.',
+  'Cómo ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad, y reclamar ante la AEPD.',
+];
+---
+<AuthLayout title="Privacidad de las cuentas">
+  <section class="auth-card liquid-glass-strong legal" aria-labelledby="titulo">
+    <p class="label">// Información legal</p>
+    <h1 id="titulo" class="auth-title heading">Privacidad de las cuentas</h1>
+    <div class="alert alert-warn" role="note"><Icon name="alert" /><span><strong>Texto pendiente.</strong> El titular de la plataforma debe redactarlo con su asesor legal antes de abrir el registro al público.</span></div>
+    <p>Esta página deberá incluir, al menos:</p>
+    <ul>{items.map(i => <li>{i}</li>)}</ul>
+  </section>
+</AuthLayout>

@@ -60,7 +60,7 @@ jobs:
       - run: npm run test:mcp
 
   e2e:
-    name: Formularios de extremo a extremo (base de datos real)
+    name: Formularios y acceso de extremo a extremo (Supabase Auth y base de datos reales)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -89,5 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-trazas
-          path: test-results/
+          path: |
+            test-results/
+            .cache/auth/serve.log
           retention-days: 7

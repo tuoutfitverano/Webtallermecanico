@@ -1,31 +1,14 @@
--- Imitación mínima de lo que Supabase ya trae de serie, para poder probar las
--- migraciones en un PostgreSQL normal (sin Docker). NO se usa en producción.
+-- Imitación mínima de los roles y permisos que Supabase trae de serie, para
+-- poder probar las migraciones en un PostgreSQL normal (sin Docker).
+-- Se aplica ANTES de las migraciones de Supabase Auth. NO se usa en producción.
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin noinherit; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin noinherit; end if;
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin noinherit bypassrls; end if;
 end $$;
 
-create schema auth;
-create table auth.users (
-  id uuid primary key default gen_random_uuid(),
-  email text unique,
-  raw_user_meta_data jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
-
--- Igual que en Supabase: el usuario y su token se leen de la configuración de la petición.
-create function auth.jwt() returns jsonb language sql stable as $$
-  select coalesce(nullif(current_setting('request.jwt.claim', true), ''), nullif(current_setting('request.jwt.claims', true), ''))::jsonb
-$$;
-create function auth.uid() returns uuid language sql stable as $$
-  select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid
-$$;
-create function auth.role() returns text language sql stable as $$
-  select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role'))::text
-$$;
-grant usage on schema auth to anon, authenticated, service_role;
-grant execute on all functions in schema auth to anon, authenticated, service_role;
+-- El esquema "auth" (auth.users, auth.uid(), auth.jwt()…) NO se imita: lo crean
+-- las migraciones oficiales de Supabase Auth (scripts/lib/supabase-auth.sh).
 
 -- Supabase concede por defecto todo en "public" a estos roles; lo replicamos
 -- para comprobar que las migraciones cierran bien los permisos.
