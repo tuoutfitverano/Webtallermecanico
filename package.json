@@ -15,9 +15,12 @@
     "build": "npm run build --workspace @talleres/web",
     "check": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:db": "bash scripts/test-db.sh"
+    "test:db": "bash scripts/test-db.sh",
+    "test:mcp": "node scripts/check-playwright-mcp.mjs",
+    "mcp:playwright": "node scripts/playwright-mcp.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "supabase": "^2.121.0"
   }
 }

@@ -20,3 +20,14 @@ supabase/.temp/
 # Sistema
 .DS_Store
 *.log
+
+# Playwright y su servidor MCP
+.playwright-mcp/
+test-results/
+playwright-report/
+blob-report/
+# Sesiones guardadas: contienen cookies con las que se puede suplantar a un usuario
+playwright/.auth/
+
+# Ajustes locales de Claude Code (cada persona los suyos)
+.claude/settings.local.json

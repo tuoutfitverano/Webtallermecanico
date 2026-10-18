@@ -4,6 +4,7 @@ Webs comerciales y herramientas de gestión (vehículos, clientes, empleados y r
 
 - **Arquitectura y decisiones:** [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)
 - **Plan por fases:** [docs/ROADMAP.md](docs/ROADMAP.md)
+- **Navegador para Claude (Playwright MCP):** [docs/PLAYWRIGHT_MCP.md](docs/PLAYWRIGHT_MCP.md)
 - **Demo comercial antigua (HTML estático):** [demo/](demo/README.md)
 
 ## Estructura
@@ -35,6 +36,7 @@ npm test             # pruebas de la lógica compartida
 npm run check        # comprobación de tipos
 npm run build        # compilar para Cloudflare
 npm run test:db      # pruebas de base de datos y permisos
+npm run test:mcp     # comprueba que el navegador de Claude (Playwright MCP) funciona
 ```
 
 ## Secretos

@@ -36,6 +36,7 @@ Este documento explica **cómo está construida la plataforma y por qué**. Est�
 | Cloudflare Workers | adaptador `@astrojs/cloudflare` 14.4 | Elegido por ti. Plan gratuito con uso comercial, rápido en España y con soporte de dominios de clientes ("Cloudflare for SaaS"). |
 | Zod | 4.6 | Valida los datos de los formularios con mensajes en español. |
 | Vitest | 5.0 | Pruebas automáticas de la lógica compartida. |
+| Playwright | 1.64.1 (fijada) | Navegador real para Claude Code vía MCP y, más adelante, pruebas de extremo a extremo. Ver [PLAYWRIGHT_MCP.md](PLAYWRIGHT_MCP.md). |
 
 ## 4. Cómo se separan los datos de cada taller (multiempresa)
 
@@ -94,6 +95,7 @@ Para probar en local se usa `demo.localhost`, que siempre apunta a tu propio ord
 | `npm run check` | Tipos de TypeScript y de Astro. |
 | `npm run build` | Que la web compila para Cloudflare. |
 | `npm run test:db` | Migraciones y **permisos RLS** con usuarios reales de cada rol, sobre un PostgreSQL local. |
+| `npm run test:mcp` | Que el servidor Playwright MCP arranca y controla el navegador. |
 
 `npm run test:db` usa una imitación mínima de Supabase (`supabase/tests/_harness`), porque en este entorno no hay Docker. En tu ordenador, con Docker, también puedes levantar Supabase completo con `npx supabase start`.
 

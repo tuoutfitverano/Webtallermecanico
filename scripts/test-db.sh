@@ -19,6 +19,10 @@ else
 fi
 PSQL+=(-X -q -v ON_ERROR_STOP=1)
 
+if ! "${PSQL[@]}" -d postgres -c "select 1" >/dev/null 2>&1; then
+  echo "✘ No puedo conectar con PostgreSQL. ¿Está arrancado? (en este contenedor: pg_ctlcluster 16 main start)" >&2
+  exit 1
+fi
 "${PSQL[@]}" -d postgres -c "drop database if exists $DB" -c "create database $DB" >/dev/null 2>&1
 
 run_file() { "${PSQL[@]}" -d "$DB" -f "$1"; }
