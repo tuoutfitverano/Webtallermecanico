@@ -1,0 +1,31 @@
+---
+/** Campos del formulario de cliente (alta y edición). */
+interface Props {
+  values: { full_name?: string | null; phone?: string | null; email?: string | null; internal_notes?: string | null };
+  errors?: Partial<Record<string, string>>;
+}
+const { values, errors = {} } = Astro.props;
+const err = (k: string) => errors[k];
+---
+<div class={`field ${err('fullName') ? 'has-error' : ''}`}>
+  <label for="full_name">Nombre completo o nombre comercial</label>
+  <input class="input" id="full_name" name="full_name" required maxlength="120" autocomplete="off" value={values.full_name ?? ''} aria-invalid={err('fullName') ? 'true' : undefined} aria-describedby={err('fullName') ? 'full_name-err' : undefined} />
+  {err('fullName') && <p class="field-error" id="full_name-err">{err('fullName')}</p>}
+</div>
+<div class="form-row">
+  <div class={`field ${err('phone') ? 'has-error' : ''}`}>
+    <label for="phone">Teléfono <span class="muted">(opcional)</span></label>
+    <input class="input" id="phone" name="phone" type="tel" inputmode="tel" maxlength="30" autocomplete="off" value={values.phone ?? ''} aria-invalid={err('phone') ? 'true' : undefined} aria-describedby={err('phone') ? 'phone-err' : undefined} />
+    {err('phone') && <p class="field-error" id="phone-err">{err('phone')}</p>}
+  </div>
+  <div class={`field ${err('email') ? 'has-error' : ''}`}>
+    <label for="email">Correo electrónico <span class="muted">(opcional)</span></label>
+    <input class="input" id="email" name="email" type="email" inputmode="email" maxlength="254" autocomplete="off" value={values.email ?? ''} aria-invalid={err('email') ? 'true' : undefined} aria-describedby={err('email') ? 'email-err' : undefined} />
+    {err('email') && <p class="field-error" id="email-err">{err('email')}</p>}
+  </div>
+</div>
+<div class={`field note-internal ${err('internalNotes') ? 'has-error' : ''}`}>
+  <label for="internal_notes">Notas internas <span class="muted">(solo para el taller; el cliente nunca las ve)</span></label>
+  <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="2000" rows="3">{values.internal_notes ?? ''}</textarea>
+  {err('internalNotes') && <p class="field-error">{err('internalNotes')}</p>}
+</div>

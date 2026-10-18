@@ -1,0 +1,228 @@
+---
+/**
+ * Ficha de una orden: estado, asignación, información para el cliente,
+ * notas internas (separadas) e historial de cambios (solo lectura: lo
+ * escribe la base de datos).
+ *
+ * El servidor solo envía los campos que el rol puede cambiar, y la base de
+ * datos vuelve a comprobarlo (un mecánico no reasigna ni marca "entregado").
+ */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import { field, isUuid, loadTeam, memberName, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { FIELD_LABELS, formatDateTime } from '../../../lib/panel/format.ts';
+import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
+import {
+  fieldErrors, formatPlate, isRepairStatus, orderLabel, orderUpdateSchema, REPAIR_STATUS_LABELS, REPAIR_STATUSES, type RepairStatus,
+} from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+const id = Astro.params.id ?? '';
+
+interface Order {
+  id: string; number: number; status: RepairStatus; received_at: string; problem_description: string; diagnosis: string | null;
+  work_done: string | null; internal_notes: string | null; assigned_to: string | null; created_at: string; updated_at: string;
+  delivered_at: string | null; created_by: string | null;
+  vehicles: { id: string; plate: string; make: string; model: string } | null;
+  customers: { id: string; full_name: string; phone: string | null; email: string | null } | null;
+}
+interface Event {
+  id: number; kind: 'creada' | 'estado' | 'asignacion' | 'datos'; from_status: RepairStatus | null; to_status: RepairStatus | null;
+  from_assignee: string | null; to_assignee: string | null; changed_fields: string[] | null; actor: string | null; created_at: string;
+}
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creada') === '1' ? 'Orden creada.' : '' };
+let errors: Partial<Record<string, string>> = {};
+let draft: Record<string, string> | null = null;
+
+const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, vehicles(id, plate, make, model), customers(id, full_name, phone, email)';
+const ctx = panel;
+async function loadOrder() {
+  if (!ctx.workshop || !isUuid(id)) return null;
+  const { data } = await ctx.supabase.from('repair_orders').select(SELECT).eq('id', id).eq('workshop_id', ctx.workshop.id).maybeSingle();
+  return (data as unknown as Order | null) ?? null;
+}
+
+let order = await loadOrder();
+
+if (panel.form && panel.workshop && order) {
+  const action = field(panel.form, 'action');
+  let update: Record<string, unknown> | null = null;
+  if (action === 'estado') {
+    const status = field(panel.form, 'status');
+    if (!isRepairStatus(status)) flash = { kind: 'bad', text: 'Estado no válido.' };
+    else update = { status };
+  } else if (action === 'guardar') {
+    draft = {
+      assigned_to: field(panel.form, 'assigned_to'), problem_description: field(panel.form, 'problem_description'),
+      diagnosis: field(panel.form, 'diagnosis'), work_done: field(panel.form, 'work_done'), internal_notes: field(panel.form, 'internal_notes'),
+    };
+    const parsed = orderUpdateSchema.safeParse({
+      status: order.status,
+      assignedTo: panel.isManager ? draft.assigned_to : order.assigned_to,
+      problemDescription: panel.isManager ? draft.problem_description : order.problem_description,
+      diagnosis: draft.diagnosis, workDone: draft.work_done, internalNotes: draft.internal_notes,
+    });
+    if (!parsed.success) {
+      errors = fieldErrors(parsed.error);
+      flash = { kind: 'bad', text: 'Revisa los campos marcados.' };
+      Astro.response.status = 422;
+    } else {
+      const d = parsed.data;
+      update = { diagnosis: d.diagnosis, work_done: d.workDone, internal_notes: d.internalNotes };
+      // Solo gestores: asignación y descripción (la base de datos lo exige igualmente).
+      if (panel.isManager) Object.assign(update, { assigned_to: d.assignedTo, problem_description: d.problemDescription });
+    }
+  }
+  if (update) {
+    const { data, error } = await panel.supabase.from('repair_orders').update(update).eq('id', order.id).eq('workshop_id', panel.workshop.id).select('id');
+    if (error || !data?.length) {
+      logAuth('panel_order_update_error', error?.code);
+      flash = {
+        kind: 'bad',
+        text: error?.code === '23503'
+          ? (error.message?.includes('equipo activo') ? error.message : 'La persona elegida no pertenece a tu taller.')
+          : error ? dbErrorMessage(error) : 'No se ha guardado: la orden ya no está asignada a ti o no tienes permiso.',
+      };
+      Astro.response.status = 400;
+    } else {
+      flash = { kind: 'ok', text: action === 'estado' ? 'Estado actualizado.' : 'Cambios guardados.' };
+      draft = null;
+      order = await loadOrder();
+    }
+  }
+}
+
+let events: Event[] = [];
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+if (order) {
+  const [e, t] = await Promise.all([
+    panel.supabase.from('repair_order_events').select('id, kind, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
+    loadTeam(panel),
+  ]);
+  events = (e.data ?? []) as Event[];
+  team = t;
+}
+if (panel.workshop && !order) Astro.response.status = 404;
+
+const v: Record<string, string> = draft ?? (order ? {
+  assigned_to: order.assigned_to ?? '', problem_description: order.problem_description, diagnosis: order.diagnosis ?? '',
+  work_done: order.work_done ?? '', internal_notes: order.internal_notes ?? '',
+} : {});
+const who = (u: string | null) => memberName(team, u, panel.user.id);
+const describe = (e: Event): string => {
+  switch (e.kind) {
+    case 'creada': return `Orden creada${e.to_assignee ? ` y asignada a ${who(e.to_assignee)}` : ''}`;
+    case 'estado': return `Estado: ${e.from_status ? REPAIR_STATUS_LABELS[e.from_status] : '—'} → ${e.to_status ? REPAIR_STATUS_LABELS[e.to_status] : '—'}`;
+    case 'asignacion': return e.to_assignee ? `Asignada a ${who(e.to_assignee)}` : 'Asignación retirada';
+    default: return `Cambió: ${(e.changed_fields ?? []).map(f => FIELD_LABELS[f] ?? f).join(', ')}`;
+  }
+};
+const statusOptions = REPAIR_STATUSES.filter(s => panel.isManager || s !== 'entregado' || order?.status === 'entregado');
+const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to);
+---
+<PanelLayout panel={panel} title={order ? orderLabel(order.number) : 'Orden'} section="ordenes">
+  <a class="pnl-back" href="/panel/ordenes"><Icon name="arrow" />Órdenes</a>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !order ? (
+    <div class="empty"><strong>Orden no encontrada.</strong><span>No existe, es de otro taller o no está asignada a ti.</span><a class="btn" href="/panel/ordenes">Volver a órdenes</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{orderLabel(order.number)} <StatusBadge status={order.status} /></h1>
+          <p class="pnl-sub">
+            {order.vehicles && <><a href={`/panel/vehiculos/${order.vehicles.id}`}><span class="plate">{formatPlate(order.vehicles.plate)}</span></a> {order.vehicles.make} {order.vehicles.model} · </>}
+            {order.customers && <a href={`/panel/clientes/${order.customers.id}`}>{order.customers.full_name}</a>}
+            {order.customers?.phone && <> · {order.customers.phone}</>}
+          </p>
+        </div>
+      </header>
+      <Flash kind={flash.kind} text={flash.text} />
+
+      <section class="card" aria-labelledby="estado-t">
+        <h2 id="estado-t" class="card-title">Estado</h2>
+        <form method="post" class="status-picker" data-busy="Guardando…">
+          <input type="hidden" name="action" value="estado" />
+          {statusOptions.map(s => (
+            <button class="btn btn-sm" type="submit" name="status" value={s} aria-pressed={s === order!.status ? 'true' : 'false'} disabled={s === order!.status}>{REPAIR_STATUS_LABELS[s]}</button>
+          ))}
+        </form>
+        {!panel.isManager && <p class="hint" style="margin-top:10px">Marcar como entregado lo hace el propietario o un administrador.</p>}
+      </section>
+
+      <div class="grid-2" style="margin-top:16px">
+        <form method="post" class="stack" data-busy="Guardando…" novalidate>
+          <input type="hidden" name="action" value="guardar" />
+          <section class="card" aria-labelledby="cliente-t">
+            <h2 id="cliente-t" class="card-title">Información de la reparación <span class="muted small">(podrá verla el cliente)</span></h2>
+            <div class="form-stack">
+              <div class={`field ${errors.problemDescription ? 'has-error' : ''}`}>
+                <label for="problem_description">Descripción del problema</label>
+                {panel.isManager
+                  ? <textarea class="textarea" id="problem_description" name="problem_description" required maxlength="4000" rows="3">{v.problem_description}</textarea>
+                  : <p id="problem_description">{order.problem_description}</p>}
+                {errors.problemDescription && <p class="field-error">{errors.problemDescription}</p>}
+              </div>
+              <div class="field">
+                <label for="diagnosis">Diagnosis</label>
+                <textarea class="textarea" id="diagnosis" name="diagnosis" maxlength="4000" rows="3">{v.diagnosis}</textarea>
+              </div>
+              <div class="field">
+                <label for="work_done">Trabajo realizado o pendiente</label>
+                <textarea class="textarea" id="work_done" name="work_done" maxlength="4000" rows="3">{v.work_done}</textarea>
+              </div>
+            </div>
+          </section>
+          <section class="card note-internal" aria-labelledby="internas-t">
+            <h2 id="internas-t" class="card-title">Notas internas <span class="muted small">(solo para el taller)</span></h2>
+            <label for="internal_notes" class="sr-only">Notas internas</label>
+            <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="4000" rows="3">{v.internal_notes}</textarea>
+          </section>
+          <section class="card" aria-labelledby="asig-t">
+            <h2 id="asig-t" class="card-title"><Icon name="user" />Mecánico asignado</h2>
+            {panel.isManager ? (
+              <>
+                <label for="assigned_to" class="sr-only">Mecánico asignado</label>
+                <select class="select" id="assigned_to" name="assigned_to">
+                  <option value="">Sin asignar</option>
+                  {activeTeam.map(m => <option value={m.user_id} selected={m.user_id === v.assigned_to}>{m.full_name ?? m.email ?? 'Sin nombre'} · {ROLE_LABELS[m.role]}{m.active ? '' : ' (desactivado)'}</option>)}
+                </select>
+              </>
+            ) : <p>{who(order.assigned_to)}</p>}
+          </section>
+          <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar cambios</span></button>
+        </form>
+
+        <div class="stack">
+          <section class="card" aria-labelledby="fechas-t">
+            <h2 id="fechas-t" class="card-title"><Icon name="clock" />Fechas</h2>
+            <dl class="facts">
+              <dt>Recepción</dt><dd>{formatDateTime(order.received_at)}</dd>
+              <dt>Creada</dt><dd>{formatDateTime(order.created_at)} · {who(order.created_by)}</dd>
+              <dt>Actualizada</dt><dd>{formatDateTime(order.updated_at)}</dd>
+              {order.delivered_at && <><dt>Entregada</dt><dd>{formatDateTime(order.delivered_at)}</dd></>}
+            </dl>
+          </section>
+          <section class="card" aria-labelledby="hist-t">
+            <h2 id="hist-t" class="card-title"><Icon name="history" />Historial de cambios</h2>
+            {events.length === 0 ? <p class="hint">Sin cambios registrados.</p> : (
+              <ol class="timeline">
+                {events.map(e => (
+                  <li><span class="dot" aria-hidden="true"></span><span><span>{describe(e)}</span><br /><span class="when">{who(e.actor)} · {formatDateTime(e.created_at)}</span></span></li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+      </div>
+    </>
+  )}
+</PanelLayout>

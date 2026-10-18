@@ -1,0 +1,19 @@
+---
+/** Estado para quien todavía no pertenece a ningún taller (o no se pudieron cargar). */
+interface Props { loadError?: boolean }
+const { loadError = false } = Astro.props;
+---
+<div class="empty">
+  {loadError ? (
+    <>
+      <strong>No hemos podido cargar tus talleres.</strong>
+      <span>Puede ser un problema de conexión con la base de datos. Recarga la página en unos minutos.</span>
+    </>
+  ) : (
+    <>
+      <strong>Tu cuenta todavía no pertenece a ningún taller.</strong>
+      <span>Si te han invitado, abre el enlace de la invitación con este mismo correo. Si quieres dar de alta tu taller, contacta con la plataforma.</span>
+      <a class="btn" href="/cuenta">Ir a mi cuenta</a>
+    </>
+  )}
+</div>

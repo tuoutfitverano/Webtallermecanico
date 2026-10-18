@@ -39,6 +39,7 @@ const { title, user = null, wide = false } = Astro.props;
       </a>
       {user && (
         <form method="post" action="/salir" class="auth-top-user">
+          <a class="btn btn-sm" href="/panel">Panel</a>
           <span class="auth-top-email" title={user.email}>{user.email}</span>
           <button class="btn btn-sm" type="submit">Salir</button>
         </form>

@@ -45,17 +45,24 @@ configurar Turnstile y las variables en Cloudflare, y redactar los textos legale
 Pendiente que requiere tu acción: ver `docs/PUESTA_EN_MARCHA.md` (proyecto de Supabase, migraciones,
 URLs de Auth, plantillas de correo, SMTP propio, primer taller).
 
-## Fase 4 · Panel de gestión del taller
+## ✅ Fase 4 · Panel de gestión del taller (pendiente de tu revisión)
 
-- Bandeja de solicitudes web (nueva → en gestión → aceptada/rechazada) y avisos de nuevas solicitudes.
-- Gestión del equipo en pantalla: cambiar rol, desactivar y reactivar (las funciones de base de datos ya existen y están probadas).
-- Fichas de clientes y vehículos (usa `packages/core`).
-- 2FA obligatorio para propietarios y administración de la plataforma.
+- Panel en `/panel`: barra lateral en escritorio, pestañas inferiores en móvil, cabecera con taller y persona, selector de taller.
+- Inicio con indicadores reales (activas, pendientes de diagnosis, esperando recambios, listas para recoger) y últimas órdenes.
+- Clientes: lista, búsqueda (nombre, teléfono, correo), alta con aviso de posible duplicado, ficha, edición, borrado con confirmación.
+- Vehículos: matrícula normalizada y única por taller, datos manuales con fuente y verificación visibles, historial de reparaciones.
+- Órdenes de reparación (`repair_orders`): seis estados, asignación a personas activas del taller, información para el cliente
+  separada de las notas internas, filtros por estado y empleado, búsqueda por número/matrícula/cliente.
+- Historial de cambios (`repair_order_events`) escrito solo por la base de datos.
+- Equipo: roles, órdenes activas por persona, cambio de rol y desactivación según permisos.
+- Pruebas: 261 comprobaciones SQL y 66 pruebas de navegador con Supabase Auth real.
 
-## Fase 5 · Órdenes de reparación y portal del cliente
+Pendiente para fases siguientes: bandeja de solicitudes web dentro del panel, 2FA obligatorio para propietarios
+y administración de la plataforma, avisos/notificaciones.
 
-- Órdenes con estados, historial de cambios, asignación de mecánicos y notas internas separadas.
-- Invitación del cliente a su portal: solo sus vehículos y reparaciones autorizadas.
+## Fase 5 · Portal del cliente
+
+- Invitación del cliente a su portal: solo sus vehículos y el estado e información autorizada de sus reparaciones (nunca notas internas).
 
 ## Fase 6 · Notificaciones y automatizaciones
 

@@ -1,0 +1,71 @@
+---
+/** Vehículos del taller con búsqueda por matrícula, marca, modelo o cliente. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatPlate, FUEL_LABELS, type FuelType } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface Row { id: string; plate: string; make: string; model: string; year: number | null; fuel: FuelType | null; customer_name: string | null; open_orders: number }
+const q = (Astro.url.searchParams.get('q') ?? '').trim().slice(0, 100);
+let rows: Row[] = [];
+let error = false;
+if (panel.workshop) {
+  const { data, error: e } = await panel.supabase.rpc('search_vehicles', { p_workshop_id: panel.workshop.id, p_query: q, p_limit: 100 });
+  if (e) { logAuth('panel_vehicles_error', e.code); error = true; }
+  rows = (data ?? []) as Row[];
+}
+const deleted = Astro.url.searchParams.get('borrado') === '1';
+---
+<PanelLayout panel={panel} title="Vehículos" section="vehiculos">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Vehículos</h1>
+      <p class="pnl-sub">Datos introducidos por el taller. No se consultan matrículas en servicios externos.</p>
+    </div>
+    {panel.workshop && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/vehiculos/nuevo"><Icon name="plus" />Registrar vehículo</a></div>}
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <>
+      <Flash kind="ok" text={deleted ? 'Vehículo borrado.' : ''} />
+      <form method="get" class="filters" role="search">
+        <div class="field search">
+          <label for="q" class="sr-only">Buscar vehículos</label>
+          <Icon name="search" />
+          <input class="input" id="q" name="q" type="search" value={q} placeholder="Matrícula, marca, modelo o cliente" autocomplete="off" />
+        </div>
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+      {error && <Flash kind="bad" text="No hemos podido cargar los vehículos. Recarga la página." />}
+      <section class="card" aria-label="Lista de vehículos">
+        {rows.length === 0 ? (
+          <div class="empty">
+            <strong>{q ? `Ningún vehículo coincide con «${q}».` : 'Todavía no hay vehículos registrados.'}</strong>
+            <a class="btn btn-primary" href="/panel/vehiculos/nuevo"><Icon name="plus" />{q ? 'Registrar vehículo' : 'Registrar el primer vehículo'}</a>
+          </div>
+        ) : (
+          <ul class="list">
+            {rows.map(v => (
+              <li>
+                <a class="row" href={`/panel/vehiculos/${v.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="plate">{formatPlate(v.plate)}</span>{v.make} {v.model}</span>
+                    <span class="row-meta">{v.customer_name ?? 'Sin cliente'}{v.fuel ? ` · ${FUEL_LABELS[v.fuel]}` : ''}{v.year ? ` · ${v.year}` : ''}</span>
+                  </span>
+                  <span class="row-side">{v.open_orders > 0 && <span class="row-meta">{v.open_orders} en el taller</span>}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PanelLayout>

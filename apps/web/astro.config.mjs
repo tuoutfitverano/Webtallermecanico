@@ -8,6 +8,9 @@ import tailwindcss from '@tailwindcss/vite';
 // Cloudflare Workers ejecuta ese código cerca del visitante.
 export default defineConfig({
   adapter: cloudflare(),
+  // La barra de desarrollo de Astro tapa la barra de pestañas del panel en las
+  // pruebas de navegador; en producción no existe.
+  devToolbar: { enabled: process.env.E2E !== '1' },
   vite: {
     plugins: [tailwindcss()],
   },

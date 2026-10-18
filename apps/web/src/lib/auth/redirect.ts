@@ -7,7 +7,7 @@
  * defecto. Así nadie puede usar nuestros enlaces para mandar a la gente a
  * una web falsa.
  */
-export const DEFAULT_AFTER_LOGIN = '/cuenta';
+export const DEFAULT_AFTER_LOGIN = '/panel';
 
 export function safeNext(raw: unknown, origin: string, fallback = DEFAULT_AFTER_LOGIN): string {
   if (typeof raw !== 'string') return fallback;

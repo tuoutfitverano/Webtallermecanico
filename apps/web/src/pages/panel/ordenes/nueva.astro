@@ -1,0 +1,148 @@
+---
+/**
+ * Crear una orden (propietario o administrador). La base de datos comprueba
+ * que vehículo, cliente y mecánico son del mismo taller: un id manipulado en
+ * el formulario no sirve.
+ */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { field, isUuid, loadTeam, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { localInputToDb, toLocalInput } from '../../../lib/panel/format.ts';
+import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
+import { fieldErrors, formatPlate, orderCreateSchema } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface V { id: string; plate: string; make: string; model: string; customer_id: string | null; customer_name: string | null }
+interface C { id: string; full_name: string; phone: string | null }
+let vehicles: V[] = [];
+let customers: C[] = [];
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+if (panel.workshop && panel.isManager) {
+  const [v, c, t] = await Promise.all([
+    panel.supabase.rpc('search_vehicles', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 }),
+    panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 }),
+    loadTeam(panel),
+  ]);
+  vehicles = (v.data ?? []) as V[];
+  customers = (c.data ?? []) as C[];
+  team = t.filter(m => m.active);
+}
+
+const preVehicle = Astro.url.searchParams.get('vehiculo');
+const preCustomer = Astro.url.searchParams.get('cliente');
+const pv = vehicles.find(v => v.id === preVehicle) ?? (isUuid(preCustomer) ? vehicles.find(v => v.customer_id === preCustomer) : undefined);
+const values: Record<string, string> = {
+  vehicle_id: pv?.id ?? '',
+  customer_id: (isUuid(preCustomer) ? preCustomer : pv?.customer_id) ?? '',
+  assigned_to: '',
+  received_at: toLocalInput(new Date()),
+  problem_description: '',
+  internal_notes: '',
+};
+let errors: Partial<Record<string, string>> = {};
+let error = '';
+
+if (panel.form && panel.workshop && panel.isManager) {
+  for (const k of Object.keys(values)) values[k] = field(panel.form, k);
+  // Si no se elige cliente, se usa el del vehículo.
+  if (!values.customer_id) values.customer_id = vehicles.find(v => v.id === values.vehicle_id)?.customer_id ?? '';
+  const parsed = orderCreateSchema.safeParse({
+    vehicleId: values.vehicle_id, customerId: values.customer_id, assignedTo: values.assigned_to,
+    receivedAt: values.received_at, problemDescription: values.problem_description, internalNotes: values.internal_notes,
+  });
+  if (!parsed.success) {
+    errors = fieldErrors(parsed.error);
+    if (errors.vehicleId) errors.vehicleId = 'Elige el vehículo.';
+    if (errors.customerId) errors.customerId = 'Elige el cliente (el vehículo no tiene ninguno asignado).';
+    error = 'Revisa los campos marcados.';
+    Astro.response.status = 422;
+  } else {
+    const d = parsed.data;
+    const { data, error: e } = await panel.supabase.from('repair_orders').insert({
+      workshop_id: panel.workshop.id,
+      vehicle_id: d.vehicleId,
+      customer_id: d.customerId,
+      assigned_to: d.assignedTo,
+      received_at: d.receivedAt ? localInputToDb(d.receivedAt) : undefined,
+      problem_description: d.problemDescription,
+      internal_notes: d.internalNotes,
+    }).select('id').single();
+    if (!e && data) return Astro.redirect(`/panel/ordenes/${data.id}?creada=1`, 303);
+    logAuth('panel_order_create_error', e?.code);
+    error = e?.code === '23503'
+      ? (e.message?.includes('equipo activo') ? e.message : 'El vehículo, el cliente o la persona asignada no son de tu taller.')
+      : dbErrorMessage(e);
+    Astro.response.status = 400;
+  }
+}
+const err = (k: string) => errors[k];
+---
+<PanelLayout panel={panel} title="Nueva orden" section="ordenes">
+  <a class="pnl-back" href="/panel/ordenes"><Icon name="arrow" />Órdenes</a>
+  <header class="pnl-head"><h1 class="pnl-title">Nueva orden de reparación</h1></header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isManager ? (
+    <div class="empty"><strong>Solo el propietario o un administrador puede crear órdenes.</strong><a class="btn" href="/panel/ordenes">Ver mis órdenes</a></div>
+  ) : vehicles.length === 0 ? (
+    <div class="empty">
+      <strong>Primero registra un vehículo.</strong>
+      <span>Cada orden se crea sobre un vehículo del taller.</span>
+      <a class="btn btn-primary" href="/panel/vehiculos/nuevo"><Icon name="car" />Registrar vehículo</a>
+    </div>
+  ) : (
+    <section class="card">
+      <Flash kind="bad" text={error} />
+      <form method="post" class="form-stack" data-busy="Creando…" novalidate>
+        <div class="form-row">
+          <div class={`field ${err('vehicleId') ? 'has-error' : ''}`}>
+            <label for="vehicle_id">Vehículo</label>
+            <select class="select" id="vehicle_id" name="vehicle_id" required data-sets-customer="customer_id">
+              <option value="">Elige un vehículo…</option>
+              {vehicles.map(v => <option value={v.id} data-customer={v.customer_id ?? ''} selected={v.id === values.vehicle_id}>{formatPlate(v.plate)} · {v.make} {v.model}{v.customer_name ? ` · ${v.customer_name}` : ''}</option>)}
+            </select>
+            {err('vehicleId') && <p class="field-error">{err('vehicleId')}</p>}
+          </div>
+          <div class={`field ${err('customerId') ? 'has-error' : ''}`}>
+            <label for="customer_id">Cliente</label>
+            <select class="select" id="customer_id" name="customer_id">
+              <option value="">El del vehículo</option>
+              {customers.map(c => <option value={c.id} selected={c.id === values.customer_id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+            </select>
+            {err('customerId') && <p class="field-error">{err('customerId')}</p>}
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="assigned_to">Mecánico asignado <span class="muted">(opcional)</span></label>
+            <select class="select" id="assigned_to" name="assigned_to">
+              <option value="">Sin asignar</option>
+              {team.map(m => <option value={m.user_id} selected={m.user_id === values.assigned_to}>{m.full_name ?? m.email ?? 'Sin nombre'} · {ROLE_LABELS[m.role]}</option>)}
+            </select>
+          </div>
+          <div class={`field ${err('receivedAt') ? 'has-error' : ''}`}>
+            <label for="received_at">Recepción</label>
+            <input class="input" id="received_at" name="received_at" type="datetime-local" value={values.received_at} />
+            {err('receivedAt') && <p class="field-error">{err('receivedAt')}</p>}
+          </div>
+        </div>
+        <div class={`field ${err('problemDescription') ? 'has-error' : ''}`}>
+          <label for="problem_description">Descripción del problema <span class="muted">(lo que cuenta el cliente; podrá verlo en su portal)</span></label>
+          <textarea class="textarea" id="problem_description" name="problem_description" required maxlength="4000" rows="4">{values.problem_description}</textarea>
+          {err('problemDescription') && <p class="field-error">{err('problemDescription')}</p>}
+        </div>
+        <div class="field note-internal">
+          <label for="internal_notes">Notas internas <span class="muted">(solo para el taller)</span></label>
+          <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="4000" rows="3">{values.internal_notes}</textarea>
+        </div>
+        <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear orden</span></button>
+      </form>
+    </section>
+  )}
+</PanelLayout>

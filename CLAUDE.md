@@ -16,6 +16,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego panel y portal)
   src/pages/              index (web del taller), privacidad, aviso-legal, api/solicitudes.ts
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
+                          panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
   src/middleware.ts       Área privada: dominio APP_URL y cabeceras anti-caché
   src/components/         Secciones de la web y formularios (RequestForm.astro)
   src/scripts/            JavaScript del navegador (request-forms.ts)
@@ -24,9 +25,14 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/lib/server/         Configuración del servidor (lee astro:env), sesión (auth.ts, auth-page.ts) — solo servidor
   src/lib/auth/           Redirección segura (?next=), mensajes de error, validación de acceso
   src/layouts/AuthLayout  Plantilla del área privada
+  src/layouts/PanelLayout Plantilla del panel (barra lateral / pestañas en móvil, ClientRouter)
+  src/lib/server/panel.ts Contexto del panel: sesión, talleres, taller activo validado, equipo
+  src/lib/panel/          Formatos de fecha (Europe/Madrid) y lectura del formulario de vehículos
+  src/components/panel/   Piezas del panel (estado, avisos, campos de cliente y vehículo)
+  src/styles/panel.css    Estilos del panel (más denso y opaco que la web pública)
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
   e2e/                    Pruebas de navegador (Playwright Test)
-packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes
+packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes, clientes y órdenes (workshop.ts)
 supabase/migrations/      Esquema + permisos (RLS). Nunca edites una migración ya aplicada: crea otra.
 supabase/tests/           Pruebas SQL de permisos por rol (con el esquema auth REAL de Supabase Auth)
 supabase/templates/       Plantillas de correo de Supabase Auth (confirmación, recuperación)
@@ -88,6 +94,19 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Contraseñas: mínimo 10 con mayúsculas, minúsculas y números (igual en `validate.ts` y `supabase/config.toml`).
 - En pruebas e2e los correos llegan a `scripts/e2e/mail-sink.mjs`; `test-e2e.sh` usa `exec` para que la limpieza mate los servidores (si un puerto está ocupado, aborta).
 - `Referrer-Policy: same-origin` en el área privada (con `no-referrer` el navegador envía `Origin: null` y los formularios se rechazan).
+
+## Panel del taller (Fase 4)
+
+- Todas las páginas empiezan con `panelPage(Astro)`: exige sesión, carga `my_workshops()` y elige el taller activo. La cookie `panel_taller` y `?taller=` son **solo preferencias** validadas contra las membresías; nunca dan acceso.
+- Lecturas y escrituras con el token del usuario (RLS). Filtra siempre también por `workshop_id` del taller activo, pero la seguridad la pone la base de datos.
+- Órdenes (`repair_orders`): vehículo, cliente y mecánico del MISMO taller por claves foráneas compuestas; número `OR-n` correlativo por taller; `internal_notes` nunca se mostrará al cliente.
+- Mecánico: solo ve las órdenes asignadas a él; puede cambiar estado (no "entregado"), diagnosis, trabajo y notas internas. No crea, no reasigna. Lo impone el disparador `repair_orders_guard`, no la interfaz.
+- Historial (`repair_order_events`): lo escriben los disparadores; nadie (ni la clave secreta) lo modifica. Desactivar a un empleado no borra sus órdenes.
+- Búsquedas y resumen: funciones `search_*` y `workshop_dashboard` con `security invoker` (RLS igual que una consulta). Para comodines usa `private.like_pattern()`.
+- **Nunca** pongas `security definer` a una función que llame a `private.is_privileged()`: dentro, el usuario actual sería `postgres` y daría permisos a todo el mundo (lo cubren las pruebas de `08_ordenes_reparacion.test.sql`).
+- Formularios sin JavaScript (POST al servidor y aviso integrado); acciones destructivas en dos pasos (`pedir-borrar` → `borrar`). Nada de `alert()`/`confirm()`.
+- Fechas: se muestran en hora de Madrid (`lib/panel/format.ts`); un `datetime-local` se guarda con `localInputToDb()`.
+- En pruebas e2e la barra de desarrollo de Astro está desactivada (`E2E=1`) porque tapa las pestañas del móvil.
 
 ## Formularios y solicitudes (Fase 2)
 

@@ -1,0 +1,83 @@
+---
+/**
+ * Alta de cliente. Si ya hay alguien con el mismo teléfono o correo, avisa y
+ * pide confirmación (evita duplicados accidentales sin impedir, por ejemplo,
+ * dos personas de una familia con el mismo teléfono).
+ */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import CustomerFields from '../../../components/panel/CustomerFields.astro';
+import { field, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { customerInputSchema, fieldErrors } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const values = { full_name: '', phone: '', email: '', internal_notes: '' };
+let errors: Partial<Record<string, string>> = {};
+let error = '';
+let duplicates: Array<{ id: string; full_name: string; phone: string | null; email: string | null }> = [];
+
+if (panel.form && panel.workshop) {
+  values.full_name = field(panel.form, 'full_name');
+  values.phone = field(panel.form, 'phone');
+  values.email = field(panel.form, 'email');
+  values.internal_notes = field(panel.form, 'internal_notes');
+  const parsed = customerInputSchema.safeParse({ fullName: values.full_name, phone: values.phone, email: values.email, internalNotes: values.internal_notes });
+  if (!parsed.success) {
+    errors = fieldErrors(parsed.error);
+    error = 'Revisa los campos marcados.';
+    Astro.response.status = 422;
+  } else {
+    const d = parsed.data;
+    if (field(panel.form, 'confirmar_duplicado') !== 'on' && (d.phone || d.email)) {
+      const { data } = await panel.supabase.rpc('find_customer_duplicates', { p_workshop_id: panel.workshop.id, p_phone: d.phone ?? '', p_email: d.email ?? '' });
+      duplicates = (data ?? []) as typeof duplicates;
+    }
+    if (duplicates.length === 0) {
+      const { data, error: e } = await panel.supabase.from('customers')
+        .insert({ workshop_id: panel.workshop.id, full_name: d.fullName, phone: d.phone, email: d.email, internal_notes: d.internalNotes })
+        .select('id').single();
+      if (e || !data) {
+        logAuth('panel_customer_create_error', e?.code);
+        error = dbErrorMessage(e);
+        Astro.response.status = 400;
+      } else {
+        return Astro.redirect(`/panel/clientes/${data.id}?creado=1`, 303);
+      }
+    }
+  }
+}
+---
+<PanelLayout panel={panel} title="Añadir cliente" section="clientes">
+  <a class="pnl-back" href="/panel/clientes"><Icon name="arrow" />Clientes</a>
+  <header class="pnl-head"><h1 class="pnl-title">Añadir cliente</h1></header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <section class="card">
+      <Flash kind="bad" text={error} />
+      {duplicates.length > 0 && (
+        <div class="alert alert-warn" role="alert">
+          <Icon name="alert" />
+          <span>
+            Ya hay {duplicates.length === 1 ? 'un cliente' : 'clientes'} con ese teléfono o correo:
+            {duplicates.map((c, i) => <>{i > 0 && ', '}<a href={`/panel/clientes/${c.id}`}>{c.full_name}</a></>)}.
+            Si es otra persona, marca la casilla y guarda de nuevo.
+          </span>
+        </div>
+      )}
+      <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+        <CustomerFields values={values} errors={errors} />
+        {duplicates.length > 0 && (
+          <label class="check"><input type="checkbox" name="confirmar_duplicado" /><span>Es otra persona: crear la ficha igualmente.</span></label>
+        )}
+        <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar cliente</span></button>
+      </form>
+    </section>
+  )}
+</PanelLayout>

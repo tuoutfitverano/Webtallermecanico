@@ -35,7 +35,8 @@ async function login(page: Page, email: string, password = PASSWORD, next = '') 
 }
 
 async function logout(page: Page) {
-  await page.getByRole('button', { name: 'Salir' }).click();
+  // En el área de cuenta el botón dice "Salir"; en el panel, "Cerrar sesión".
+  await page.getByRole('button', { name: /^(Salir|Cerrar sesión)$/ }).click();
   await expect(page).toHaveURL(/\/acceso\?salida=1/);
 }
 
@@ -94,7 +95,10 @@ async function createConfirmedUser(email: string, fullName = 'Persona de Prueba'
 test.describe('Inicio de sesión', () => {
   test('con credenciales válidas entra y ve su taller y su rol', async ({ page }) => {
     await login(page, 'propietaria@e2e.test');
-    await expect(page).toHaveURL(/\/cuenta$/);
+    // Tras iniciar sesión se llega al panel del taller.
+    await expect(page).toHaveURL(/\/panel$/);
+    await expect(page.locator('.pnl-workshop-name')).toHaveText('Taller Demo');
+    await page.goto('/cuenta');
     await expect(page.getByRole('heading', { name: 'Hola, Paula' })).toBeVisible();
     await expect(page.locator('.workshop-list')).toContainText('Taller Demo');
     await expect(page.locator('.workshop-list')).toContainText('Propietario/a');
@@ -115,7 +119,7 @@ test.describe('Inicio de sesión', () => {
   });
 
   test('el mecánico entra y no ve la gestión del equipo', async ({ page }) => {
-    await login(page, 'mecanico@e2e.test');
+    await login(page, 'mecanico@e2e.test', PASSWORD, '/cuenta');
     await expect(page.locator('.workshop-list')).toContainText('Mecánico/a');
     await expect(page.getByRole('heading', { name: /^Equipo de/ })).toHaveCount(0);
   });
@@ -131,14 +135,14 @@ test.describe('Inicio de sesión', () => {
 
   test('no redirige a webs externas aunque se manipule ?next=', async ({ page, baseURL }) => {
     await login(page, 'propietaria@e2e.test', PASSWORD, 'https://evil.test/robar');
-    await expect(page).toHaveURL(`${baseURL}/cuenta`);
+    await expect(page).toHaveURL(`${baseURL}/panel`);
     await page.goto('/acceso?next=//evil.test');
-    await expect(page).toHaveURL(`${baseURL}/cuenta`);
+    await expect(page).toHaveURL(`${baseURL}/panel`);
   });
 
   test('cerrar sesión la termina de verdad', async ({ page }) => {
     await login(page, 'propietaria@e2e.test');
-    await expect(page).toHaveURL(/\/cuenta$/);
+    await expect(page).toHaveURL(/\/panel$/);
     await logout(page);
     await expect(page.getByRole('status')).toContainText('Has cerrado la sesión.');
     await page.goto('/cuenta');
@@ -191,7 +195,10 @@ test.describe('Registro, confirmación y recuperación', () => {
     await page.goto(link!);
     await expect(page).toHaveURL(/\/auth\/confirmar\?/);
     await page.getByRole('button', { name: 'Confirmar mi correo' }).click();
-    await expect(page).toHaveURL(/\/cuenta$/);
+    // Con la cuenta confirmada se llega al panel, que no da acceso a nada sin taller.
+    await expect(page).toHaveURL(/\/panel$/);
+    await expect(page.getByText('Tu cuenta todavía no pertenece a ningún taller.')).toBeVisible();
+    await page.goto('/cuenta');
     await expect(page.getByText('Todavía no perteneces a ningún taller')).toBeVisible();
   });
 
@@ -231,7 +238,8 @@ test.describe('Registro, confirmación y recuperación', () => {
     await login(page, email, PASSWORD);
     await expect(page.getByRole('alert')).toContainText('no son correctos');
     await login(page, email, 'Clave-nueva-1234');
-    await expect(page).toHaveURL(/\/cuenta$/);
+    await expect(page).toHaveURL(/\/panel$/);
+    await expect(page.getByText('Tu cuenta todavía no pertenece a ningún taller.')).toBeVisible();
   });
 
   test('un enlace de correo inventado o gastado no da acceso', async ({ page }) => {
@@ -256,7 +264,7 @@ test.describe('Invitaciones', () => {
 
   test('la propietaria invita → la persona crea su cuenta, confirma y entra como mecánico', async ({ page }) => {
     const email = uniqueEmail('invitada');
-    await login(page, 'propietaria@e2e.test');
+    await login(page, 'propietaria@e2e.test', PASSWORD, '/cuenta');
     await page.getByLabel('Correo de la persona').fill(email);
     await page.getByLabel('Rol').selectOption('mecanico');
     await page.getByRole('button', { name: 'Crear invitación' }).click();
@@ -297,7 +305,7 @@ test.describe('Invitaciones', () => {
   });
 
   test('una invitación abierta con otra cuenta no se puede aceptar', async ({ page }) => {
-    await login(page, 'propietaria@e2e.test');
+    await login(page, 'propietaria@e2e.test', PASSWORD, '/cuenta');
     await page.getByLabel('Correo de la persona').fill(uniqueEmail('para-otra'));
     await page.getByRole('button', { name: 'Crear invitación' }).click();
     const inviteUrl = await page.getByLabel('Enlace de invitación').inputValue();

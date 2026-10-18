@@ -1,0 +1,123 @@
+---
+/**
+ * Inicio del panel: resumen REAL del taller (workshop_dashboard) y últimas
+ * órdenes. Un mecánico ve el resumen de sus propios trabajos.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import StatusBadge from '../../components/panel/StatusBadge.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDateTime } from '../../lib/panel/format.ts';
+import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface Summary { active: number; pending_diagnosis: number; waiting_parts: number; in_repair: number; ready: number; delivered_30d: number; customers: number; vehicles: number }
+interface OrderRow { id: string; number: number; status: RepairStatus; updated_at: string; plate: string; make: string; model: string; customer_name: string; assigned_to: string | null }
+
+let summary: Summary | null = null;
+let recent: OrderRow[] = [];
+let error = false;
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+if (panel.workshop) {
+  const id = panel.workshop.id;
+  const [s, r, t] = await Promise.all([
+    panel.supabase.rpc('workshop_dashboard', { p_workshop_id: id }),
+    panel.supabase.rpc('search_repair_orders', { p_workshop_id: id, p_query: '', p_limit: 8 }),
+    loadTeam(panel),
+  ]);
+  if (s.error || r.error) {
+    logAuth('panel_dashboard_error', s.error?.code ?? r.error?.code);
+    error = true;
+  }
+  summary = (Array.isArray(s.data) ? s.data[0] : null) ?? null;
+  recent = (r.data ?? []) as OrderRow[];
+  team = t;
+}
+const mine = !panel.isManager;
+const kpis = summary ? [
+  { value: summary.active, label: mine ? 'Tus reparaciones activas' : 'Reparaciones activas', href: '/panel/ordenes' },
+  { value: summary.pending_diagnosis, label: 'Pendientes de diagnosis', href: '/panel/ordenes?estado=diagnosis' },
+  { value: summary.waiting_parts, label: 'Esperando recambios', href: '/panel/ordenes?estado=esperando_recambios' },
+  { value: summary.ready, label: 'Listos para recoger', href: '/panel/ordenes?estado=listo' },
+] : [];
+---
+<PanelLayout panel={panel} title="Inicio" section="inicio">
+  {!panel.workshop ? (
+    <>
+      <header class="pnl-head"><h1 class="pnl-title">Panel del taller</h1></header>
+      <NoWorkshop loadError={panel.loadError} />
+    </>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">Hoy en el taller</h1>
+          <p class="pnl-sub">{mine ? 'Resumen de los trabajos asignados a ti.' : `Resumen de ${panel.workshop.name}.`}</p>
+        </div>
+      </header>
+
+      {error && <Flash kind="bad" text="No hemos podido cargar el resumen. Recarga la página; si sigue fallando, puede ser un problema de conexión con la base de datos." />}
+
+      {summary && (
+        <section aria-label="Indicadores" class="kpis">
+          {kpis.map(k => (
+            <a class="kpi" href={k.href}>
+              <span class="kpi-value">{k.value}</span>
+              <span class="kpi-label">{k.label}</span>
+            </a>
+          ))}
+        </section>
+      )}
+
+      {panel.isManager && (
+        <section class="card" aria-labelledby="atajos">
+          <h2 id="atajos" class="card-title">Accesos rápidos</h2>
+          <div class="quick">
+            <a href="/panel/ordenes/nueva"><Icon name="plus" />Crear orden de reparación</a>
+            <a href="/panel/vehiculos/nuevo"><Icon name="car" />Registrar vehículo</a>
+            <a href="/panel/clientes/nuevo"><Icon name="user" />Añadir cliente</a>
+            <a href="/panel/ordenes"><Icon name="clipboard" />Ver todas las reparaciones</a>
+          </div>
+        </section>
+      )}
+
+      <section class="card" aria-labelledby="ultimas">
+        <h2 id="ultimas" class="card-title"><Icon name="history" />Últimas órdenes actualizadas</h2>
+        {recent.length === 0 ? (
+          <div class="empty">
+            <strong>{mine ? 'No tienes trabajos asignados.' : 'Todavía no hay reparaciones registradas.'}</strong>
+            {panel.isManager ? (
+              <>
+                <span>{summary?.vehicles ? 'Crea la primera orden a partir de un vehículo registrado.' : 'Empieza registrando un cliente y su vehículo; después crea la orden.'}</span>
+                <a class="btn btn-primary" href={summary?.vehicles ? '/panel/ordenes/nueva' : '/panel/clientes/nuevo'}>
+                  <Icon name="plus" />{summary?.vehicles ? 'Crear la primera orden' : 'Añadir el primer cliente'}
+                </a>
+              </>
+            ) : <span>Cuando el taller te asigne una orden, aparecerá aquí.</span>}
+          </div>
+        ) : (
+          <ul class="list">
+            {recent.map(o => (
+              <li>
+                <a class="row" href={`/panel/ordenes/${o.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{orderLabel(o.number)}</span><span class="plate">{formatPlate(o.plate)}</span>{o.make} {o.model}</span>
+                    <span class="row-meta">{o.customer_name} · {memberName(team, o.assigned_to, panel.user.id)} · {formatDateTime(o.updated_at)}</span>
+                  </span>
+                  <span class="row-side"><StatusBadge status={o.status} /></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PanelLayout>

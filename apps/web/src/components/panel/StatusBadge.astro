@@ -1,0 +1,6 @@
+---
+import { REPAIR_STATUS_LABELS, type RepairStatus } from '@talleres/core';
+interface Props { status: RepairStatus }
+const { status } = Astro.props;
+---
+<span class={`status status-${status}`}>{REPAIR_STATUS_LABELS[status]}</span>

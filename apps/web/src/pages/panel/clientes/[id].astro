@@ -1,0 +1,152 @@
+---
+/** Ficha de cliente: datos, edición, vehículos, reparaciones y borrado con confirmación. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import CustomerFields from '../../../components/panel/CustomerFields.astro';
+import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
+import { customerInputSchema, fieldErrors, formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+const id = Astro.params.id ?? '';
+
+interface Customer { id: string; full_name: string; phone: string | null; email: string | null; internal_notes: string | null; created_at: string; user_id: string | null }
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creado') === '1' ? 'Cliente guardado.' : '' };
+let errors: Partial<Record<string, string>> = {};
+let editValues: Record<string, string> | null = null;
+let askDelete = false;
+
+if (panel.form && panel.workshop && isUuid(id)) {
+  const action = field(panel.form, 'action');
+  if (action === 'editar') {
+    editValues = { full_name: field(panel.form, 'full_name'), phone: field(panel.form, 'phone'), email: field(panel.form, 'email'), internal_notes: field(panel.form, 'internal_notes') };
+    const parsed = customerInputSchema.safeParse({ fullName: editValues.full_name, phone: editValues.phone, email: editValues.email, internalNotes: editValues.internal_notes });
+    if (!parsed.success) {
+      errors = fieldErrors(parsed.error);
+      flash = { kind: 'bad', text: 'Revisa los campos marcados.' };
+      Astro.response.status = 422;
+    } else {
+      const d = parsed.data;
+      const { data, error } = await panel.supabase.from('customers')
+        .update({ full_name: d.fullName, phone: d.phone, email: d.email, internal_notes: d.internalNotes })
+        .eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+      if (error || !data?.length) {
+        logAuth('panel_customer_update_error', error?.code);
+        flash = { kind: 'bad', text: error ? dbErrorMessage(error) : 'No se ha guardado: la ficha no existe o no tienes permiso.' };
+        Astro.response.status = 400;
+      } else {
+        flash = { kind: 'ok', text: 'Cambios guardados.' };
+        editValues = null;
+      }
+    }
+  } else if (action === 'pedir-borrar') {
+    askDelete = true;
+  } else if (action === 'borrar') {
+    const { data, error } = await panel.supabase.from('customers').delete().eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+    if (!error && data?.length) return Astro.redirect('/panel/clientes?borrado=1', 303);
+    logAuth('panel_customer_delete_error', error?.code);
+    flash = {
+      kind: 'bad',
+      text: error?.code === '23503'
+        ? 'No se puede borrar: tiene órdenes de reparación. La ficha se conserva para mantener el historial.'
+        : 'No se ha borrado: solo el propietario o un administrador puede borrar clientes.',
+    };
+    Astro.response.status = 400;
+  }
+}
+
+let customer: Customer | null = null;
+let vehicles: Array<{ id: string; plate: string; make: string; model: string }> = [];
+let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
+if (panel.workshop && isUuid(id)) {
+  const [c, v, o] = await Promise.all([
+    panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
+    panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
+    panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
+  ]);
+  customer = (c.data as Customer | null) ?? null;
+  vehicles = (v.data ?? []) as typeof vehicles;
+  orders = (o.data ?? []) as unknown as typeof orders;
+}
+if (panel.workshop && !customer) Astro.response.status = 404;
+const values = editValues ?? customer ?? {};
+---
+<PanelLayout panel={panel} title={customer?.full_name ?? 'Cliente'} section="clientes">
+  <a class="pnl-back" href="/panel/clientes"><Icon name="arrow" />Clientes</a>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !customer ? (
+    <div class="empty"><strong>Cliente no encontrado.</strong><span>No existe o pertenece a otro taller.</span><a class="btn" href="/panel/clientes">Volver a clientes</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{customer.full_name}</h1>
+          <p class="pnl-sub">Cliente desde el {formatDate(customer.created_at)} · {customer.user_id ? 'Con cuenta en el portal' : 'Sin cuenta en el portal'}</p>
+        </div>
+        <div class="pnl-actions">
+          <a class="btn" href={`/panel/vehiculos/nuevo?cliente=${customer.id}`}><Icon name="car" />Registrar vehículo</a>
+          {panel.isManager && vehicles.length > 0 && <a class="btn btn-primary" href={`/panel/ordenes/nueva?cliente=${customer.id}`}><Icon name="plus" />Nueva orden</a>}
+        </div>
+      </header>
+      <Flash kind={flash.kind} text={flash.text} />
+      <div class="grid-2">
+        <div class="stack">
+          <section class="card" aria-labelledby="veh">
+            <h2 id="veh" class="card-title"><Icon name="car" />Vehículos</h2>
+            {vehicles.length === 0 ? <p class="hint">Este cliente no tiene vehículos registrados.</p> : (
+              <ul class="list">{vehicles.map(v => (
+                <li><a class="row" href={`/panel/vehiculos/${v.id}`}><span class="row-main"><span class="row-title"><span class="plate">{formatPlate(v.plate)}</span>{v.make} {v.model}</span></span></a></li>
+              ))}</ul>
+            )}
+          </section>
+          <section class="card" aria-labelledby="rep">
+            <h2 id="rep" class="card-title"><Icon name="clipboard" />Reparaciones</h2>
+            {orders.length === 0 ? <p class="hint">{panel.isManager ? 'Sin reparaciones registradas.' : 'Sin reparaciones asignadas a ti para este cliente.'}</p> : (
+              <ul class="list">{orders.map(o => (
+                <li><a class="row" href={`/panel/ordenes/${o.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{orderLabel(o.number)}</span>{o.vehicles && <span class="plate">{formatPlate(o.vehicles.plate)}</span>}</span>
+                    <span class="row-meta">Actualizada {formatDateTime(o.updated_at)}</span>
+                  </span>
+                  <span class="row-side"><StatusBadge status={o.status} /></span>
+                </a></li>
+              ))}</ul>
+            )}
+          </section>
+        </div>
+        <section class="card" aria-labelledby="datos">
+          <h2 id="datos" class="card-title"><Icon name="user" />Datos del cliente</h2>
+          <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+            <input type="hidden" name="action" value="editar" />
+            <CustomerFields values={values} errors={errors} />
+            <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar cambios</span></button>
+          </form>
+          {panel.isManager && (
+            <div style="margin-top:20px">
+              {askDelete ? (
+                <form method="post" class="confirm" data-busy="Borrando…">
+                  <input type="hidden" name="action" value="borrar" />
+                  <strong>¿Borrar la ficha de {customer.full_name}?</strong>
+                  <span class="hint">No se puede deshacer. Sus vehículos se quedan sin cliente asignado. Si tiene órdenes, no se podrá borrar.</span>
+                  <div class="pnl-actions">
+                    <button class="btn btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, borrar definitivamente</span></button>
+                    <a class="btn" href={`/panel/clientes/${customer.id}`}>Cancelar</a>
+                  </div>
+                </form>
+              ) : (
+                <form method="post"><input type="hidden" name="action" value="pedir-borrar" /><button class="btn btn-sm btn-danger" type="submit">Borrar cliente…</button></form>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </>
+  )}
+</PanelLayout>

@@ -98,7 +98,29 @@ Una misma persona puede ser mecánico en un taller y cliente en otro: los permis
 - **Invitaciones**: código aleatorio de 64 caracteres; en la base de datos solo se guarda su huella SHA-256. Un solo uso, ligado al correo invitado, caduca a los 7 días. Nadie invita como propietario.
 - **Alta de talleres**: `private.create_workshop(slug, nombre, correo_propietario)`, solo ejecutable desde el SQL Editor (superusuario); la API no la ve.
 
-## 6. Webs de los talleres
+## 6. Panel del taller y órdenes de reparación
+
+```
+workshops ─┬─ customers ──┐
+           ├─ vehicles ───┤ (id, workshop_id)   ← claves foráneas compuestas: todo del MISMO taller
+           ├─ workshop_members ─┐
+           └─ repair_orders ────┴─ vehicle_id, customer_id, assigned_to
+                  └─ repair_order_events (historial: solo lo escriben disparadores)
+```
+
+| Quién | Órdenes |
+| --- | --- |
+| Propietario / administrador | Ven, crean y modifican todas las del taller; asignan; marcan "entregado". |
+| Mecánico | Solo las asignadas a él: estado (menos "entregado"), diagnosis, trabajo, notas internas. |
+| Nadie (por la API) | Borrar órdenes o tocar el historial. |
+
+- **Información para el cliente vs. notas internas**: `problem_description`, `diagnosis` y `work_done` podrán mostrarse en el portal del cliente; `internal_notes` nunca.
+- **Numeración**: `OR-1`, `OR-2`… por taller (contador en `workshop_counters`, solo lo usa el disparador).
+- **Asignación**: solo a personas **activas** del taller. Desactivar a alguien no borra nada: las órdenes conservan quién las llevaba.
+- **Búsquedas** (`search_customers`, `search_vehicles`, `search_repair_orders`, `workshop_dashboard`): funciones `security invoker`, así que devuelven exactamente lo que RLS deja ver a quien pregunta. El id de taller que reciben solo filtra.
+- **Interfaz**: páginas de servidor (formularios que funcionan sin JavaScript) con navegación sin recarga completa (ClientRouter de Astro). Avisos integrados, confirmación en dos pasos para borrar.
+
+## 7. Webs de los talleres
 
 Una única aplicación Astro decide qué taller mostrar según el **dominio** de la visita (`get_public_site(hostname)`, con la clave publicable). El contenido y la marca de cada taller (nombre, color, servicios, teléfono, horario, dirección…) se guardan en `workshop_sites` y se validan al leerlos (`src/lib/site/content.ts`). El campo `is_demo_content` obliga a la web a avisar de que los datos son de demostración y a no aparecer en buscadores.
 
@@ -120,7 +142,7 @@ navegador ──► POST /api/solicitudes ──► handleSubmission ──► s
 - **Privacidad**: no se guarda el IP, solo una huella HMAC que cambia cada día y se borra a los 2 días. Los registros técnicos no contienen datos del formulario. El personal no puede leer la huella ni la clave de idempotencia.
 - **Sin JavaScript** los formularios también funcionan (envío clásico y redirección con el resultado).
 
-## 7. Vehículos
+## 8. Vehículos
 
 - La matrícula se guarda **normalizada** (`1950 bxf` → `1950BXF`) y es única dentro de cada taller.
 - Se reconocen los formatos españoles: actual, provincial antiguo (con su provincia), ciclomotor, remolque, especial e histórico. Una matrícula con otro formato (extranjera, diplomática…) solo se acepta si el usuario lo confirma.
@@ -128,7 +150,7 @@ navegador ──► POST /api/solicitudes ──► handleSubmission ──► s
 - El año es opcional y, si se indica, hay que decir si es de **fabricación** o de **primera matriculación**. No se inventa.
 - `data_source` (de dónde salen los datos) y `verification_status` (si se han comprobado) **no los decide el formulario**: por defecto son "manual" y "pendiente". Solo el sistema puede marcar "proveedor externo" y solo un gestor puede verificar (queda registrado quién y cuándo).
 
-## 8. Pruebas
+## 9. Pruebas
 
 | Comando | Qué comprueba |
 | --- | --- |

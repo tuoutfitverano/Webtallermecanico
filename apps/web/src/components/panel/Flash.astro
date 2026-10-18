@@ -1,0 +1,11 @@
+---
+/** Aviso dentro de la página (nunca alert() del navegador). */
+import Icon from '../Icon.astro';
+interface Props { kind: 'ok' | 'bad' | 'warn'; text: string }
+const { kind, text } = Astro.props;
+---
+{text && (
+  <div class={`alert alert-${kind}`} role={kind === 'ok' ? 'status' : 'alert'}>
+    <Icon name={kind === 'ok' ? 'check' : 'alert'} /><span>{text}<slot /></span>
+  </div>
+)}

@@ -1,0 +1,71 @@
+---
+/** Campos del formulario de vehículo (alta y edición). Sin consultas externas de matrículas. */
+import { FUEL_LABELS, FUEL_TYPES, YEAR_KIND_LABELS, YEAR_KINDS } from '@talleres/core';
+interface Props {
+  values: Record<string, string>;
+  errors?: Partial<Record<string, string>>;
+  customers: Array<{ id: string; full_name: string; phone: string | null }>;
+  /** Mostrar la casilla de "matrícula no estándar" (cuando la validación lo pide). */
+  askPlateConfirmation?: boolean;
+}
+const { values, errors = {}, customers, askPlateConfirmation = false } = Astro.props;
+const err = (k: string) => errors[k];
+---
+<div class="form-row">
+  <div class={`field ${err('plate') ? 'has-error' : ''}`}>
+    <label for="plate">Matrícula</label>
+    <input class="input input-plate" id="plate" name="plate" required maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="1234 ABC" value={values.plate ?? ''} aria-invalid={err('plate') ? 'true' : undefined} aria-describedby={err('plate') ? 'plate-err' : undefined} />
+    {err('plate') && <p class="field-error" id="plate-err">{err('plate')}</p>}
+    {askPlateConfirmation && (
+      <label class="check"><input type="checkbox" name="confirm_plate" /><span>La matrícula es correcta aunque no tenga formato español (extranjera, histórica…).</span></label>
+    )}
+  </div>
+  <div class={`field ${err('customerId') ? 'has-error' : ''}`}>
+    <label for="customer_id">Cliente</label>
+    <select class="select" id="customer_id" name="customer_id">
+      <option value="">Sin cliente asignado</option>
+      {customers.map(c => <option value={c.id} selected={c.id === values.customer_id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+    </select>
+    {err('customerId') && <p class="field-error">{err('customerId')}</p>}
+  </div>
+</div>
+<div class="form-row">
+  <div class={`field ${err('make') ? 'has-error' : ''}`}>
+    <label for="make">Marca</label>
+    <input class="input" id="make" name="make" required maxlength="60" autocomplete="off" placeholder="Ej.: Volkswagen" value={values.make ?? ''} aria-invalid={err('make') ? 'true' : undefined} />
+    {err('make') && <p class="field-error">{err('make')}</p>}
+  </div>
+  <div class={`field ${err('model') ? 'has-error' : ''}`}>
+    <label for="model">Modelo</label>
+    <input class="input" id="model" name="model" required maxlength="80" autocomplete="off" placeholder="Ej.: Golf" value={values.model ?? ''} aria-invalid={err('model') ? 'true' : undefined} />
+    {err('model') && <p class="field-error">{err('model')}</p>}
+  </div>
+</div>
+<div class="form-row">
+  <div class={`field ${err('year') ? 'has-error' : ''}`}>
+    <label for="year">Año <span class="muted">(opcional: déjalo vacío si no se sabe)</span></label>
+    <input class="input" id="year" name="year" inputmode="numeric" maxlength="4" autocomplete="off" value={values.year ?? ''} aria-invalid={err('year') ? 'true' : undefined} />
+    {err('year') && <p class="field-error">{err('year')}</p>}
+  </div>
+  <div class={`field ${err('yearKind') ? 'has-error' : ''}`}>
+    <label for="year_kind">Ese año es de…</label>
+    <select class="select" id="year_kind" name="year_kind">
+      <option value="">—</option>
+      {YEAR_KINDS.map(k => <option value={k} selected={k === values.year_kind}>{YEAR_KIND_LABELS[k]}</option>)}
+    </select>
+    {err('yearKind') && <p class="field-error">{err('yearKind')}</p>}
+  </div>
+</div>
+<div class={`field ${err('fuel') ? 'has-error' : ''}`}>
+  <label for="fuel">Combustible <span class="muted">(opcional)</span></label>
+  <select class="select" id="fuel" name="fuel">
+    <option value="">Sin indicar</option>
+    {FUEL_TYPES.map(f => <option value={f} selected={f === values.fuel}>{FUEL_LABELS[f]}</option>)}
+  </select>
+</div>
+<div class="field note-internal">
+  <label for="internal_notes">Notas internas <span class="muted">(solo para el taller)</span></label>
+  <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="2000" rows="3">{values.internal_notes ?? ''}</textarea>
+  {err('internalNotes') && <p class="field-error">{err('internalNotes')}</p>}
+</div>
+<p class="hint">Los datos se guardan como <strong>introducidos manualmente</strong> y con verificación externa <strong>pendiente</strong>. No se consulta la matrícula en ningún servicio externo.</p>

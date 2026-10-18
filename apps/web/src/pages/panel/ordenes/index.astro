@@ -1,0 +1,106 @@
+---
+/** Órdenes del taller: búsqueda (número, matrícula, cliente) y filtros por estado y empleado. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import { isUuid, loadTeam, memberName, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDateTime } from '../../../lib/panel/format.ts';
+import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
+import { formatPlate, isRepairStatus, orderLabel, REPAIR_STATUS_LABELS, REPAIR_STATUSES, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface Row { id: string; number: number; status: RepairStatus; updated_at: string; received_at: string; problem_description: string; assigned_to: string | null; plate: string; make: string; model: string; customer_name: string }
+const params = Astro.url.searchParams;
+const q = (params.get('q') ?? '').trim().slice(0, 100);
+const estadoParam = params.get('estado') ?? '';
+const estado = isRepairStatus(estadoParam) ? estadoParam : null;
+const todas = estadoParam === 'todas';
+const empleadoParam = params.get('empleado') ?? '';
+const empleado = isUuid(empleadoParam) ? empleadoParam : null;
+
+let rows: Row[] = [];
+let error = false;
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+if (panel.workshop) {
+  const [r, t] = await Promise.all([
+    panel.supabase.rpc('search_repair_orders', {
+      p_workshop_id: panel.workshop.id, p_query: q, p_status: estado, p_assigned_to: empleado,
+      p_only_active: !estado && !todas, p_limit: 200,
+    }),
+    loadTeam(panel),
+  ]);
+  if (r.error) { logAuth('panel_orders_error', r.error.code); error = true; }
+  rows = (r.data ?? []) as Row[];
+  team = t;
+}
+const filtered = Boolean(q || estado || todas || empleado);
+---
+<PanelLayout panel={panel} title="Órdenes" section="ordenes">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Órdenes de reparación</h1>
+      <p class="pnl-sub">{panel.isManager ? 'Todas las órdenes del taller.' : 'Las órdenes asignadas a ti.'}</p>
+    </div>
+    {panel.isManager && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/ordenes/nueva"><Icon name="plus" />Nueva orden</a></div>}
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <>
+      <form method="get" class="filters" role="search">
+        <div class="field search">
+          <label for="q" class="sr-only">Buscar órdenes</label>
+          <Icon name="search" />
+          <input class="input" id="q" name="q" type="search" value={q} placeholder="Nº de orden, matrícula o cliente" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="estado" class="sr-only">Estado</label>
+          <select class="select" id="estado" name="estado">
+            <option value="">En curso (sin entregar)</option>
+            {REPAIR_STATUSES.map(s => <option value={s} selected={s === estado}>{REPAIR_STATUS_LABELS[s]}</option>)}
+            <option value="todas" selected={todas}>Todas</option>
+          </select>
+        </div>
+        {panel.isManager ? (
+          <div class="field">
+            <label for="empleado" class="sr-only">Empleado</label>
+            <select class="select" id="empleado" name="empleado">
+              <option value="">Todo el equipo</option>
+              {team.map(m => <option value={m.user_id} selected={m.user_id === empleado}>{m.full_name ?? m.email ?? 'Sin nombre'} · {ROLE_LABELS[m.role]}{m.active ? '' : ' (desactivado)'}</option>)}
+            </select>
+          </div>
+        ) : <span></span>}
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+      {error && <Flash kind="bad" text="No hemos podido cargar las órdenes. Recarga la página." />}
+      <section class="card" aria-label="Lista de órdenes">
+        {rows.length === 0 ? (
+          <div class="empty">
+            <strong>{filtered ? 'Ninguna orden coincide con los filtros.' : panel.isManager ? 'No hay reparaciones en curso.' : 'No tienes reparaciones asignadas en curso.'}</strong>
+            {filtered ? <a class="btn" href="/panel/ordenes">Quitar filtros</a> : panel.isManager && <a class="btn btn-primary" href="/panel/ordenes/nueva"><Icon name="plus" />Crear una orden</a>}
+          </div>
+        ) : (
+          <ul class="list">
+            {rows.map(o => (
+              <li>
+                <a class="row" href={`/panel/ordenes/${o.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{orderLabel(o.number)}</span><span class="plate">{formatPlate(o.plate)}</span>{o.make} {o.model}</span>
+                    <span class="row-meta">{o.customer_name} · {o.problem_description}</span>
+                    <span class="row-meta">{memberName(team, o.assigned_to, panel.user.id)} · actualizada {formatDateTime(o.updated_at)}</span>
+                  </span>
+                  <span class="row-side"><StatusBadge status={o.status} /></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PanelLayout>

@@ -24,19 +24,19 @@ describe('safeNext: redirección después de iniciar sesión', () => {
     '/cuenta\n//evil.test',
     '  ',
   ])('rechaza destinos externos o raros: %s', raw => {
-    expect(safeNext(raw, ORIGIN)).toBe('/cuenta');
+    expect(safeNext(raw, ORIGIN)).toBe('/panel');
   });
 
   it('rechaza valores que no son texto y usa el destino por defecto indicado', () => {
-    expect(safeNext(undefined, ORIGIN)).toBe('/cuenta');
-    expect(safeNext(['/x'], ORIGIN)).toBe('/cuenta');
+    expect(safeNext(undefined, ORIGIN)).toBe('/panel');
+    expect(safeNext(['/x'], ORIGIN)).toBe('/panel');
     expect(safeNext('https://evil.test', ORIGIN, '/cuenta/contrasena')).toBe('/cuenta/contrasena');
   });
 
   it('no vuelve a las pantallas de acceso (evita bucles)', () => {
-    expect(safeNext('/acceso?next=/cuenta', ORIGIN)).toBe('/cuenta');
-    expect(safeNext('/auth/confirmar?code=x', ORIGIN)).toBe('/cuenta');
-    expect(safeNext('/salir', ORIGIN)).toBe('/cuenta');
+    expect(safeNext('/acceso?next=/cuenta', ORIGIN)).toBe('/panel');
+    expect(safeNext('/auth/confirmar?code=x', ORIGIN)).toBe('/panel');
+    expect(safeNext('/salir', ORIGIN)).toBe('/panel');
   });
 
   it('loginUrl codifica la ruta de vuelta', () => {

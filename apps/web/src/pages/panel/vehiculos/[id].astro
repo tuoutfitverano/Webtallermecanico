@@ -1,0 +1,166 @@
+---
+/** Ficha de vehículo: datos, origen y verificación, edición, historial de reparaciones y borrado. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import StatusBadge from '../../../components/panel/StatusBadge.astro';
+import VehicleFields from '../../../components/panel/VehicleFields.astro';
+import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { readVehicleForm } from '../../../lib/panel/vehicle-form.ts';
+import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
+import {
+  DATA_SOURCE_LABELS, FUEL_LABELS, formatPlate, orderLabel, VERIFICATION_LABELS, YEAR_KIND_LABELS,
+  type DataSource, type FuelType, type RepairStatus, type VerificationStatus, type YearKind,
+} from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+const id = Astro.params.id ?? '';
+
+interface Vehicle {
+  id: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null;
+  customer_id: string | null; internal_notes: string | null; data_source: DataSource; verification_status: VerificationStatus; created_at: string;
+  customers: { id: string; full_name: string } | null;
+}
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creado') === '1' ? 'Vehículo registrado.' : '' };
+let errors: Partial<Record<string, string>> = {};
+let editValues: Record<string, string> | null = null;
+let askPlate = false;
+let askDelete = false;
+let openEdit = false;
+
+if (panel.form && panel.workshop && isUuid(id)) {
+  const action = field(panel.form, 'action');
+  if (action === 'editar') {
+    const r = readVehicleForm(panel.form);
+    if (!r.ok) {
+      editValues = r.values; errors = r.errors; askPlate = r.needsPlateConfirmation; openEdit = true;
+      flash = { kind: 'bad', text: 'Revisa los campos marcados.' };
+      Astro.response.status = 422;
+    } else {
+      const { data, error } = await panel.supabase.from('vehicles').update(r.row).eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+      if (error || !data?.length) {
+        logAuth('panel_vehicle_update_error', error?.code);
+        editValues = r.values; openEdit = true;
+        flash = { kind: 'bad', text: error?.code === '23505' ? 'Ya hay otro vehículo con esa matrícula en tu taller.' : error ? dbErrorMessage(error) : 'No se ha guardado: el vehículo no existe o no tienes permiso.' };
+        Astro.response.status = 400;
+      } else {
+        flash = { kind: 'ok', text: 'Cambios guardados.' };
+      }
+    }
+  } else if (action === 'pedir-borrar') {
+    askDelete = true;
+  } else if (action === 'borrar') {
+    const { data, error } = await panel.supabase.from('vehicles').delete().eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+    if (!error && data?.length) return Astro.redirect('/panel/vehiculos?borrado=1', 303);
+    logAuth('panel_vehicle_delete_error', error?.code);
+    flash = {
+      kind: 'bad',
+      text: error?.code === '23503'
+        ? 'No se puede borrar: tiene órdenes de reparación. Se conserva para mantener el historial.'
+        : 'No se ha borrado: solo el propietario o un administrador puede borrar vehículos.',
+    };
+    Astro.response.status = 400;
+  }
+}
+
+let vehicle: Vehicle | null = null;
+let orders: Array<{ id: string; number: number; status: RepairStatus; received_at: string; problem_description: string }> = [];
+let customers: Array<{ id: string; full_name: string; phone: string | null }> = [];
+if (panel.workshop && isUuid(id)) {
+  const [v, o, c] = await Promise.all([
+    panel.supabase.from('vehicles')
+      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, customers(id, full_name)')
+      .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
+    panel.supabase.from('repair_orders').select('id, number, status, received_at, problem_description')
+      .eq('vehicle_id', id).eq('workshop_id', panel.workshop.id).order('received_at', { ascending: false }).limit(50),
+    panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 }),
+  ]);
+  vehicle = (v.data as unknown as Vehicle | null) ?? null;
+  orders = (o.data ?? []) as typeof orders;
+  customers = (c.data ?? []) as typeof customers;
+}
+if (panel.workshop && !vehicle) Astro.response.status = 404;
+const values: Record<string, string> = editValues ?? (vehicle ? {
+  plate: vehicle.plate, make: vehicle.make, model: vehicle.model, year: vehicle.year?.toString() ?? '',
+  year_kind: vehicle.year_kind ?? '', fuel: vehicle.fuel ?? '', customer_id: vehicle.customer_id ?? '', internal_notes: vehicle.internal_notes ?? '',
+} : {});
+---
+<PanelLayout panel={panel} title={vehicle ? formatPlate(vehicle.plate) : 'Vehículo'} section="vehiculos">
+  <a class="pnl-back" href="/panel/vehiculos"><Icon name="arrow" />Vehículos</a>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !vehicle ? (
+    <div class="empty"><strong>Vehículo no encontrado.</strong><span>No existe o pertenece a otro taller.</span><a class="btn" href="/panel/vehiculos">Volver a vehículos</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title"><span class="plate" style="font-size:1.5rem;vertical-align:middle">{formatPlate(vehicle.plate)}</span> {vehicle.make} {vehicle.model}</h1>
+          <p class="pnl-sub">Registrado el {formatDate(vehicle.created_at)}</p>
+        </div>
+        {panel.isManager && <div class="pnl-actions"><a class="btn btn-primary" href={`/panel/ordenes/nueva?vehiculo=${vehicle.id}`}><Icon name="plus" />Nueva orden</a></div>}
+      </header>
+      <Flash kind={flash.kind} text={flash.text} />
+      <div class="grid-2">
+        <div class="stack">
+          <section class="card" aria-labelledby="ficha">
+            <h2 id="ficha" class="card-title"><Icon name="car" />Ficha</h2>
+            <dl class="facts">
+              <dt>Cliente</dt><dd>{vehicle.customers ? <a href={`/panel/clientes/${vehicle.customers.id}`}>{vehicle.customers.full_name}</a> : 'Sin cliente asignado'}</dd>
+              <dt>Año</dt><dd>{vehicle.year ? `${vehicle.year}${vehicle.year_kind ? ` (${YEAR_KIND_LABELS[vehicle.year_kind].toLowerCase()})` : ''}` : 'Pendiente'}</dd>
+              <dt>Combustible</dt><dd>{vehicle.fuel ? FUEL_LABELS[vehicle.fuel] : 'Sin indicar'}</dd>
+              <dt>Fuente de los datos</dt><dd>{DATA_SOURCE_LABELS[vehicle.data_source]}</dd>
+              <dt>Verificación externa</dt><dd>{VERIFICATION_LABELS[vehicle.verification_status]}</dd>
+              {vehicle.internal_notes && <><dt>Notas internas</dt><dd class="note-internal">{vehicle.internal_notes}</dd></>}
+            </dl>
+          </section>
+          <section class="card" aria-labelledby="hist">
+            <h2 id="hist" class="card-title"><Icon name="history" />Historial de reparaciones</h2>
+            {orders.length === 0 ? <p class="hint">{panel.isManager ? 'Sin reparaciones registradas.' : 'Sin reparaciones asignadas a ti para este vehículo.'}</p> : (
+              <ul class="list">{orders.map(o => (
+                <li><a class="row" href={`/panel/ordenes/${o.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{orderLabel(o.number)}</span>{formatDateTime(o.received_at)}</span>
+                    <span class="row-meta">{o.problem_description}</span>
+                  </span>
+                  <span class="row-side"><StatusBadge status={o.status} /></span>
+                </a></li>
+              ))}</ul>
+            )}
+          </section>
+        </div>
+        <section class="card" aria-labelledby="editar">
+          <details open={openEdit}>
+            <summary id="editar" class="card-title" style="cursor:pointer">Editar datos</summary>
+            <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+              <input type="hidden" name="action" value="editar" />
+              <VehicleFields values={values} errors={errors} customers={customers} askPlateConfirmation={askPlate} />
+              <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar cambios</span></button>
+            </form>
+          </details>
+          {panel.isManager && (
+            <div style="margin-top:20px">
+              {askDelete ? (
+                <form method="post" class="confirm" data-busy="Borrando…">
+                  <input type="hidden" name="action" value="borrar" />
+                  <strong>¿Borrar el vehículo {formatPlate(vehicle.plate)}?</strong>
+                  <span class="hint">No se puede deshacer. Si tiene órdenes de reparación, no se podrá borrar.</span>
+                  <div class="pnl-actions">
+                    <button class="btn btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, borrar definitivamente</span></button>
+                    <a class="btn" href={`/panel/vehiculos/${vehicle.id}`}>Cancelar</a>
+                  </div>
+                </form>
+              ) : (
+                <form method="post"><input type="hidden" name="action" value="pedir-borrar" /><button class="btn btn-sm btn-danger" type="submit">Borrar vehículo…</button></form>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </>
+  )}
+</PanelLayout>

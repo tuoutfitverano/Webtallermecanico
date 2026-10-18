@@ -7,7 +7,7 @@ import AuthLayout from '../layouts/AuthLayout.astro';
 import Icon from '../components/Icon.astro';
 import { authPage, formText } from '../lib/server/auth-page.ts';
 import { logAuth } from '../lib/server/auth.ts';
-import { safeNext } from '../lib/auth/redirect.ts';
+import { DEFAULT_AFTER_LOGIN, safeNext } from '../lib/auth/redirect.ts';
 import { authErrorMessage, AUTH_UNAVAILABLE } from '../lib/auth/messages.ts';
 import { isEmail, normalizeEmail, passwordProblem, PASSWORD_MIN, text } from '../lib/auth/validate.ts';
 
@@ -68,7 +68,7 @@ if (page.form) {
     Astro.response.status = 422;
   }
 }
-const qsNext = next === '/cuenta' ? '' : `?next=${encodeURIComponent(next)}`;
+const qsNext = next === DEFAULT_AFTER_LOGIN ? '' : `?next=${encodeURIComponent(next)}`;
 ---
 <AuthLayout title="Crear una cuenta">
   <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">

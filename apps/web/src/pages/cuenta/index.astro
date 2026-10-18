@@ -91,6 +91,7 @@ const invitableFor = (w: Workshop): readonly MemberRole[] => (w.role === 'propie
   <header class="account-head">
     <p class="label">// Tu cuenta</p>
     <h1 class="account-title heading">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1>
+    {workshops.length > 0 && <p class="auth-lead" style="margin:12px 0 0"><a class="btn btn-primary" href="/panel">Ir al panel del taller</a></p>}
   </header>
 
   {welcome && <div class="alert alert-ok" role="status"><Icon name="check" /><span>Invitación aceptada. Ya formas parte del equipo.</span></div>}

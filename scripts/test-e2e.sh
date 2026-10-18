@@ -126,11 +126,15 @@ create_user() { # correo nombre
 create_user propietaria@e2e.test "Paula Propietaria"
 create_user mecanico@e2e.test "Marcos Mecánico"
 create_user otro@e2e.test "Óscar Otro Taller"
+create_user gestora@e2e.test "Gloria Gestora"
+create_user temporal@e2e.test "Tomás Temporal"
 "${PSQL[@]}" -d "$DB" >/dev/null <<'SQL'
 -- Taller demo: propietaria y mecánico. Otro taller con sus propios datos.
 select private.add_workshop_owner('d0000000-0000-0000-0000-000000000001', 'propietaria@e2e.test');
 insert into public.workshop_members (workshop_id, user_id, role)
-  select 'd0000000-0000-0000-0000-000000000001', id, 'mecanico' from auth.users where email = 'mecanico@e2e.test';
+  select 'd0000000-0000-0000-0000-000000000001', id,
+         case email when 'gestora@e2e.test' then 'administrador'::public.member_role else 'mecanico'::public.member_role end
+  from auth.users where email in ('mecanico@e2e.test', 'gestora@e2e.test', 'temporal@e2e.test');
 select private.create_workshop('taller-otro', 'Taller Otro', 'otro@e2e.test');
 insert into public.vehicles (workshop_id, plate, make, model)
   select id, '9999ZZZ', 'Renault', 'Clio' from public.workshops where slug = 'taller-otro';
@@ -141,7 +145,7 @@ echo "▸ Arrancando la web"
 (cd "$ROOT/apps/web" && npx astro dev stop >/dev/null 2>&1 || true)
 (cd "$ROOT/apps/web" && \
   SUPABASE_URL="http://127.0.0.1:$PROXY_PORT" SUPABASE_PUBLISHABLE_KEY="$ANON_KEY" SUPABASE_SECRET_KEY="$SERVICE_KEY" \
-  REQUEST_HASH_SECRET="hash-de-pruebas" ASTRO_TELEMETRY_DISABLED=1 \
+  REQUEST_HASH_SECRET="hash-de-pruebas" ASTRO_TELEMETRY_DISABLED=1 E2E=1 \
   npx astro dev --port $WEB_PORT --host 127.0.0.1 --background >/dev/null 2>&1)
 ready=0
 for i in $(seq 1 60); do
@@ -154,9 +158,17 @@ if [ "$ready" != 1 ]; then
   exit 1
 fi
 
+# Vídeo de prueba local para comprobar el vídeo de la portada (los reales están en otro servidor).
+TEST_VIDEO=""
+if command -v ffmpeg >/dev/null 2>&1; then
+  mkdir -p "$ROOT/.cache/e2e"
+  TEST_VIDEO="$ROOT/.cache/e2e/portada.webm"
+  [ -s "$TEST_VIDEO" ] || ffmpeg -loglevel error -y -f lavfi -i "testsrc2=size=320x180:rate=24:duration=3" -c:v libvpx-vp9 -b:v 200k "$TEST_VIDEO"
+fi
+
 echo "▸ Ejecutando pruebas de extremo a extremo"
 cd "$ROOT/apps/web"
 E2E_BASE_URL="http://demo.localhost:$WEB_PORT" E2E_API_URL="http://127.0.0.1:$WEB_PORT" E2E_REST_URL="http://127.0.0.1:$PROXY_PORT/rest/v1" \
 E2E_PROXY_URL="http://127.0.0.1:$PROXY_PORT" E2E_ANON_KEY="$ANON_KEY" E2E_SERVICE_KEY="$SERVICE_KEY" \
-E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" \
+E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" E2E_VIDEO="$TEST_VIDEO" \
   npx playwright test "$@"

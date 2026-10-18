@@ -31,8 +31,9 @@ Las migraciones se aplican en orden y **ninguna borra datos**:
 | `20261018120000_fundamentos_multiempresa.sql` | Talleres, perfiles, membresías, clientes, vehículos, web pública, RLS |
 | `20261018160000_solicitudes_web.sql` | Solicitudes de la web (cita, presupuesto, contacto) |
 | `20261019090000_cuentas_equipos_invitaciones.sql` | Logotipo y contacto del taller, invitaciones, gestión del equipo, alta controlada |
+| `20261020090000_ordenes_reparacion.sql` | Órdenes de reparación, historial de cambios, búsquedas y resumen del panel |
 
-`db push` modifica la base de datos de producción. Si ya aplicaste las dos primeras, solo aplicará la tercera.
+`db push` modifica la base de datos de producción. Solo aplica las migraciones que falten.
 
 ## 3. Configurar el inicio de sesión (Supabase → Authentication)
 
@@ -102,7 +103,7 @@ No hay ninguna pantalla pública para crear talleres ni para hacerse propietario
    -- Devuelve el id del taller. La web del taller nace SIN publicar.
    ```
 
-3. La propietaria entra en `APP_URL/cuenta`: verá su taller y podrá **invitar** a administradores y mecánicos. Cada invitación genera un enlace que se envía por WhatsApp o correo; solo funciona con el correo invitado, una vez y durante 7 días.
+3. La propietaria entra en `APP_URL/panel` (el panel del taller) y en `APP_URL/cuenta` podrá **invitar** a administradores y mecánicos. Cada invitación genera un enlace que se envía por WhatsApp o correo; solo funciona con el correo invitado, una vez y durante 7 días.
 4. Para publicar la web del taller, rellena su contenido y su dominio:
 
    ```sql
@@ -153,7 +154,7 @@ Antes de abrir al público:
 
 ## 8. Ver las solicitudes recibidas
 
-Hasta que exista el panel del taller (Fase 4), las solicitudes se ven en Supabase → **Table Editor → web_requests**. Las nuevas tienen `status = nueva` (pendientes de confirmar).
+El panel todavía no tiene bandeja de solicitudes web (llegará en una fase siguiente): de momento se ven en Supabase → **Table Editor → web_requests**. Las nuevas tienen `status = nueva` (pendientes de confirmar).
 
 ## 9. Pruebas
 

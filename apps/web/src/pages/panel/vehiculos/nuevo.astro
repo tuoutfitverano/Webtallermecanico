@@ -1,0 +1,69 @@
+---
+/** Registrar un vehículo (datos manuales). La matrícula se normaliza y no se repite en el taller. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import VehicleFields from '../../../components/panel/VehicleFields.astro';
+import { isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { readVehicleForm } from '../../../lib/panel/vehicle-form.ts';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const preCustomer = Astro.url.searchParams.get('cliente');
+let values: Record<string, string> = { customer_id: isUuid(preCustomer) ? preCustomer : '' };
+let errors: Partial<Record<string, string>> = {};
+let error = '';
+let askPlate = false;
+let existing: { id: string } | null = null;
+
+if (panel.form && panel.workshop) {
+  const r = readVehicleForm(panel.form);
+  values = r.values;
+  if (!r.ok) {
+    errors = r.errors;
+    askPlate = r.needsPlateConfirmation;
+    error = 'Revisa los campos marcados.';
+    Astro.response.status = 422;
+  } else {
+    const { data, error: e } = await panel.supabase.from('vehicles')
+      .insert({ workshop_id: panel.workshop.id, ...r.row })
+      .select('id').single();
+    if (!e && data) return Astro.redirect(`/panel/vehiculos/${data.id}?creado=1`, 303);
+    logAuth('panel_vehicle_create_error', e?.code);
+    Astro.response.status = 400;
+    if (e?.code === '23505') {
+      const found = await panel.supabase.from('vehicles').select('id').eq('workshop_id', panel.workshop.id).eq('plate', r.row.plate).maybeSingle();
+      existing = found.data;
+      error = 'Ya hay un vehículo con esa matrícula en tu taller.';
+    } else if (e?.code === '23503') {
+      error = 'El cliente elegido no existe en tu taller.';
+    } else {
+      error = dbErrorMessage(e);
+    }
+  }
+}
+
+const { data: customers } = panel.workshop
+  ? await panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 })
+  : { data: [] };
+---
+<PanelLayout panel={panel} title="Registrar vehículo" section="vehiculos">
+  <a class="pnl-back" href="/panel/vehiculos"><Icon name="arrow" />Vehículos</a>
+  <header class="pnl-head"><h1 class="pnl-title">Registrar vehículo</h1></header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <section class="card">
+      <Flash kind="bad" text={error}>{existing && <> <a href={`/panel/vehiculos/${existing.id}`}>Ver el vehículo existente</a>.</>}</Flash>
+      <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+        <VehicleFields values={values} errors={errors} customers={(customers ?? []) as Array<{ id: string; full_name: string; phone: string | null }>} askPlateConfirmation={askPlate} />
+        <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar vehículo</span></button>
+      </form>
+      {(customers ?? []).length === 0 && <p class="hint" style="margin-top:12px">Todavía no hay clientes: puedes registrar el vehículo sin cliente y asignarlo después, o <a href="/panel/clientes/nuevo">añadir antes el cliente</a>.</p>}
+    </section>
+  )}
+</PanelLayout>

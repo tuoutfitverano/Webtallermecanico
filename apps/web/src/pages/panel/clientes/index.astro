@@ -1,0 +1,73 @@
+---
+/** Clientes del taller con búsqueda por nombre, teléfono o correo. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface Row { id: string; full_name: string; phone: string | null; email: string | null; vehicle_count: number; open_orders: number }
+const q = (Astro.url.searchParams.get('q') ?? '').trim().slice(0, 100);
+let rows: Row[] = [];
+let error = false;
+if (panel.workshop) {
+  const { data, error: e } = await panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: q, p_limit: 100 });
+  if (e) { logAuth('panel_customers_error', e.code); error = true; }
+  rows = (data ?? []) as Row[];
+}
+const deleted = Astro.url.searchParams.get('borrado') === '1';
+---
+<PanelLayout panel={panel} title="Clientes" section="clientes">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Clientes</h1>
+      <p class="pnl-sub">Fichas de clientes del taller. Una ficha no crea ninguna cuenta de acceso.</p>
+    </div>
+    {panel.workshop && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/clientes/nuevo"><Icon name="plus" />Añadir cliente</a></div>}
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <>
+      <Flash kind="ok" text={deleted ? 'Cliente borrado.' : ''} />
+      <form method="get" class="filters" role="search">
+        <div class="field search">
+          <label for="q" class="sr-only">Buscar clientes</label>
+          <Icon name="search" />
+          <input class="input" id="q" name="q" type="search" value={q} placeholder="Nombre, teléfono o correo" autocomplete="off" />
+        </div>
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+      {error && <Flash kind="bad" text="No hemos podido cargar los clientes. Recarga la página." />}
+      <section class="card" aria-label="Lista de clientes">
+        {rows.length === 0 ? (
+          <div class="empty">
+            <strong>{q ? `Ningún cliente coincide con «${q}».` : 'Todavía no hay clientes registrados.'}</strong>
+            <a class="btn btn-primary" href="/panel/clientes/nuevo"><Icon name="plus" />{q ? 'Añadir cliente' : 'Añadir el primer cliente'}</a>
+          </div>
+        ) : (
+          <ul class="list">
+            {rows.map(c => (
+              <li>
+                <a class="row" href={`/panel/clientes/${c.id}`}>
+                  <span class="row-main">
+                    <span class="row-title">{c.full_name}</span>
+                    <span class="row-meta">{[c.phone, c.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}</span>
+                  </span>
+                  <span class="row-side">
+                    <span class="row-meta">{c.vehicle_count} {c.vehicle_count === 1 ? 'vehículo' : 'vehículos'}</span>
+                    {c.open_orders > 0 && <span class="row-meta">{c.open_orders} en curso</span>}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PanelLayout>
