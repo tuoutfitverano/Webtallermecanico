@@ -140,7 +140,7 @@ test.describe('Datos del taller', () => {
     const res = await api(`/workshops?id=eq.${DEMO}`, token, 'PATCH', { name: 'Taller Colado' });
     expect(res.json).toEqual([]);
     const [row] = await adminRows(`/workshops?id=eq.${DEMO}&select=name`);
-    expect(row!.name).toBe('Taller Demo');
+    expect(row!.name).toBe('AutoValue');
   });
 });
 

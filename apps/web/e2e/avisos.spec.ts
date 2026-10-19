@@ -113,14 +113,14 @@ test.describe('Avisos · de un cambio de estado al cliente', () => {
     await expect(page.getByRole('status')).toContainText('Cambios guardados.');
     expect(await notificationsOf(job.owner.token, job.orderId)).toHaveLength(2);
     // Al guardar, el servidor aprovecha para enviar lo que hubiera en cola de esta orden.
-    await expect.poll(async () => (await emailsTo(job.email)).map(m => m.subject)).toEqual(['Taller Demo: Hemos recibido tu vehículo']);
+    await expect.poll(async () => (await emailsTo(job.email)).map(m => m.subject)).toEqual(['AutoValue: Hemos recibido tu vehículo']);
 
     // Cambio real a "Listo para recoger" con mensaje → aviso en portal + email.
     await changeStatus(page, job.orderId, 'Listo para recoger', 'Puedes pasar a partir de las 17:00.');
     await expect.poll(async () => (await emailsTo(job.email)).length).toBe(2);
     const [mail] = await emailsTo(job.email);
-    expect(mail!.subject).toBe('Taller Demo: Tu vehículo está listo para recoger');
-    expect(mail!.from).toBe('"Taller Demo" <avisos@talleres.test>');
+    expect(mail!.subject).toBe('AutoValue: Tu vehículo está listo para recoger');
+    expect(mail!.from).toBe('"AutoValue" <avisos@talleres.test>');
     expect(mail!.reply_to).toBe('taller-demo@e2e.test');
     expect(mail!.text).toContain('Puedes pasar a partir de las 17:00.');
     expect(mail!.text).toContain('/portal/reparaciones/');
@@ -176,7 +176,7 @@ test.describe('Avisos · de un cambio de estado al cliente', () => {
     const job = await setup();
     const client = await newPage(browser);
     await login(client, job.email, '/portal/datos');
-    const form = client.getByRole('form', { name: 'Comunicaciones de Taller Demo' });
+    const form = client.getByRole('form', { name: 'Comunicaciones de AutoValue' });
     await expect(form.getByLabel(/Avisos de mis reparaciones por email/)).toBeChecked();
     await expect(form.getByLabel(/Ofertas y promociones/)).not.toBeChecked();
     await form.getByLabel(/Avisos de mis reparaciones por email/).uncheck();

@@ -95,6 +95,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Animaciones sin librerías: `BlurText.astro` (palabra a palabra) y la clase `.reveal` + `data-reveal`. El estado oculto inicial solo se aplica con la clase `anim` en `<html>` (la pone un script en línea): sin JavaScript o con "reducir movimiento" todo se ve. Nunca ocultes contenido con CSS sin esa condición.
 - `[hidden]` siempre oculta (`display:none !important`). No lo quites: el panel de "Solicitud recibida" depende de ello.
 - Vídeos de fondo opcionales por taller en `workshop_sites.theme` (`heroVideo`, `servicesVideo`, solo `https`). `FadingVideo.astro` no los descarga sin JavaScript, con "reducir movimiento" o con ahorro de datos; entonces se ve el fondo animado. Una web real debe usar vídeos propios o con licencia.
+- Coche que gira con el scroll: `theme.scrollFrames` (`src` con `{n}`, `count`, `poster`, `focusX/focusY` = punto del zoom final). `ScrollStage.astro` + `scripts/scroll-stage.ts` dibujan fotogramas en un canvas: portada → vuelta completa → servicios → zoom hasta la ventanilla tintada → «Cómo trabajamos». Sin JavaScript, con «reducir movimiento» o ahorro de datos: solo la imagen fija y sin huecos. Fotogramas del taller demo (AutoValue) en `public/demo/autovalue/` (vídeo aportado por el propietario; lleva la marca de agua de KlingAI).
 - React solo cuando una pantalla lo necesite de verdad (todavía no se usa).
 - Variables de entorno: `apps/web/.env` en local (plantilla en `.env.example`); en producción, secretos de Cloudflare.
 

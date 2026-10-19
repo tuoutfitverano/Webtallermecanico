@@ -36,7 +36,7 @@ No se ha encontrado ninguna exposición de datos entre talleres o clientes: las 
 | B4 | Bajo | `portal_my_vehicles` y `portal_my_workshops` (Fase 0) sin uso. | Se mantienen: son seguras y tienen pruebas |
 | B5 | Bajo | Si una orden cambia de cliente, el cliente anterior conserva los avisos del portal que ya recibió (título, vehículo y número). | **Abierto**: aceptable para un piloto |
 | B6 | Bajo | El CSP no limita los scripts (la web usa scripts en línea y Turnstile). | **Abierto**: mejora futura |
-| B7 | Bajo | No hay vídeo sincronizado con el scroll; el vídeo de portada en bucle funciona y respeta «reducir movimiento». | **Abierto**: funcionalidad no implementada |
+| B7 | Bajo | No había vídeo sincronizado con el scroll. | **Resuelto después**: `ScrollStage` (coche que gira con el scroll), con imagen fija sin JavaScript o con «reducir movimiento» |
 | B8 | Bajo | El alta manual de vehículos **sin** proveedor de matrículas solo está probada con pruebas unitarias: el entorno de navegador siempre tiene el proveedor simulado. | Abierto (verificación parcial) |
 
 ## 3. Pruebas añadidas

@@ -47,7 +47,7 @@
 | Migraciones reproducibles en un entorno nuevo | ✅ | `test:db` las aplica desde cero; prueba con una transacción por archivo |
 | Pantallas en móvil y escritorio, accesibilidad básica | ✅ | `calidad.spec`: 31 pantallas, axe sin fallos graves ni críticos, sin desbordes, teclado |
 | Vídeo de portada (bucle con fundido) y «reducir movimiento» | ✅ | `panel.spec` (vídeo) y `FadingVideo.astro` |
-| Vídeo sincronizado con el scroll | ❌ | No implementado (nunca se hizo) |
+| Coche que gira con el scroll y zoom hasta la ventanilla (taller demo) | ✅ | `panel.spec` (web pública: giro, zoom, «reducir movimiento»). Sin JavaScript queda la imagen fija |
 | Despliegue real en Cloudflare | 🟡 | No realizado (falta autorización y cuenta). Guía en `DESPLIEGUE.md` |
 
 ## Legal y negocio

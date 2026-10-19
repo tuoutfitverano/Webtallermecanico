@@ -1,0 +1,40 @@
+---
+/**
+ * Escenario con el coche de fondo para la portada y los servicios:
+ *  1. Portada: el coche (primer fotograma) detrás del texto, oscurecido.
+ *  2. Al bajar hacia los servicios, el coche da una vuelta completa al ritmo del scroll.
+ *  3. Antes de la tercera sección, la cámara se acerca hasta la ventanilla
+ *     tintada (focusX/focusY) y la pantalla queda oscura: transición a la siguiente.
+ *
+ * Sin JavaScript, con «reducir movimiento» o con ahorro de datos: solo la
+ * imagen fija de fondo, sin espacios vacíos ni animación (nada queda oculto).
+ */
+import type { ScrollFrames } from '../lib/site/content.ts';
+interface Props { frames: ScrollFrames }
+const { frames } = Astro.props;
+---
+<div
+  class="stage"
+  data-stage
+  data-src={frames.src}
+  data-count={frames.count}
+  data-focus-x={frames.focusX}
+  data-focus-y={frames.focusY}
+>
+  <div class="stage-sticky" aria-hidden="true">
+    <img class="stage-poster" src={frames.poster} alt="" decoding="async" fetchpriority="high" />
+    <canvas class="stage-canvas"></canvas>
+    <div class="stage-dim"></div>
+  </div>
+  <div class="stage-content">
+    <slot name="first" />
+    <div class="stage-gap stage-gap-turn" aria-hidden="true"></div>
+    <slot name="second" />
+    <div class="stage-gap stage-gap-zoom" aria-hidden="true"></div>
+  </div>
+</div>
+
+<script>
+  import { setupScrollStage } from '../scripts/scroll-stage.ts';
+  setupScrollStage();
+</script>

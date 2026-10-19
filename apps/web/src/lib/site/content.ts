@@ -33,10 +33,28 @@ export const siteContentSchema = z.object({
 /** Vídeo de fondo opcional: solo https y alojado donde el taller tenga derecho a usarlo. */
 const videoUrl = z.url({ protocol: /^https$/ }).max(500).nullable().default(null).catch(null);
 
+/** Imagen o fotograma: https o una ruta de la propia web ("/demo/…"), nunca otro esquema. */
+const assetUrl = z.string().max(500).refine(v => /^https:\/\/\S+$/.test(v) || /^\/(?!\/)\S*$/.test(v));
+
+/**
+ * Coche que gira con el scroll (portada → servicios) y zoom final hasta un punto
+ * de la imagen (focusX/focusY, de 0 a 1) como transición a la siguiente sección.
+ * `src` lleva {n}: el número de fotograma con tres cifras (000, 001…).
+ */
+export const scrollFramesSchema = z.object({
+  src: assetUrl.refine(v => v.includes('{n}')),
+  count: z.number().int().min(2).max(240),
+  poster: assetUrl,
+  focusX: z.number().min(0).max(1).default(0.5),
+  focusY: z.number().min(0).max(1).default(0.5),
+});
+export type ScrollFrames = z.output<typeof scrollFramesSchema>;
+
 export const siteThemeSchema = z.object({
   accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#e4572e').catch('#e4572e'),
   heroVideo: videoUrl,
   servicesVideo: videoUrl,
+  scrollFrames: scrollFramesSchema.nullable().default(null).catch(null),
 });
 
 export type SiteService = z.output<typeof serviceSchema>;
@@ -51,6 +69,8 @@ export interface PublicSite {
   accent: string;
   /** Vídeos de fondo; sin vídeo, la web usa un fondo animado. */
   videos: { hero: string | null; services: string | null };
+  /** Secuencia de fotogramas controlada por el scroll (sustituye a los vídeos de portada y servicios). */
+  scrollFrames: ScrollFrames | null;
   content: SiteContent;
 }
 
@@ -78,6 +98,7 @@ export function parsePublicSite(raw: unknown): PublicSite | null {
     isDemoContent: site.is_demo_content,
     accent: theme.accent,
     videos: { hero: theme.heroVideo, services: theme.servicesVideo },
+    scrollFrames: theme.scrollFrames,
     content: content.success ? content.data : siteContentSchema.parse({}),
   };
 }

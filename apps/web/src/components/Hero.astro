@@ -3,17 +3,25 @@ import Icon from './Icon.astro';
 import BlurText from './BlurText.astro';
 import FadingVideo from './FadingVideo.astro';
 import type { PublicSite } from '../lib/site/content.ts';
-interface Props { site: PublicSite }
-const { site } = Astro.props;
+interface Props {
+  site: PublicSite;
+  /** Dentro del escenario del coche (ScrollStage): sin fondo propio. */
+  staged?: boolean;
+}
+const { site, staged = false } = Astro.props;
 const c = site.content;
 // Solo datos reales del taller: nada de cifras, reseñas ni logos inventados.
 ---
-<section class="hero">
-  <div class="ambient" aria-hidden="true"></div>
-  {site.videos.hero && (
-    <FadingVideo src={site.videos.hero} class="hero-video" style="width:120%;height:120%" />
+<section class:list={['hero', { 'is-staged': staged }]}>
+  {!staged && (
+    <>
+      <div class="ambient" aria-hidden="true"></div>
+      {site.videos.hero && (
+        <FadingVideo src={site.videos.hero} class="hero-video" style="width:120%;height:120%" />
+      )}
+      <div class="hero-shade" aria-hidden="true"></div>
+    </>
   )}
-  <div class="hero-shade" aria-hidden="true"></div>
 
   <div class="hero-content">
     <div class="hero-main">

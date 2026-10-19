@@ -163,7 +163,7 @@ test.describe('Consulta por matrícula · permisos', () => {
     expect([303, 403]).toContain(res.status);
     if (res.status === 303) expect(res.headers.get('location')).toContain('/acceso');
 
-    // Otro taller con el id del Taller Demo.
+    // Otro taller con el id del taller demo.
     const otro = await tokenFor('otro@e2e.test');
     expect((await api('/rpc/start_vehicle_lookup', otro, 'POST', { ...args, p_request_key: crypto.randomUUID() })).status).toBeGreaterThanOrEqual(400);
     expect((await api('/vehicle_lookups?select=id', otro)).json).toEqual([]);
@@ -179,7 +179,7 @@ test.describe('Consulta por matrícula · permisos', () => {
     await expect(page).toHaveURL(/\/acceso/);
   });
 
-  test('las consultas del Taller Demo no se ven ni se reutilizan desde otro taller', async () => {
+  test('las consultas del taller demo no se ven ni se reutilizan desde otro taller', async () => {
     const owner = await tokenFor('propietaria@e2e.test');
     const mine = (await api('/vehicle_lookups?select=id,workshop_id', owner)).json as Array<{ workshop_id: string }>;
     expect(mine.length).toBeGreaterThan(0);

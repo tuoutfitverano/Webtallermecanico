@@ -1,22 +1,23 @@
 -- Datos de DEMOSTRACIÓN para desarrollo local (`supabase db reset`).
--- Nada de esto es un taller ni un cliente real. Nunca se carga en producción.
+-- Nombre y dirección del taller: los que ha dado el propietario. El resto (teléfono,
+-- correo, horario, servicios, vehículos) es de ejemplo. Nunca se carga en producción.
 
 insert into public.workshops (id, slug, name, status)
-values ('d0000000-0000-0000-0000-000000000001', 'taller-demo', 'Taller Demo', 'demo');
+values ('d0000000-0000-0000-0000-000000000001', 'taller-demo', 'AutoValue', 'demo');
 
 -- Mismo contenido que apps/web/src/lib/site/demo.ts (la demo local sin base de datos).
 insert into public.workshop_sites (workshop_id, published, is_demo_content, theme, content)
 values (
   'd0000000-0000-0000-0000-000000000001', true, true,
-  '{"accent": "#e4572e", "heroVideo": "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260619_191346_9d19d66e-86a4-47f7-8dc6-712c1788c3b2.mp4", "servicesVideo": "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_093722_ccfc7ebf-182f-419f-8a62-2dc02db7dd9d.mp4"}',
+  '{"accent": "#e4572e", "scrollFrames": {"src": "/demo/autovalue/giro/{n}.webp", "count": 73, "poster": "/demo/autovalue/portada.webp", "focusX": 0.365, "focusY": 0.41}}',
   '{
   "tagline": "Mecánica y electrónica del automóvil",
-  "city": "Guadalajara",
+  "city": "El Casar",
   "intro": "Taller multimarca de demostración. Pide cita o presupuesto desde la web y te contestaremos para confirmarlo.",
   "phone": "+34 600 000 000",
   "whatsapp": "+34 600 000 000",
   "email": "demo@example.com",
-  "address": "Calle de Ejemplo 1, 19001 Guadalajara",
+  "address": "Calle Castilla 2122, El Casar",
   "hours": [
     "Lunes a viernes: 8:30–14:00 y 15:30–19:00",
     "Sábados y domingos: cerrado"
@@ -59,7 +60,7 @@ values (
       "description": "Ruidos, testigos encendidos y fallos de arranque."
     }
   ],
-  "notice": "Web de demostración: el taller, los teléfonos y la dirección son ficticios."
+  "notice": "Web de demostración: el teléfono, el correo, el horario y los servicios son de ejemplo."
 }'
 );
 

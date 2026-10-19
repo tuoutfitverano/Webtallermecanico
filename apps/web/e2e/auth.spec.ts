@@ -3,8 +3,8 @@
  * PostgREST y PostgreSQL con RLS. Los correos llegan a un buzón de pruebas.
  *
  * Cuentas preparadas por scripts/test-e2e.sh (contraseña E2E_PASSWORD):
- *   propietaria@e2e.test → propietaria del Taller Demo
- *   mecanico@e2e.test    → mecánico del Taller Demo
+ *   propietaria@e2e.test → propietaria del taller demo
+ *   mecanico@e2e.test    → mecánico del taller demo
  *   otro@e2e.test        → propietario de "Taller Otro" (con un vehículo 9999ZZZ)
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -97,10 +97,10 @@ test.describe('Inicio de sesión', () => {
     await login(page, 'propietaria@e2e.test');
     // Tras iniciar sesión se llega al panel del taller.
     await expect(page).toHaveURL(/\/panel$/);
-    await expect(page.locator('.pnl-workshop-name')).toHaveText('Taller Demo');
+    await expect(page.locator('.pnl-workshop-name')).toHaveText('AutoValue');
     await page.goto('/cuenta');
     await expect(page.getByRole('heading', { name: 'Hola, Paula' })).toBeVisible();
-    await expect(page.locator('.workshop-list')).toContainText('Taller Demo');
+    await expect(page.locator('.workshop-list')).toContainText('AutoValue');
     await expect(page.locator('.workshop-list')).toContainText('Propietario/a');
     // El equipo se gestiona en el panel; desde la cuenta hay un enlace directo.
     await page.getByRole('link', { name: 'Equipo e invitaciones' }).click();
@@ -301,11 +301,11 @@ test.describe('Invitaciones', () => {
     await page.goto(mail.links.find(l => l.includes('/auth/confirmar'))!);
     await page.getByRole('button', { name: 'Confirmar mi correo' }).click();
     await expect(page).toHaveURL(/\/invitacion\?token=/);
-    await expect(page.getByRole('heading', { name: 'Únete a Taller Demo' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Únete a AutoValue' })).toBeVisible();
     await expect(page.getByText('Mecánico/a')).toBeVisible();
     await page.getByRole('button', { name: 'Aceptar la invitación' }).click();
     await expect(page).toHaveURL(/\/cuenta\?bienvenida=1/);
-    await expect(page.locator('.workshop-list')).toContainText('Taller Demo');
+    await expect(page.locator('.workshop-list')).toContainText('AutoValue');
     await expect(page.locator('.workshop-list')).toContainText('Mecánico/a');
 
     // El mismo enlace no sirve dos veces.

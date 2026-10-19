@@ -70,5 +70,5 @@ Se revisaron las 40 rutas, los menús de panel y portal, y el uso de cada funci�
 | Editar textos, aspecto y dominios de la web pública desde el panel | La base de datos lo permite (`workshop_sites`), pero el contenido es un JSON libre. Una pantalla segura y útil es una función nueva: fuera del alcance de esta revisión |
 | Consulta real de matrículas y email real | Dependen de contratar Openapi y Resend (credenciales). Probado solo con simuladores |
 | Antispam real (Turnstile) | Necesita las claves de Cloudflare. Sin ellas la web responde 503 y no finge envíos |
-| Vídeo sincronizado con el scroll | No existía: nunca se implementó (el vídeo en bucle sí funciona) |
+| Vídeo sincronizado con el scroll | Hecho después de esta revisión (coche que gira en la portada del taller demo) |
 | Textos legales | Pendientes de un asesor |

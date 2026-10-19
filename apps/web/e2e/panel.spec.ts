@@ -2,20 +2,18 @@
  * Panel del taller con base de datos y Supabase Auth REALES.
  *
  * Cuentas (scripts/test-e2e.sh, contraseña E2E_PASSWORD):
- *   propietaria@e2e.test (propietaria del Taller Demo) · gestora@e2e.test (administradora)
+ *   propietaria@e2e.test (propietaria del taller demo) · gestora@e2e.test (administradora)
  *   mecanico@e2e.test y temporal@e2e.test (mecánicos) · otro@e2e.test (propietario de "Taller Otro")
  *
  * Las pruebas comparten base de datos y se ejecutan en orden (workers: 1):
  * cada una crea sus propios datos con nombres y matrículas únicos.
  */
-import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const REST = `${PROXY}/rest/v1`;
 const ANON = process.env.E2E_ANON_KEY ?? '';
 const PASSWORD = process.env.E2E_PASSWORD ?? '';
-const VIDEO = process.env.E2E_VIDEO ?? '';
 const DEMO = 'd0000000-0000-0000-0000-000000000001';
 
 test.skip(!PROXY || !PASSWORD, 'Lanza estas pruebas con scripts/test-e2e.sh');
@@ -92,7 +90,7 @@ test.describe('Panel · propietaria', () => {
     for (const label of ['Crear orden de reparación', 'Registrar vehículo', 'Añadir cliente', 'Ver todas las reparaciones']) {
       await expect(page.getByRole('link', { name: label })).toBeVisible();
     }
-    await expect(page.locator('.pnl-workshop-name')).toHaveText('Taller Demo');
+    await expect(page.locator('.pnl-workshop-name')).toHaveText('AutoValue');
     await expect(page.locator('.pnl-role')).toHaveText('Propietario/a');
   });
 
@@ -332,7 +330,7 @@ test.describe('Panel · mecánico', () => {
 test.describe('Panel · aislamiento entre talleres', () => {
   test.skip(({ isMobile }) => isMobile, 'Escritorio');
 
-  test('otro taller no ve nada del Taller Demo, ni por URL ni manipulando la cookie', async ({ page, browser, context }) => {
+  test('otro taller no ve nada del taller demo, ni por URL ni manipulando la cookie', async ({ page, browser, context }) => {
     const owner = await browser.newPage();
     await login(owner, 'propietaria@e2e.test');
     const job = await createJob(owner);
@@ -371,7 +369,7 @@ test.describe('Panel · aislamiento entre talleres', () => {
     const intoDemo = await api('/repair_orders', otro.token, 'POST', {
       workshop_id: DEMO, vehicle_id: demoVehicle.id, customer_id: demoVehicle.customer_id, problem_description: 'Colada',
     });
-    expect(intoDemo.status).toBe(403); // RLS: no es gestor del Taller Demo
+    expect(intoDemo.status).toBe(403); // RLS: no es gestor del taller demo
     for (const path of [`/repair_orders?workshop_id=eq.${DEMO}`, `/customers?workshop_id=eq.${DEMO}`, `/vehicles?workshop_id=eq.${DEMO}`, '/repair_order_events?select=id']) {
       const r = await api(path, otro.token);
       expect((r.json as unknown[]).length, path).toBe(0);
@@ -401,15 +399,32 @@ test.describe('Panel · móvil y usuarios sin taller', () => {
 
 // ======================================================================
 test.describe('Web pública', () => {
-  test('el vídeo de la portada sigue apareciendo con su fundido', async ({ page, isMobile }) => {
-    test.skip(isMobile || !VIDEO, 'Necesita el vídeo de prueba (ffmpeg)');
-    const video = readFileSync(VIDEO);
-    // Los vídeos reales están en otro servidor: se sirve uno local en su lugar.
-    await page.route('https://d8j0ntlcm91z4.cloudfront.net/**', r => r.fulfill({ status: 200, contentType: 'video/webm', body: video }));
+  test('el coche gira con el scroll y se acerca a la ventanilla antes de la tercera sección', async ({ page }) => {
+    const frames: string[] = [];
+    page.on('request', r => { if (r.url().includes('/demo/autovalue/giro/')) frames.push(r.url()); });
     await page.goto('/');
-    const hero = page.locator('.hero video[data-fading-video]');
-    await expect(hero).toHaveCount(1);
-    await expect.poll(async () => Number(await hero.evaluate(v => (v as HTMLVideoElement).style.opacity)), { timeout: 8000 }).toBeGreaterThan(0.9);
+    await expect(page.locator('html')).toHaveClass(/stage-on/);
+    await expect(page.locator('.stage')).toHaveClass(/is-live/);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu coche en buenas manos.');
+    const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));
+    expect(await dim()).toBeGreaterThan(0.5); // portada: coche oscurecido detrás del texto
+    // En mitad de la vuelta el coche se ve limpio.
+    await page.evaluate(() => { const g = document.querySelector('.stage-gap-turn')!; scrollTo(0, g.getBoundingClientRect().top + scrollY); });
+    await expect.poll(dim).toBeLessThan(0.2);
+    // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza «Cómo trabajamos».
+    await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
+    await expect.poll(dim).toBeGreaterThan(0.95);
+    expect(new Set(frames).size).toBeGreaterThan(20);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  test('con «reducir movimiento» solo hay imagen fija y ningún hueco', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await expect(page.locator('html')).not.toHaveClass(/stage-on/);
+    await expect(page.locator('.stage-poster')).toBeVisible();
+    await expect(page.locator('.stage-gap-turn')).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Tu coche, de principio a fin' })).toBeVisible();
   });
 });

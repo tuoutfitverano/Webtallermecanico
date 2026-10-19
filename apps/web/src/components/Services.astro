@@ -3,8 +3,12 @@ import Icon from './Icon.astro';
 import BlurText from './BlurText.astro';
 import FadingVideo from './FadingVideo.astro';
 import type { PublicSite } from '../lib/site/content.ts';
-interface Props { site: PublicSite }
-const { site } = Astro.props;
+interface Props {
+  site: PublicSite;
+  /** Dentro del escenario del coche (ScrollStage): sin fondo propio. */
+  staged?: boolean;
+}
+const { site, staged = false } = Astro.props;
 const { services, brands } = site.content;
 
 // Icono según el servicio; los que no están en la lista llevan la llave.
@@ -19,10 +23,14 @@ const ICON_FOR: Record<string, 'gauge' | 'chip' | 'disc' | 'tire' | 'cog' | 'ale
 };
 ---
 {services.length > 0 && (
-  <section class="capabilities" id="servicios">
-    <div class="ambient ambient-alt" aria-hidden="true"></div>
-    {site.videos.services && <FadingVideo src={site.videos.services} class="cover-video" />}
-    <div class="section-shade" aria-hidden="true"></div>
+  <section class:list={['capabilities', { 'is-staged': staged }]} id="servicios">
+    {!staged && (
+      <>
+        <div class="ambient ambient-alt" aria-hidden="true"></div>
+        {site.videos.services && <FadingVideo src={site.videos.services} class="cover-video" />}
+        <div class="section-shade" aria-hidden="true"></div>
+      </>
+    )}
 
     <div class="cap-inner">
       <header class="cap-head">

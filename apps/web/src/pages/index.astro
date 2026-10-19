@@ -8,6 +8,7 @@ import DemoNotice from '../components/DemoNotice.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import Hero from '../components/Hero.astro';
 import Services from '../components/Services.astro';
+import ScrollStage from '../components/ScrollStage.astro';
 import HowItWorks from '../components/HowItWorks.astro';
 import RequestForms from '../components/RequestForms.astro';
 import ContactInfo from '../components/ContactInfo.astro';
@@ -41,8 +42,17 @@ const title = [site.name, site.content.tagline || 'Taller mecánico', site.conte
   <DemoNotice site={site} />
   <SiteHeader site={site} />
   <main>
-    <Hero site={site} />
-    <Services site={site} />
+    {site.scrollFrames ? (
+      <ScrollStage frames={site.scrollFrames}>
+        <Hero slot="first" site={site} staged />
+        <Services slot="second" site={site} staged />
+      </ScrollStage>
+    ) : (
+      <>
+        <Hero site={site} />
+        <Services site={site} />
+      </>
+    )}
     <HowItWorks />
     <RequestForms site={site} turnstileSiteKey={turnstileSiteKey()} noJsResult={noJsResult} />
     <ContactInfo site={site} />

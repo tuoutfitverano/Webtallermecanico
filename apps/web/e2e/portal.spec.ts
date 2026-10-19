@@ -2,7 +2,7 @@
  * Portal del cliente con base de datos y Supabase Auth REALES.
  *
  * Cuentas (scripts/test-e2e.sh, contraseña E2E_PASSWORD):
- *   propietaria@e2e.test (Taller Demo) · mecanico@e2e.test (mecánico del Taller Demo)
+ *   propietaria@e2e.test (taller demo) · mecanico@e2e.test (mecánico del taller demo)
  *   otro@e2e.test (propietario de "Taller Otro")
  * Cada prueba crea sus propios clientes (correos y matrículas únicos).
  *
@@ -81,7 +81,7 @@ async function waitForMail(to: string, before: number): Promise<Mail> {
 }
 
 /**
- * Ficha de cliente + vehículo + orden en el Taller Demo creada por la
+ * Ficha de cliente + vehículo + orden en el taller demo creada por la
  * propietaria con SU token (RLS), y, si se pide, cuenta vinculada mediante
  * invitación aceptada por el propio cliente.
  */
@@ -162,7 +162,7 @@ test.describe('Portal · invitación y seguimiento', () => {
 
     // 3. Vuelve a la invitación y la acepta.
     await expect(client).toHaveURL(/\/portal\/invitacion\?token=/);
-    await expect(client.getByRole('heading', { name: 'Tu portal en Taller Demo' })).toBeVisible();
+    await expect(client.getByRole('heading', { name: 'Tu portal en AutoValue' })).toBeVisible();
     await client.getByRole('button', { name: 'Aceptar y ver mi portal' }).click();
     await expect(client).toHaveURL(/\/portal\?bienvenida=1$/);
     await expect(client.getByRole('status').filter({ hasText: 'Tu cuenta ya está vinculada' })).toBeVisible();
@@ -311,14 +311,14 @@ test.describe('Portal · permisos en la base de datos', () => {
     expect(rows(check)[0]).toEqual({ status: 'recibido', customer_id: mine.customerId });
   });
 
-  test('otro taller no puede invitar a clientes del Taller Demo ni ver su portal', async () => {
+  test('otro taller no puede invitar a clientes del taller demo ni ver su portal', async () => {
     const job = await setupCustomer({ link: true });
     const otro = await tokenFor('otro@e2e.test');
     expect((await rpc('create_customer_invitation', otro.token, { p_customer_id: job.customerId })).status).toBeGreaterThanOrEqual(400);
     expect((await rpc('unlink_customer_account', otro.token, { p_customer_id: job.customerId })).status).toBeGreaterThanOrEqual(400);
     // El propietario de otro taller no es cliente: el portal no le devuelve nada.
     expect(rows(await rpc('portal_order', otro.token, { p_order_id: job.orderId }))).toHaveLength(0);
-    // El cliente del Taller Demo no ve el vehículo 9999ZZZ del Taller Otro.
+    // El cliente del taller demo no ve el vehículo 9999ZZZ del Taller Otro.
     const plates = rows(await rpc('portal_vehicles', job.client!.token)).map(v => v.plate);
     expect(plates).not.toContain('9999ZZZ');
     expect(rows(await api('/vehicles?plate=eq.9999ZZZ', job.client!.token))).toHaveLength(0);
