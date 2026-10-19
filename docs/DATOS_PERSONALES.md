@@ -48,7 +48,7 @@ Todo se hace en Supabase → **SQL Editor**, con una persona autorizada. Las fun
 | **Rectificación** | El taller corrige la ficha en el panel. El cliente puede pedirlo; en el portal sus datos son de solo lectura |
 | **Supresión** con historial que conservar | `select private.anonymize_customer('<id>');` borra o sustituye nombre, teléfono, correo, notas, acceso al portal, avisos del portal y mensajes. Conserva las reparaciones sin datos personales. Si la ficha no tiene órdenes, se puede borrar entera desde el panel |
 | **Oposición a comunicaciones** | El cliente desde «Mis datos», o el taller en la ficha («Desactivar avisos por email» / «Retirar consentimiento de promociones») |
-| **Solicitudes web** | Un gestor puede borrarlas (permiso de borrado por RLS). Hoy, desde Supabase → Table Editor |
+| **Solicitudes web** | Un gestor las borra desde **Panel → Solicitudes web → Borrar…** (dos pasos; permiso de borrado por RLS) |
 | **Cuentas de usuario** | Supabase → Authentication → Users → borrar. Las fichas de cliente se quedan sin cuenta (`on delete set null`) y el historial se mantiene |
 
 Antes de responder, compruebe la identidad de quien lo pide. Hay plazo de un mes según el RGPD: confirmar con el asesor.

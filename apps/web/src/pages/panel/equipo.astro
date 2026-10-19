@@ -3,6 +3,7 @@
  * Equipo del taller: quién hay, con qué rol y cuántas órdenes activas lleva.
  * Propietario: cambia roles (administrador ↔ mecánico) y desactiva/reactiva.
  * Administrador: desactiva/reactiva mecánicos. Mecánico: solo consulta.
+ * Invitaciones (gestores): create_workshop_invitation / revoke_workshop_invitation.
  * Todo pasa por funciones de la base de datos que comprueban el rol.
  * Desactivar NO borra nada: las órdenes conservan a quién estaban asignadas.
  */
@@ -13,7 +14,8 @@ import Flash from '../../components/panel/Flash.astro';
 import { field, isUuid, loadTeam, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../lib/auth/messages.ts';
-import { INVITABLE_ROLES, isMemberRole, ROLE_LABELS } from '../../lib/auth/validate.ts';
+import { INVITABLE_ROLES, isEmail, isMemberRole, normalizeEmail, ROLE_LABELS, type MemberRole } from '../../lib/auth/validate.ts';
+import { formatDate } from '../../lib/panel/format.ts';
 
 export const prerender = false;
 
@@ -22,11 +24,35 @@ if (panel instanceof Response) return panel;
 
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
 let confirmDeactivate: string | null = null;
+let inviteLink: { url: string; email: string } | null = null;
+let inviteEmail = '';
 
 if (panel.form && panel.workshop) {
   const action = field(panel.form, 'action');
   const target = field(panel.form, 'user_id');
-  if (!isUuid(target)) {
+  if (action === 'invitar') {
+    // El taller sale del activo (validado contra las membresías) y la función vuelve a comprobar el rol.
+    inviteEmail = normalizeEmail(panel.form.get('email'));
+    const role = field(panel.form, 'role');
+    if (!isEmail(inviteEmail) || !isMemberRole(role)) flash = { kind: 'bad', text: 'Escribe un correo válido y elige un rol.' };
+    else {
+      const { data, error } = await panel.supabase.rpc('create_workshop_invitation', { p_workshop_id: panel.workshop.id, p_email: inviteEmail, p_role: role });
+      const created = Array.isArray(data) ? data[0] : null;
+      if (error || !created?.token) {
+        logAuth('panel_invite_error', error?.code);
+        flash = { kind: 'bad', text: dbErrorMessage(error) };
+      } else {
+        logAuth('panel_invite_ok');
+        inviteLink = { email: inviteEmail, url: `${panel.origin}/invitacion?token=${encodeURIComponent(created.token)}` };
+        inviteEmail = '';
+      }
+    }
+  } else if (action === 'anular') {
+    const invitationId = field(panel.form, 'invitation_id');
+    const { error } = isUuid(invitationId) ? await panel.supabase.rpc('revoke_workshop_invitation', { p_invitation_id: invitationId }) : { error: null };
+    if (error) logAuth('panel_invite_revoke_error', error.code);
+    flash = !isUuid(invitationId) ? { kind: 'bad', text: 'Invitación no válida.' } : error ? { kind: 'bad', text: dbErrorMessage(error) } : { kind: 'ok', text: 'Invitación anulada.' };
+  } else if (!isUuid(target)) {
     flash = { kind: 'bad', text: 'Persona no válida.' };
   } else if (action === 'rol') {
     const role = field(panel.form, 'role');
@@ -54,6 +80,17 @@ if (panel.workshop) {
     if (o.assigned_to) counts.set(o.assigned_to, (counts.get(o.assigned_to) ?? 0) + 1);
   }
 }
+interface Invitation { id: string; email: string; role: MemberRole; expires_at: string }
+let invitations: Invitation[] = [];
+if (panel.workshop && panel.isManager) {
+  const { data, error } = await panel.supabase.from('workshop_invitations').select('id, email, role, expires_at')
+    .eq('workshop_id', panel.workshop.id).eq('status', 'pendiente').gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false });
+  if (error) logAuth('panel_invitations_error', error.code);
+  invitations = (data ?? []) as Invitation[];
+}
+// Un administrador solo invita mecánicos (lo impone también create_workshop_invitation).
+const invitable: readonly MemberRole[] = panel.isOwner ? INVITABLE_ROLES : ['mecanico'];
 const canManage = (role: string) => panel.isOwner ? role !== 'propietario' : panel.isManager && role === 'mecanico';
 ---
 <PanelLayout panel={panel} title="Equipo" section="equipo">
@@ -62,7 +99,7 @@ const canManage = (role: string) => panel.isOwner ? role !== 'propietario' : pan
       <h1 class="pnl-title">Equipo</h1>
       <p class="pnl-sub">Personas del taller y trabajos activos asignados.</p>
     </div>
-    {panel.isManager && <div class="pnl-actions"><a class="btn" href="/cuenta"><Icon name="mail" />Invitar a alguien</a></div>}
+    {panel.isManager && <div class="pnl-actions"><a class="btn" href="#invitar"><Icon name="mail" />Invitar a alguien</a></div>}
   </header>
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
     <>
@@ -121,6 +158,57 @@ const canManage = (role: string) => panel.isOwner ? role !== 'propietario' : pan
           </ul>
         )}
       </section>
+
+      {panel.isManager && (
+        <section class="card" aria-labelledby="invitar">
+          <h2 id="invitar" class="card-title"><Icon name="mail" />Invitar a alguien</h2>
+          {inviteLink ? (
+            <div class="invite-result">
+              <div class="alert alert-ok" role="status">
+                <Icon name="check" />
+                <span>Invitación creada para <strong>{inviteLink.email}</strong>. Envíale este enlace (por WhatsApp o correo). Solo funciona con ese correo, una vez y durante 7 días. <strong>No se volverá a mostrar.</strong></span>
+              </div>
+              <div class="copy-row">
+                <input class="input mono" id="invite-link" value={inviteLink.url} readonly aria-label="Enlace de invitación" />
+                <button class="btn" type="button" data-copy="invite-link">Copiar</button>
+              </div>
+            </div>
+          ) : (
+            <p class="hint">La persona crea su cuenta (o entra con la suya) con ese mismo correo y acepta la invitación. Ningún correo se envía solo: tú le mandas el enlace.</p>
+          )}
+          <form method="post" class="invite-form" data-busy="Creando…" style="margin-top:12px">
+            <input type="hidden" name="action" value="invitar" />
+            <div class="field">
+              <label for="inv-email">Correo de la persona</label>
+              <input class="input" id="inv-email" name="email" type="email" inputmode="email" required maxlength="254" value={inviteEmail} />
+            </div>
+            <div class="field">
+              <label for="inv-role">Rol</label>
+              <select class="select" id="inv-role" name="role" required>
+                {invitable.map(r => <option value={r}>{ROLE_LABELS[r]}</option>)}
+              </select>
+            </div>
+            <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear invitación</span></button>
+          </form>
+
+          <h3 class="panel-sub">Invitaciones pendientes</h3>
+          {invitations.length === 0 ? <p class="hint">No hay invitaciones pendientes.</p> : (
+            <ul class="invite-list">
+              {invitations.map(i => (
+                <li>
+                  <span class="mono">{i.email}</span>
+                  <span class="muted small">{ROLE_LABELS[i.role]} · caduca el {formatDate(i.expires_at)}</span>
+                  <form method="post" data-busy="Anulando…">
+                    <input type="hidden" name="action" value="anular" />
+                    <input type="hidden" name="invitation_id" value={i.id} />
+                    <button class="btn btn-sm" type="submit" aria-label={`Anular la invitación de ${i.email}`}><span class="spinner" aria-hidden="true"></span><span data-label>Anular</span></button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </>
   )}
 </PanelLayout>

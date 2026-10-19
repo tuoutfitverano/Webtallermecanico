@@ -131,3 +131,15 @@ test('capturas de la fase 8', async ({ page, isMobile }) => {
   await page.goto('/panel/solicitudes');
   await page.screenshot({ path: `${DIR}/f8-panel-solicitudes-escritorio.png`, fullPage: true });
 });
+
+test('capturas de la integración', async ({ page, isMobile }) => {
+  const sfx = isMobile ? 'movil' : 'escritorio';
+  await login(page, 'propietaria@e2e.test', '/panel/taller');
+  await page.screenshot({ path: `${DIR}/int-taller-${sfx}.png`, fullPage: !isMobile });
+  await page.goto('/panel/equipo');
+  await page.screenshot({ path: `${DIR}/int-equipo-${sfx}.png`, fullPage: !isMobile });
+  if (isMobile) {
+    await page.locator('.pnl-tabs').getByText('Más', { exact: true }).click();
+    await page.screenshot({ path: `${DIR}/int-menu-mas-${sfx}.png` });
+  }
+});

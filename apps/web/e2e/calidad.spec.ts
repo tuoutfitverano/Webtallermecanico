@@ -102,7 +102,7 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
   await login(page, 'propietaria@e2e.test', '/panel');
   await audit(page, [
     '/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/ordenes/nueva', '/panel/vehiculos', '/panel/vehiculos/nuevo',
-    '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos',
+    '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
   ], isMobile);
 });
 

@@ -1,0 +1,194 @@
+---
+/**
+ * Datos y configuración del taller (propietario y administradores).
+ *
+ *  · Datos de la cuenta: los guarda RLS («workshops: edición gestores»); el
+ *    identificador y el estado comercial los protege workshops_guard.
+ *  · Web pública, dominios e integraciones: solo lectura. Se configuran desde
+ *    la plataforma (ver docs/PUESTA_EN_MARCHA.md y docs/DESPLIEGUE.md).
+ *  · Nunca se muestra ninguna clave: solo si cada servicio está activo o no.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../lib/auth/messages.ts';
+import { emailAvailable, turnstileSiteKey, vehicleLookupAvailable } from '../../lib/server/config.ts';
+import { formatDate } from '../../lib/panel/format.ts';
+import { fieldErrors, workshopProfileSchema } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface WorkshopRow {
+  name: string; legal_name: string | null; tax_id: string | null; contact_email: string | null;
+  contact_phone: string | null; logo_url: string | null; status: string; created_at: string;
+}
+const values = { name: '', legal_name: '', tax_id: '', contact_email: '', contact_phone: '', logo_url: '' };
+let errors: Partial<Record<string, string>> = {};
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('guardado') === '1' ? 'Datos del taller guardados.' : '' };
+let posted = false;
+
+if (panel.form && panel.workshop && field(panel.form, 'action') === 'datos') {
+  posted = true;
+  for (const k of Object.keys(values) as Array<keyof typeof values>) values[k] = field(panel.form, k);
+  if (!panel.isManager) {
+    // La base de datos tampoco lo permitiría (RLS): se responde sin intentarlo.
+    flash = { kind: 'bad', text: 'Solo el propietario o un administrador pueden cambiar los datos del taller.' };
+    Astro.response.status = 403;
+  } else {
+    const parsed = workshopProfileSchema.safeParse({
+      name: values.name, legalName: values.legal_name, taxId: values.tax_id,
+      contactEmail: values.contact_email, contactPhone: values.contact_phone, logoUrl: values.logo_url,
+    });
+    if (!parsed.success) {
+      errors = fieldErrors(parsed.error);
+      flash = { kind: 'bad', text: 'Revisa los campos marcados.' };
+      Astro.response.status = 422;
+    } else {
+      const d = parsed.data;
+      const { data, error } = await panel.supabase.from('workshops')
+        .update({ name: d.name, legal_name: d.legalName, tax_id: d.taxId, contact_email: d.contactEmail, contact_phone: d.contactPhone, logo_url: d.logoUrl })
+        .eq('id', panel.workshop.id).select('id');
+      if (error || !data?.length) {
+        logAuth('panel_workshop_update_error', error?.code);
+        flash = { kind: 'bad', text: error ? dbErrorMessage(error) : 'No se ha guardado: no tienes permiso para cambiar este taller.' };
+        Astro.response.status = 400;
+      } else {
+        // Redirección: el nombre nuevo aparece también en la cabecera del panel.
+        return Astro.redirect('/panel/taller?guardado=1', 303);
+      }
+    }
+  }
+}
+
+let workshop: WorkshopRow | null = null;
+let site: { published: boolean; is_demo_content: boolean } | null = null;
+let domains: Array<{ hostname: string; is_primary: boolean }> = [];
+let loadError = false;
+if (panel.workshop && panel.isManager) {
+  const id = panel.workshop.id;
+  const [w, s, d] = await Promise.all([
+    panel.supabase.from('workshops').select('name, legal_name, tax_id, contact_email, contact_phone, logo_url, status, created_at').eq('id', id).maybeSingle(),
+    panel.supabase.from('workshop_sites').select('published, is_demo_content').eq('workshop_id', id).maybeSingle(),
+    panel.supabase.from('workshop_domains').select('hostname, is_primary').eq('workshop_id', id).order('is_primary', { ascending: false }),
+  ]);
+  if (w.error || !w.data) { logAuth('panel_workshop_load_error', w.error?.code); loadError = true; }
+  workshop = (w.data as WorkshopRow | null) ?? null;
+  site = s.data ?? null;
+  domains = d.data ?? [];
+  if (workshop && !posted) {
+    Object.assign(values, {
+      name: workshop.name, legal_name: workshop.legal_name ?? '', tax_id: workshop.tax_id ?? '', contact_email: workshop.contact_email ?? '',
+      contact_phone: workshop.contact_phone ?? '', logo_url: workshop.logo_url ?? '',
+    });
+  }
+}
+
+const STATUS_LABELS: Record<string, string> = { demo: 'Demostración', activo: 'Activo', suspendido: 'Suspendido' };
+const err = (k: string) => errors[k];
+const integrations = [
+  { name: 'Formularios de la web (antispam)', on: Boolean(turnstileSiteKey()), off: 'Sin antispam configurado: la web no acepta solicitudes (responde «no disponible»), nunca finge que se han enviado.' },
+  { name: 'Emails a clientes', on: emailAvailable(), off: 'Sin proveedor de email: los avisos aparecen en el portal del cliente y los emails quedan pendientes.' },
+  { name: 'Consulta de datos por matrícula', on: vehicleLookupAvailable(), off: 'Sin proveedor contratado: los vehículos se dan de alta a mano.' },
+];
+---
+<PanelLayout panel={panel} title="Taller" section="taller">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Taller</h1>
+      <p class="pnl-sub">Datos de la cuenta del taller, web pública y servicios conectados.</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isManager ? (
+    <div class="empty"><strong>Solo el propietario o un administrador gestionan los datos del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No se han podido cargar los datos del taller. Recarga la página." />}
+      <div class="grid-2">
+        <section class="card" aria-labelledby="datos-t">
+          <h2 id="datos-t" class="card-title"><Icon name="wrench" />Datos del taller</h2>
+          <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+            <input type="hidden" name="action" value="datos" />
+            <div class={`field ${err('name') ? 'has-error' : ''}`}>
+              <label for="name">Nombre comercial</label>
+              <input class="input" id="name" name="name" required maxlength="120" value={values.name} aria-invalid={err('name') ? 'true' : undefined} aria-describedby={err('name') ? 'name-err' : undefined} />
+              {err('name') && <p class="field-error" id="name-err">{err('name')}</p>}
+            </div>
+            <div class="form-row">
+              <div class={`field ${err('legalName') ? 'has-error' : ''}`}>
+                <label for="legal_name">Razón social <span class="muted">(opcional)</span></label>
+                <input class="input" id="legal_name" name="legal_name" maxlength="160" value={values.legal_name} aria-invalid={err('legalName') ? 'true' : undefined} />
+                {err('legalName') && <p class="field-error">{err('legalName')}</p>}
+              </div>
+              <div class={`field ${err('taxId') ? 'has-error' : ''}`}>
+                <label for="tax_id">NIF / CIF <span class="muted">(opcional)</span></label>
+                <input class="input mono" id="tax_id" name="tax_id" maxlength="20" autocomplete="off" value={values.tax_id} aria-invalid={err('taxId') ? 'true' : undefined} />
+                {err('taxId') && <p class="field-error">{err('taxId')}</p>}
+              </div>
+            </div>
+            <div class="form-row">
+              <div class={`field ${err('contactEmail') ? 'has-error' : ''}`}>
+                <label for="contact_email">Correo de contacto <span class="muted">(opcional)</span></label>
+                <input class="input" id="contact_email" name="contact_email" type="email" inputmode="email" maxlength="254" value={values.contact_email} aria-invalid={err('contactEmail') ? 'true' : undefined} aria-describedby={err('contactEmail') ? 'contact_email-err' : 'contact_email-hint'} />
+                {err('contactEmail') ? <p class="field-error" id="contact_email-err">{err('contactEmail')}</p> : <p class="hint" id="contact_email-hint">Para la plataforma; no se publica en la web.</p>}
+              </div>
+              <div class={`field ${err('contactPhone') ? 'has-error' : ''}`}>
+                <label for="contact_phone">Teléfono de contacto <span class="muted">(opcional)</span></label>
+                <input class="input" id="contact_phone" name="contact_phone" type="tel" inputmode="tel" maxlength="30" value={values.contact_phone} aria-invalid={err('contactPhone') ? 'true' : undefined} />
+                {err('contactPhone') && <p class="field-error">{err('contactPhone')}</p>}
+              </div>
+            </div>
+            <div class={`field ${err('logoUrl') ? 'has-error' : ''}`}>
+              <label for="logo_url">Dirección del logotipo <span class="muted">(opcional, https)</span></label>
+              <input class="input mono" id="logo_url" name="logo_url" type="url" inputmode="url" maxlength="500" placeholder="https://…" value={values.logo_url} aria-invalid={err('logoUrl') ? 'true' : undefined} />
+              {err('logoUrl') && <p class="field-error">{err('logoUrl')}</p>}
+            </div>
+            <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar datos</span></button>
+          </form>
+        </section>
+
+        <div>
+          <section class="card" aria-labelledby="cuenta-t">
+            <h2 id="cuenta-t" class="card-title"><Icon name="shield" />Cuenta en la plataforma</h2>
+            <dl class="facts">
+              <dt>Estado</dt><dd>{workshop ? (STATUS_LABELS[workshop.status] ?? workshop.status) : '—'}</dd>
+              <dt>Identificador</dt><dd class="mono">{panel.workshop.slug}</dd>
+              {workshop && <><dt>Alta</dt><dd>{formatDate(workshop.created_at)}</dd></>}
+            </dl>
+            <p class="hint" style="margin-top:10px">El estado y el identificador solo los cambia la plataforma.</p>
+          </section>
+
+          <section class="card" aria-labelledby="web-t">
+            <h2 id="web-t" class="card-title"><Icon name="home" />Web pública</h2>
+            <dl class="facts">
+              <dt>Publicada</dt><dd>{site ? (site.published ? 'Sí' : 'No') : 'Sin configurar'}</dd>
+              {site && <><dt>Contenido</dt><dd>{site.is_demo_content ? 'De demostración (pendiente de sustituir por el real)' : 'Propio del taller'}</dd></>}
+              <dt>Dominios</dt>
+              <dd>{domains.length === 0 ? 'Ninguno todavía' : domains.map((d, i) => <>{i > 0 && ', '}<span class="mono">{d.hostname}</span>{d.is_primary && ' (principal)'}</>)}</dd>
+            </dl>
+            <p class="hint" style="margin-top:10px">Los textos, el aspecto y los dominios de la web los configura la plataforma. Las solicitudes que llegan desde ella están en <a href="/panel/solicitudes">Solicitudes web</a>.</p>
+          </section>
+
+          <section class="card" aria-labelledby="int-t">
+            <h2 id="int-t" class="card-title"><Icon name="cog" />Servicios conectados</h2>
+            <ul class="plain-list">
+              {integrations.map(i => (
+                <li>
+                  <strong>{i.name}:</strong> {i.on ? 'activo' : 'no configurado'}
+                  {!i.on && <span class="hint" style="display:block">{i.off}</span>}
+                </li>
+              ))}
+            </ul>
+            <p class="hint" style="margin-top:10px">Qué avisos reciben tus clientes se decide en <a href="/panel/avisos#ajustes">Avisos</a>.</p>
+          </section>
+        </div>
+      </div>
+    </>
+  )}
+</PanelLayout>

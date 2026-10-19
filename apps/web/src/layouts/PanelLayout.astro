@@ -17,25 +17,30 @@ import Icon from '../components/Icon.astro';
 import type { Panel } from '../lib/server/panel.ts';
 import { ROLE_LABELS } from '../lib/auth/validate.ts';
 
-export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos' | 'solicitudes';
+export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos' | 'solicitudes' | 'taller';
 interface Props {
   panel: Panel;
   title: string;
   section?: PanelSection;
 }
 const { panel, title, section } = Astro.props;
-const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' | 'mail'; tab?: false }> = [
+const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' | 'mail' | 'cog' }> = [
   { id: 'inicio', href: '/panel', label: 'Inicio', icon: 'home' },
   { id: 'ordenes', href: '/panel/ordenes', label: 'Órdenes', icon: 'clipboard' },
   { id: 'vehiculos', href: '/panel/vehiculos', label: 'Vehículos', icon: 'car' },
   { id: 'clientes', href: '/panel/clientes', label: 'Clientes', icon: 'user' },
   { id: 'equipo', href: '/panel/equipo', label: 'Equipo', icon: 'users' },
-  // Avisos a clientes: solo propietario y administradores (la base de datos tampoco se los enseña a nadie más).
-  ...(panel.isManager ? [{ id: 'avisos' as const, href: '/panel/avisos', label: 'Avisos', icon: 'bell' as const }] : []),
-  // Solicitudes de la web: en móvil se llega desde el inicio (no caben más pestañas).
-  ...(panel.isManager ? [{ id: 'solicitudes' as const, href: '/panel/solicitudes', label: 'Solicitudes web', icon: 'mail' as const, tab: false as const }] : []),
+  // Solo propietario y administradores (la base de datos tampoco les enseña estos datos a los demás).
+  ...(panel.isManager ? [
+    { id: 'avisos' as const, href: '/panel/avisos', label: 'Avisos', icon: 'bell' as const },
+    { id: 'solicitudes' as const, href: '/panel/solicitudes', label: 'Solicitudes web', icon: 'mail' as const },
+    { id: 'taller' as const, href: '/panel/taller', label: 'Taller', icon: 'cog' as const },
+  ] : []),
 ];
-const tabs = nav.filter(n => n.tab !== false);
+// Móvil: cuatro pestañas fijas y el resto en «Más» (con «Mi cuenta»).
+const tabs = nav.slice(0, 4);
+const more = nav.slice(4);
+const moreOn = more.some(n => n.id === section);
 const w = panel.workshop;
 ---
 <!doctype html>
@@ -103,12 +108,21 @@ const w = panel.workshop;
     </div>
 
     {w && (
-      <nav class:list={['pnl-tabs', { 'pnl-tabs-6': tabs.length === 6 }]} aria-label="Secciones">
+      <nav class="pnl-tabs" aria-label="Secciones">
         {tabs.map(n => (
           <a href={n.href} class:list={['pnl-tab', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
             <Icon name={n.icon} /><span>{n.label}</span>
           </a>
         ))}
+        <details class="pnl-more">
+          <summary class:list={['pnl-tab', { 'is-on': moreOn }]}><Icon name="menu" /><span>Más</span></summary>
+          <div class="pnl-more-menu">
+            {more.map(n => (
+              <a href={n.href} class:list={{ 'is-on': n.id === section }} aria-current={n.id === section ? 'page' : undefined}><Icon name={n.icon} /><span>{n.label}</span></a>
+            ))}
+            <a href="/cuenta"><Icon name="user" /><span>Mi cuenta</span></a>
+          </div>
+        </details>
       </nav>
     )}
 

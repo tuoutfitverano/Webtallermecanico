@@ -92,6 +92,38 @@ export const orderUpdateSchema = z.object({
 });
 export type OrderUpdateData = z.output<typeof orderUpdateSchema>;
 
+// ---------------------------------------------------------------- datos del taller
+/**
+ * Datos de la cuenta del taller que pueden cambiar propietario y administradores.
+ * El identificador (slug) y el estado comercial solo los cambia la plataforma.
+ */
+export const workshopProfileSchema = z
+  .object({
+    name: z.string({ error: 'Escribe el nombre.' }).trim().min(2, 'Escribe el nombre (mínimo 2 caracteres).').max(120, 'Máximo 120 caracteres.'),
+    legalName: optText(160),
+    taxId: optText(20),
+    contactEmail: optText(254),
+    contactPhone: optText(30),
+    logoUrl: optText(500),
+  })
+  .superRefine((v, ctx) => {
+    if (v.contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.contactEmail)) {
+      ctx.addIssue({ code: 'custom', path: ['contactEmail'], message: 'Correo electrónico no válido.' });
+    }
+    if (v.contactPhone) {
+      const digits = v.contactPhone.replace(/\D/g, '');
+      if (digits.length < 9 || digits.length > 15 || !/^[+\d\s().-]+$/.test(v.contactPhone)) {
+        ctx.addIssue({ code: 'custom', path: ['contactPhone'], message: 'Teléfono no válido (9 a 15 cifras).' });
+      }
+    }
+    if (v.logoUrl && !/^https:\/\/[^\s]+$/.test(v.logoUrl)) {
+      ctx.addIssue({ code: 'custom', path: ['logoUrl'], message: 'Debe ser una dirección que empiece por https://' });
+    }
+  })
+  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase() : null }));
+
+export type WorkshopProfileData = z.output<typeof workshopProfileSchema>;
+
 /** Convierte los errores de zod en { campo: mensaje } para los formularios. */
 export function fieldErrors(error: z.ZodError): Partial<Record<string, string>> {
   const out: Partial<Record<string, string>> = {};

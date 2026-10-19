@@ -102,7 +102,10 @@ test.describe('Inicio de sesión', () => {
     await expect(page.getByRole('heading', { name: 'Hola, Paula' })).toBeVisible();
     await expect(page.locator('.workshop-list')).toContainText('Taller Demo');
     await expect(page.locator('.workshop-list')).toContainText('Propietario/a');
-    await expect(page.getByRole('heading', { name: 'Equipo de Taller Demo' })).toBeVisible();
+    // El equipo se gestiona en el panel; desde la cuenta hay un enlace directo.
+    await page.getByRole('link', { name: 'Equipo e invitaciones' }).click();
+    await expect(page).toHaveURL(/\/panel\/equipo\?taller=/);
+    await expect(page.getByRole('heading', { name: 'Invitar a alguien' })).toBeVisible();
   });
 
   test('con una contraseña incorrecta NO entra', async ({ page }) => {
@@ -121,7 +124,11 @@ test.describe('Inicio de sesión', () => {
   test('el mecánico entra y no ve la gestión del equipo', async ({ page }) => {
     await login(page, 'mecanico@e2e.test', PASSWORD, '/cuenta');
     await expect(page.locator('.workshop-list')).toContainText('Mecánico/a');
-    await expect(page.getByRole('heading', { name: /^Equipo de/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Equipo e invitaciones' })).toHaveCount(0);
+    await page.goto('/panel/equipo');
+    await expect(page.getByRole('heading', { name: 'Equipo', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Invitar a alguien' })).toHaveCount(0);
+    await expect(page.getByLabel('Correo de la persona')).toHaveCount(0);
   });
 
   test('sin sesión, el área privada manda a iniciar sesión y luego vuelve', async ({ page }) => {
@@ -266,9 +273,9 @@ test.describe('Invitaciones', () => {
 
   test('la propietaria invita → la persona crea su cuenta, confirma y entra como mecánico', async ({ page }) => {
     const email = uniqueEmail('invitada');
-    await login(page, 'propietaria@e2e.test', PASSWORD, '/cuenta');
+    await login(page, 'propietaria@e2e.test', PASSWORD, '/panel/equipo');
     await page.getByLabel('Correo de la persona').fill(email);
-    await page.getByLabel('Rol').selectOption('mecanico');
+    await page.getByLabel('Rol', { exact: true }).selectOption('mecanico');
     await page.getByRole('button', { name: 'Crear invitación' }).click();
     const linkInput = page.getByLabel('Enlace de invitación');
     await expect(linkInput).toBeVisible();
@@ -307,7 +314,7 @@ test.describe('Invitaciones', () => {
   });
 
   test('una invitación abierta con otra cuenta no se puede aceptar', async ({ page }) => {
-    await login(page, 'propietaria@e2e.test', PASSWORD, '/cuenta');
+    await login(page, 'propietaria@e2e.test', PASSWORD, '/panel/equipo');
     await page.getByLabel('Correo de la persona').fill(uniqueEmail('para-otra'));
     await page.getByRole('button', { name: 'Crear invitación' }).click();
     const inviteUrl = await page.getByLabel('Enlace de invitación').inputValue();

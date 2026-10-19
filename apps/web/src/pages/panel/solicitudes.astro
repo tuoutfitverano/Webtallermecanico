@@ -3,6 +3,8 @@
  * Solicitudes que llegan desde la web pública (cita, presupuesto, contacto).
  * Solo propietario y administradores (RLS). Una cita solicitada NO es una
  * cita confirmada: el taller contacta con la persona y cambia el estado.
+ * Borrar (derecho de supresión o spam) es en dos pasos y lo permite RLS
+ * («requests: borrado gestores»).
  */
 import PanelLayout from '../../layouts/PanelLayout.astro';
 import Icon from '../../components/Icon.astro';
@@ -22,7 +24,22 @@ const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
 
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
-if (panel.form && panel.workshop && panel.isManager && field(panel.form, 'action') === 'estado') {
+let confirmDelete: string | null = null;
+const action = field(panel.form, 'action');
+if (panel.form && panel.workshop && panel.isManager && action === 'pedir-borrar') {
+  const id = field(panel.form, 'id');
+  if (isUuid(id)) confirmDelete = id;
+} else if (panel.form && panel.workshop && panel.isManager && action === 'borrar') {
+  const id = field(panel.form, 'id');
+  const { data, error } = isUuid(id)
+    ? await panel.supabase.from('web_requests').delete().eq('id', id).eq('workshop_id', panel.workshop.id).select('id')
+    : { data: null, error: null };
+  if (error || !data?.length) {
+    logAuth('panel_request_delete_error', error?.code);
+    flash = { kind: 'bad', text: 'No se ha borrado: la solicitud no existe o no tienes permiso.' };
+    Astro.response.status = 400;
+  } else flash = { kind: 'ok', text: 'Solicitud borrada definitivamente.' };
+} else if (panel.form && panel.workshop && panel.isManager && action === 'estado') {
   const id = field(panel.form, 'id');
   const status = field(panel.form, 'status') as RequestStatus;
   if (!isUuid(id) || !REQUEST_STATUSES.includes(status)) {
@@ -109,12 +126,28 @@ if (panel.workshop && panel.isManager) {
                   </select>
                   <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cambiar estado</span></button>
                 </form>
+                {confirmDelete === r.id ? (
+                  <form method="post" class="confirm" data-busy="Borrando…" style="margin-top:10px">
+                    <input type="hidden" name="action" value="borrar" /><input type="hidden" name="id" value={r.id} />
+                    <strong><Icon name="alert" /> ¿Borrar la solicitud de {r.name}?</strong>
+                    <span class="hint">Se elimina con todos sus datos y no se puede deshacer. Úsalo para spam o cuando la persona pida que borres sus datos.</span>
+                    <div class="pnl-actions">
+                      <button class="btn btn-danger btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, borrar</span></button>
+                      <a class="btn btn-sm" href={`/panel/solicitudes?estado=${filter.id}`}>Cancelar</a>
+                    </div>
+                  </form>
+                ) : (
+                  <form method="post" style="margin-top:8px">
+                    <input type="hidden" name="action" value="pedir-borrar" /><input type="hidden" name="id" value={r.id} />
+                    <button class="btn btn-sm btn-danger" type="submit" aria-label={`Borrar… la solicitud de ${r.name}`}>Borrar…</button>
+                  </form>
+                )}
               </div>
             </li>
           ))}
         </ul>
       )}
-      <p class="hint" style="margin-top:12px">Para borrar los datos de una persona que lo pida, sigue el procedimiento de <code>docs/DATOS_PERSONALES.md</code>.</p>
+      <p class="hint" style="margin-top:12px">Si una persona pide que borres sus datos, borra también su ficha de cliente si la tiene (procedimiento en <code>docs/DATOS_PERSONALES.md</code>).</p>
     </>
   )}
 </PanelLayout>

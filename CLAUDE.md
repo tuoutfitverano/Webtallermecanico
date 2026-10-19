@@ -11,6 +11,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Navegador para Claude (Playwright MCP): `docs/PLAYWRIGHT_MCP.md`
 - Consulta por matrícula (proveedor, costes, activación): `docs/CONSULTA_MATRICULAS.md`
 - Notificaciones (portal, email, reintentos, consentimiento): `docs/NOTIFICACIONES.md`
+- Integración de pantallas (inventario y flujos verificados): `docs/INTEGRACION.md`
 - Auditoría, despliegue y lanzamiento: `docs/AUDITORIA_FASE8.md`, `docs/DESPLIEGUE.md`, `docs/CHECKLIST_LANZAMIENTO.md`, `docs/DATOS_PERSONALES.md`
 
 ## Estructura
@@ -21,7 +22,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
-                          panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web)
+                          panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web), panel/taller (datos y servicios)
                           api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend)
                           cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
@@ -116,6 +117,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Historial (`repair_order_events`): lo escriben los disparadores; nadie (ni la clave secreta) lo modifica. Desactivar a un empleado no borra sus órdenes.
 - Búsquedas y resumen: funciones `search_*` y `workshop_dashboard` con `security invoker` (RLS igual que una consulta). Para comodines usa `private.like_pattern()`.
 - **Nunca** pongas `security definer` a una función que llame a `private.is_privileged()`: dentro, el usuario actual sería `postgres` y daría permisos a todo el mundo (lo cubren las pruebas de `08_ordenes_reparacion.test.sql`).
+- Navegación: barra lateral en escritorio; en móvil 4 pestañas + «Más» (`<details>`, sin JavaScript). Las secciones de gestores (Avisos, Solicitudes web, Taller) solo aparecen a gestores y la página vuelve a comprobarlo. Invitaciones del equipo en `/panel/equipo` (no en `/cuenta`).
 - Formularios sin JavaScript (POST al servidor y aviso integrado); acciones destructivas en dos pasos (`pedir-borrar` → `borrar`). Nada de `alert()`/`confirm()`.
 - Fechas: se muestran en hora de Madrid (`lib/panel/format.ts`); un `datetime-local` se guarda con `localInputToDb()`.
 - En pruebas e2e la barra de desarrollo de Astro está desactivada (`E2E=1`) porque tapa las pestañas del móvil.

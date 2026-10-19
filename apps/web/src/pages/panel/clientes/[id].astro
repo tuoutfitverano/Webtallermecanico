@@ -124,8 +124,9 @@ let vehicles: Array<{ id: string; plate: string; make: string; model: string }> 
 let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
 let invitations: Invitation[] = [];
 let prefs = { operational_email: true, marketing_email: false, updated_at: null as string | null };
+let consentLog: Array<{ id: number; purpose: string; granted: boolean; source: string; created_at: string }> = [];
 if (panel.workshop && isUuid(id)) {
-  const [c, v, o, i, pr] = await Promise.all([
+  const [c, v, o, i, pr, cl] = await Promise.all([
     panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
     panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
     panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
@@ -135,8 +136,14 @@ if (panel.workshop && isUuid(id)) {
         .eq('status', 'pendiente').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
     panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email, updated_at').eq('customer_id', id).maybeSingle(),
+    // Registro de consentimientos: solo gestores (RLS «consent log: lectura gestores»).
+    panel.isManager
+      ? panel.supabase.from('communication_consent_log').select('id, purpose, granted, source, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
+        .order('created_at', { ascending: false }).limit(20)
+      : Promise.resolve({ data: [] }),
   ]);
   if (pr.data) prefs = pr.data as typeof prefs;
+  consentLog = (cl.data ?? []) as typeof consentLog;
   customer = (c.data as Customer | null) ?? null;
   vehicles = (v.data ?? []) as typeof vehicles;
   orders = (o.data ?? []) as unknown as typeof orders;
@@ -144,6 +151,7 @@ if (panel.workshop && isUuid(id)) {
 }
 if (panel.workshop && !customer) Astro.response.status = 404;
 const values = editValues ?? customer ?? {};
+const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su portal', panel: 'por el taller', queja_proveedor: 'automático (queja o rebote del email)' };
 ---
 <PanelLayout panel={panel} title={customer?.full_name ?? 'Cliente'} section="clientes">
   <a class="pnl-back" href="/panel/clientes"><Icon name="arrow" />Clientes</a>
@@ -269,6 +277,22 @@ const values = editValues ?? customer ?? {};
               </div>
             )}
             <p class="hint" style="margin-top:10px">Cámbialo solo si el cliente te lo pide. El consentimiento para promociones solo puede darlo el propio cliente desde su portal.</p>
+            {panel.isManager && consentLog.length > 0 && (
+              <details style="margin-top:12px">
+                <summary class="small">Historial de cambios de comunicaciones ({consentLog.length})</summary>
+                <ul class="timeline" style="margin-top:10px">
+                  {consentLog.map(e => (
+                    <li>
+                      <span class="dot" aria-hidden="true"></span>
+                      <div>
+                        <span>{e.purpose === 'comercial' ? 'Promociones' : 'Avisos de reparaciones'} por email: <strong>{e.granted ? 'activado' : 'desactivado'}</strong> · {CONSENT_SOURCE[e.source] ?? e.source}</span>
+                        <span class="when" style="display:block">{formatDateTime(e.created_at)}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </section>
           <section class="card" aria-labelledby="rep">
             <h2 id="rep" class="card-title"><Icon name="clipboard" />Reparaciones</h2>
