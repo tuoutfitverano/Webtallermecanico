@@ -37,3 +37,14 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
     }
   });
 }
+
+// «Volver a la web»: si se llegó desde la web del taller en otro dominio (el
+// área privada puede vivir en APP_URL), el botón vuelve a esa página.
+for (const link of document.querySelectorAll<HTMLAnchorElement>('a[data-back-referrer]')) {
+  try {
+    const from = new URL(document.referrer);
+    if (from.origin !== location.origin && (from.protocol === 'https:' || from.protocol === 'http:')) link.href = from.href;
+  } catch {
+    // Sin página de origen: se queda el enlace por defecto.
+  }
+}

@@ -1,0 +1,12 @@
+---
+/**
+ * Botón «Volver» de las páginas secundarias. Es un enlace normal (funciona sin
+ * JavaScript y aunque se entre directamente a la página).
+ * Con `fromReferrer`, si se llegó desde otra web (p. ej. la web del taller
+ * cuando el área privada vive en otro dominio), vuelve a esa página.
+ */
+import Icon from './Icon.astro';
+interface Props { href: string; label: string; fromReferrer?: boolean }
+const { href, label, fromReferrer = false } = Astro.props;
+---
+<a class="back-link" href={href} data-back-referrer={fromReferrer ? '' : undefined}><Icon name="arrow" /><span>{label}</span></a>

@@ -208,3 +208,32 @@ test.describe('Clientes: historial de comunicaciones', () => {
     await expect(page.getByText(/^Historial de cambios de comunicaciones/)).toHaveCount(0);
   });
 });
+
+// ======================================================================
+test.describe('Botones «Volver»', () => {
+  test('acceso, registro, páginas legales y cuenta llevan a su página anterior', async ({ page }) => {
+    await page.goto('/acceso');
+    await page.getByRole('link', { name: 'Volver a la web' }).click();
+    await expect(page).toHaveURL(/\/$/);
+
+    await page.goto('/registro');
+    await page.locator('.back-link').click();
+    await expect(page).toHaveURL(/\/acceso$/);
+
+    for (const path of ['/privacidad', '/aviso-legal', '/cookies']) {
+      await page.goto(path);
+      await page.locator('.back-link').click();
+      await expect(page).toHaveURL(/\/$/);
+    }
+
+    await page.goto('/pagina-que-no-existe');
+    await page.getByRole('link', { name: 'Volver al inicio' }).click();
+    await expect(page).toHaveURL(/\/$/);
+
+    await login(page, 'propietaria@e2e.test', '/cuenta/contrasena');
+    await page.getByRole('link', { name: 'Volver a mi cuenta' }).click();
+    await expect(page).toHaveURL(/\/cuenta$/);
+    await page.getByRole('link', { name: 'Volver al panel' }).click();
+    await expect(page).toHaveURL(/\/panel$/);
+  });
+});

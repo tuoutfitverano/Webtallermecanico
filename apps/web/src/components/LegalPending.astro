@@ -3,6 +3,7 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import SiteHeader from './SiteHeader.astro';
 import SiteFooter from './SiteFooter.astro';
+import BackLink from './BackLink.astro';
 import type { PublicSite } from '../lib/site/content.ts';
 interface Props { site: PublicSite; title: string; items: string[] }
 const { site, title, items } = Astro.props;
@@ -11,6 +12,7 @@ const { site, title, items } = Astro.props;
   <SiteHeader site={site} />
   <main class="section legal-page glow">
     <div class="wrap legal">
+      <BackLink href="/" label="Volver a la web" />
       <p class="label">// Información legal</p>
       <h1 class="heading">{title}</h1>
       <div class="alert alert-warn" role="note">

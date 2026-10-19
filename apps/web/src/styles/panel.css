@@ -86,8 +86,8 @@
 @media (min-width: 768px) { .pnl-title { font-size: 2.75rem; } }
 .pnl-sub { color: var(--p-muted); margin-top: 6px; font-size: .9375rem; }
 .pnl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.pnl-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--p-muted); font-size: .875rem; text-decoration: none; }
-.pnl-back:hover { color: var(--p-text); }
+.pnl-back { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px 0 12px; margin-bottom: 14px; border: 1px solid var(--p-line-2); border-radius: 999px; background: var(--p-surface); color: var(--p-muted); font-size: .875rem; text-decoration: none; }
+.pnl-back:hover { background: var(--p-surface-2); color: var(--p-text); }
 .pnl-back .ico { transform: rotate(180deg); width: 16px; height: 16px; }
 
 .card { background: var(--p-surface); border: 1px solid var(--p-line); border-radius: 14px; padding: 20px; min-width: 0; }

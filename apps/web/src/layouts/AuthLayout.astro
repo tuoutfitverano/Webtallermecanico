@@ -9,6 +9,7 @@ import '@fontsource/barlow/latin-400.css';
 import '@fontsource/barlow/latin-500.css';
 import '@fontsource/barlow/latin-600.css';
 import '../styles/site.css';
+import BackLink from '../components/BackLink.astro';
 import type { SessionUser } from '../lib/server/auth.ts';
 
 interface Props {
@@ -16,8 +17,14 @@ interface Props {
   user?: SessionUser | null;
   /** Ancho de la columna: estrecho para formularios, ancho para la cuenta. */
   wide?: boolean;
+  /**
+   * Botón «Volver». Por defecto: con sesión, a «mi área» (panel o portal según
+   * el rol); sin sesión, a iniciar sesión. `false` lo quita.
+   */
+  back?: { href: string; label: string; fromReferrer?: boolean } | false;
 }
 const { title, user = null, wide = false } = Astro.props;
+const back = Astro.props.back ?? (user ? { href: '/mi-area', label: 'Volver a mi área' } : { href: '/acceso', label: 'Volver a iniciar sesión' });
 ---
 <!doctype html>
 <html lang="es">
@@ -39,13 +46,14 @@ const { title, user = null, wide = false } = Astro.props;
       </a>
       {user && (
         <form method="post" action="/salir" class="auth-top-user">
-          <a class="btn btn-sm" href="/panel">Panel</a>
+          <a class="btn btn-sm" href="/mi-area">Mi área</a>
           <span class="auth-top-email" title={user.email}>{user.email}</span>
           <button class="btn btn-sm" type="submit">Salir</button>
         </form>
       )}
     </header>
     <main class={`auth-main ${wide ? 'is-wide' : ''}`}>
+      {back && <BackLink {...back} />}
       <slot />
     </main>
     <script>

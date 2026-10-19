@@ -39,18 +39,22 @@ if (page.form) {
   if (flash.kind === 'bad') Astro.response.status = 400;
 }
 
-const [{ data: profile }, { data: workshopsData, error: workshopsError }] = await Promise.all([
+const [{ data: profile }, { data: workshopsData, error: workshopsError }, { data: portalRecords }] = await Promise.all([
   supabase.from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle(),
   supabase.rpc('my_workshops'),
+  supabase.rpc('portal_profile'),
 ]);
 if (workshopsError) logAuth('account_workshops_error', workshopsError.code);
 const workshops = (workshopsData ?? []) as Workshop[];
 
+// «Volver»: al panel (personal), al portal (cliente vinculado) o, si no hay ninguno, sin botón.
+const back = workshops.length > 0 ? { href: '/panel', label: 'Volver al panel' }
+  : (portalRecords ?? []).length > 0 ? { href: '/portal', label: 'Volver a mi portal' } : false;
 const manages = (w: Workshop) => w.role === 'propietario' || w.role === 'administrador';
 
 const welcome = Astro.url.searchParams.get('bienvenida') === '1';
 ---
-<AuthLayout title="Mi cuenta" user={user} wide>
+<AuthLayout title="Mi cuenta" user={user} wide back={back}>
   <header class="account-head">
     <p class="label">// Tu cuenta</p>
     <h1 class="account-title heading">Hola{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1>

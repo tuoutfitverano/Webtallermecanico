@@ -666,3 +666,9 @@ abbr[title] { text-decoration: none; color: var(--accent-soft); }
 .legal-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
 .legal-table th, .legal-table td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgb(255 255 255 / .12); color: var(--fg-80); }
 .legal-table th { color: var(--fg); font-weight: 500; }
+
+/* Botón «Volver» de las páginas secundarias */
+.back-link { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px 0 12px; margin-bottom: 16px; border: 1px solid var(--line-2); border-radius: 999px; background: rgb(255 255 255 / .04); color: var(--fg-80); font-size: .875rem; text-decoration: none; transition: background .2s, color .2s; }
+.back-link:hover { background: rgb(255 255 255 / .1); color: var(--fg); }
+.back-link .ico { width: 16px; height: 16px; transform: rotate(180deg); }
+.auth-main > .back-link { align-self: flex-start; }

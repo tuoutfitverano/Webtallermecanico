@@ -6,6 +6,7 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import BackLink from '../components/BackLink.astro';
 import { siteForHost } from '../lib/server/config.ts';
 export const prerender = false;
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
@@ -20,6 +21,7 @@ const rows = [
   <SiteHeader site={site} />
   <main class="section legal-page glow">
     <div class="wrap legal">
+      <BackLink href="/" label="Volver a la web" />
       <p class="label">// Información legal</p>
       <h1 class="heading">Cookies</h1>
       <div class="alert alert-warn" role="note">
