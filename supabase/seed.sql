@@ -9,7 +9,7 @@ values ('d0000000-0000-0000-0000-000000000001', 'taller-demo', 'AutoValue', 'dem
 insert into public.workshop_sites (workshop_id, published, is_demo_content, theme, content)
 values (
   'd0000000-0000-0000-0000-000000000001', true, true,
-  '{"accent": "#e4572e", "scrollFrames": {"src": "/demo/autovalue/giro/{n}.webp", "count": 73, "poster": "/demo/autovalue/portada.webp", "focusX": 0.365, "focusY": 0.41}}',
+  '{"accent": "#8A9A7B", "scrollFrames": {"src": "/demo/autovalue/giro/{n}.webp", "count": 73, "poster": "/demo/autovalue/portada.webp", "focusX": 0.365, "focusY": 0.41, "backdrop": "/demo/autovalue/garaje.webp", "frameTop": 0.359375}}',
   '{
   "tagline": "Mecánica y electrónica del automóvil",
   "city": "El Casar",

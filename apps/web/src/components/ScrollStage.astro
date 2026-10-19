@@ -1,7 +1,7 @@
 ---
 /**
  * Escenario con el coche de fondo para la portada y los servicios:
- *  1. Portada: el coche (primer fotograma) detrás del texto, oscurecido.
+ *  1. Portada: el coche (primer fotograma, dentro de su fondo si lo hay) detrás del texto, oscurecido.
  *  2. Al bajar hacia los servicios, el coche da una vuelta completa al ritmo del scroll.
  *  3. Antes de la tercera sección, la cámara se acerca hasta la ventanilla
  *     tintada (focusX/focusY) y la pantalla queda oscura: transición a la siguiente.
@@ -14,8 +14,10 @@ interface Props { frames: ScrollFrames }
 const { frames } = Astro.props;
 ---
 <div
-  class="stage"
+  class:list={['stage', { 'has-backdrop': frames.backdrop }]}
   data-stage
+  data-backdrop={frames.backdrop}
+  data-frame-top={frames.frameTop}
   data-src={frames.src}
   data-count={frames.count}
   data-focus-x={frames.focusX}

@@ -37,10 +37,24 @@ function start(stage: HTMLElement) {
   const count = Number(stage.dataset.count);
   const fx = Number(stage.dataset.focusX ?? 0.5);
   const fy = Number(stage.dataset.focusY ?? 0.5);
+  const frameTop = Number(stage.dataset.frameTop ?? 0);
   if (!canvas || !ctx || !dim || !hero || !turnGap || !zoomGap || !src.includes('{n}') || !(count >= 2)) return;
   const second = turnGap.nextElementSibling as HTMLElement | null;
+  // Color de fondo de la web: el fundido final acaba en él (enlaza con la siguiente sección).
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000';
 
   document.documentElement.classList.add('stage-on');
+
+  // ---- Fondo opcional (garaje): los fotogramas, con transparencia, van encima
+  let backdrop: HTMLImageElement | null = null;
+  const wantsBackdrop = Boolean(stage.dataset.backdrop);
+  const ready = () => frames[0] && (!wantsBackdrop || backdrop);
+  if (wantsBackdrop) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => { backdrop = img; if (ready()) stage.classList.add('is-live'); queue(); };
+    img.src = stage.dataset.backdrop!;
+  }
 
   // ---- Fotogramas (en orden: el primero, el que se ve al cargar)
   const frames: Array<HTMLImageElement | null> = Array.from({ length: count }, () => null);
@@ -51,7 +65,7 @@ function start(stage: HTMLElement) {
     const i = next++;
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => { frames[i] = img; if (i === 0) stage.classList.add('is-live'); queue(); loadNext(); };
+    img.onload = () => { frames[i] = img; if (ready()) stage.classList.add('is-live'); queue(); loadNext(); };
     img.onerror = loadNext;
     img.src = url(i);
   };
@@ -111,23 +125,32 @@ function start(stage: HTMLElement) {
     const index = Math.round(turn * (count - 1));
     const img = nearest(index);
     // El fotograma dibujado forma parte de la clave: al terminar de cargarse, se redibuja.
-    const key = `${img ? frames.indexOf(img) : -1}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;
+    const key = `${img ? frames.indexOf(img) : -1}|${backdrop ? 1 : 0}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;
     if (key === last) return;
     last = key;
     dim!.style.opacity = shade.toFixed(3);
 
-    ctx!.fillStyle = '#000';
+    ctx!.fillStyle = bg;
     ctx!.fillRect(0, 0, vw, vh);
-    if (!img) return;
-    const iw = img.naturalWidth, ih = img.naturalHeight;
-    // Misma composición que la imagen fija (CSS): cubre en horizontal; en vertical, a lo ancho.
-    const base = vw >= vh ? Math.max(vw / iw, vh / ih) : (vw / iw) * 1.15;
-    const maxZoom = Math.max(MIN_ZOOM, 1.15 * Math.max(vw / (TARGET_W * iw * base), vh / (TARGET_H * ih * base)));
+    if (!img || (wantsBackdrop && !backdrop)) return;
+    // Espacio de dibujo: el fondo (si lo hay) o el propio fotograma. El fotograma
+    // ocupa todo el ancho y empieza en frameTop (fracción del alto del fondo).
+    const sw = backdrop ? backdrop.naturalWidth : img.naturalWidth;
+    const sh = backdrop ? backdrop.naturalHeight : img.naturalHeight;
+    const fTop = backdrop ? frameTop * sh : 0;
+    const fH = (sw * img.naturalHeight) / img.naturalWidth;
+    // Misma composición que la imagen fija (CSS): con fondo, cubre siempre; sin él, en vertical va a lo ancho.
+    const base = backdrop || vw >= vh ? Math.max(vw / sw, vh / sh) : (vw / sw) * 1.15;
+    const maxZoom = Math.max(MIN_ZOOM, 1.15 * Math.max(vw / (TARGET_W * sw * base), vh / (TARGET_H * fH * base)));
     const scale = base * lerp(1, maxZoom, easeIn(zoom));
+    // Punto del zoom (la ventanilla) en el espacio de dibujo; se lleva al centro de la pantalla.
+    const focusX = fx * sw, focusY = fTop + fy * fH;
     const k = easeInOut(zoom);
-    const px = lerp((vw - iw * base) / 2 + fx * iw * base, vw / 2, k);
-    const py = lerp((vh - ih * base) / 2 + fy * ih * base, vh / 2, k);
-    ctx!.drawImage(img, px - fx * iw * scale, py - fy * ih * scale, iw * scale, ih * scale);
+    const px = lerp((vw - sw * base) / 2 + focusX * base, vw / 2, k);
+    const py = lerp((vh - sh * base) / 2 + focusY * base, vh / 2, k);
+    const ox = px - focusX * scale, oy = py - focusY * scale;
+    if (backdrop) ctx!.drawImage(backdrop, ox, oy, sw * scale, sh * scale);
+    ctx!.drawImage(img, ox, oy + fTop * scale, sw * scale, fH * scale);
   }
 
   addEventListener('scroll', queue, { passive: true });

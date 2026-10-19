@@ -47,6 +47,12 @@ export const scrollFramesSchema = z.object({
   poster: assetUrl,
   focusX: z.number().min(0).max(1).default(0.5),
   focusY: z.number().min(0).max(1).default(0.5),
+  /**
+   * Fondo opcional (p. ej. un garaje) del mismo ancho que los fotogramas y más alto:
+   * los fotogramas (con transparencia) se dibujan encima a partir de frameTop (0–1 del alto).
+   */
+  backdrop: assetUrl.nullable().default(null),
+  frameTop: z.number().min(0).max(1).default(0),
 });
 export type ScrollFrames = z.output<typeof scrollFramesSchema>;
 

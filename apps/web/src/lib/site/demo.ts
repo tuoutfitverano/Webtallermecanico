@@ -14,16 +14,19 @@ export const DEMO_SITE: PublicSite = {
   slug: 'taller-demo',
   name: 'AutoValue',
   isDemoContent: true,
-  accent: '#e4572e',
+  accent: '#8A9A7B',
   videos: { hero: null, services: null },
-  // Coche girando: fotogramas del vídeo aportado por el propietario (public/demo/autovalue).
-  // El zoom final apunta a la ventanilla trasera tintada.
+  // Coche girando dentro de un garaje: fotogramas recortados del vídeo aportado por el
+  // propietario y garaje dibujado (scripts/demo-autovalue). El zoom final apunta a la
+  // ventanilla trasera tintada.
   scrollFrames: {
     src: '/demo/autovalue/giro/{n}.webp',
     count: 73,
     poster: '/demo/autovalue/portada.webp',
     focusX: 0.365,
     focusY: 0.41,
+    backdrop: '/demo/autovalue/garaje.webp',
+    frameTop: 0.359375,
   },
   content: {
     tagline: 'Mecánica y electrónica del automóvil',

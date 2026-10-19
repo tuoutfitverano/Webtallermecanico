@@ -1,0 +1,228 @@
+<!doctype html>
+<!--
+  Garaje del taller demo (AutoValue), visto de lado para que el coche quede
+  aparcado de perfil delante de la pared del fondo. Dibujo propio inspirado en
+  la referencia del propietario (techo de LED hexagonal, armarios, suelo pulido):
+  no usa su foto. Lo convierte en imagen scripts/demo-autovalue/build.mjs.
+
+  Coordenadas en «px de imagen» de 1280×2560: la franja central (y 920–1640)
+  coincide con los fotogramas del coche (1280×720). Perspectiva de un punto.
+-->
+<meta charset="utf-8">
+<canvas id="c"></canvas>
+<script>
+const S = Number(new URLSearchParams(location.search).get('s') || 1.5);
+const W = 1280, H = 2560;
+const c = document.getElementById('c');
+c.width = W * S; c.height = H * S;
+const g = c.getContext('2d');
+g.scale(S, S);
+
+// ---- Cámara: punto de fuga, distancia focal, alturas (metros)
+// El coche de los fotogramas (4,75 m ≈ 1233 px) queda a ~2,3 m de la cámara y la
+// pared del fondo a 7,6 m: plano abierto para que se vea el techo de LED.
+const VX = 640, VY = 1239, F = 600;
+const WALL_Z = 7.6, FLOOR_Y = -1.1, CEIL_Y = 1.5, HALF_W = 6, NEAR = 0.25;
+const M = 1.35; // los muebles, repartidos a lo ancho de la pared
+const P = (x, y, z) => [VX + F * x / z, VY - F * y / z];
+
+const BG = '#0F2A22', SURFACE = '#1F4536', SAGE = '#8A9A7B', CREAM = '#EFE8DA';
+
+function poly(points, fill) {
+  g.beginPath();
+  points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+  g.closePath();
+  g.fillStyle = fill;
+  g.fill();
+}
+function rectOnWall(x0, y0, x1, y1, fill) {
+  const [a, b] = P(x0, y1, WALL_Z), [cc, d] = P(x1, y0, WALL_Z);
+  g.fillStyle = fill;
+  g.fillRect(a, b, cc - a, d - b);
+  return [a, b, cc - a, d - b];
+}
+function lin(x0, y0, x1, y1, stops) {
+  const gr = g.createLinearGradient(x0, y0, x1, y1);
+  stops.forEach(([o, col]) => gr.addColorStop(o, col));
+  return gr;
+}
+
+// ---- Fondo
+g.fillStyle = '#08130f';
+g.fillRect(0, 0, W, H);
+
+// ---- Techo (iluminado por los LED)
+const [cx0, cy0] = P(-HALF_W, CEIL_Y, WALL_Z), [cx1] = P(HALF_W, CEIL_Y, WALL_Z);
+poly([P(-HALF_W, CEIL_Y, WALL_Z), P(HALF_W, CEIL_Y, WALL_Z), P(HALF_W, CEIL_Y, NEAR), P(-HALF_W, CEIL_Y, NEAR)],
+  lin(0, cy0, 0, 0, [[0, '#26302c'], [0.35, '#2f3935'], [1, '#141b18']]));
+
+// ---- Paredes laterales (los extremos del garaje)
+for (const side of [-1, 1]) {
+  poly([P(side * HALF_W, CEIL_Y, WALL_Z), P(side * HALF_W, FLOOR_Y, WALL_Z), P(side * HALF_W, FLOOR_Y, NEAR), P(side * HALF_W, CEIL_Y, NEAR)],
+    lin(side < 0 ? 0 : W, 0, side < 0 ? cx0 : cx1, 0, [[0, '#0a1411'], [1, '#17221e']]));
+}
+
+// ---- Suelo de hormigón pulido
+const [, fy] = P(0, FLOOR_Y, WALL_Z);
+poly([P(-HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, NEAR), P(-HALF_W, FLOOR_Y, NEAR)],
+  lin(0, fy, 0, H, [[0, '#2a3430'], [0.2, '#38423d'], [0.6, '#252e2a'], [1, '#121a17']]));
+// Juntas del suelo hacia el punto de fuga
+g.strokeStyle = 'rgba(239,232,218,.05)'; g.lineWidth = 1.5;
+for (let x = -HALF_W; x <= HALF_W; x += 1.5) {
+  const [a, b] = P(x, FLOOR_Y, WALL_Z), [cc, d] = P(x, FLOOR_Y, NEAR);
+  g.beginPath(); g.moveTo(a, b); g.lineTo(cc, d); g.stroke();
+}
+
+// ---- Pared del fondo
+const [wx, wy, ww, wh] = rectOnWall(-HALF_W, FLOOR_Y, HALF_W, CEIL_Y, lin(0, 0, 0, 0, [[0, '#18221e']]));
+g.fillStyle = lin(0, wy, 0, wy + wh, [[0, '#26302c'], [0.25, '#1a2420'], [1, '#121a17']]);
+g.fillRect(wx, wy, ww, wh);
+
+// Panel de piedra (izquierda) con tira LED en los cantos
+{
+  const [x, y, w, h] = rectOnWall(-5.6, FLOOR_Y, -3.7, CEIL_Y - 0.05, '#20272a');
+  for (let r = 0; r < 26; r++) {
+    for (let k = 0; k < 4; k++) {
+      const bw = w / 4, bx = x + k * bw + (r % 2 ? bw / 2 : 0), by = y + r * (h / 26);
+      const v = 30 + ((r * 7 + k * 13) % 15);
+      g.fillStyle = `rgb(${v},${v + 4},${v + 3})`;
+      g.fillRect(Math.min(bx, x + w - 2), by, Math.min(bw - 3, x + w - bx), h / 26 - 3);
+    }
+  }
+  g.save();
+  g.shadowColor = 'rgba(239,232,218,.9)'; g.shadowBlur = 18;
+  g.fillStyle = CREAM;
+  g.fillRect(x - 3, y, 3, h); g.fillRect(x + w, y, 3, h);
+  g.restore();
+}
+
+// Armarios de herramientas (centro), en el verde de la marca
+function cabinet(x0, x1, y0, y1, drawers) {
+  const [x, y, w, h] = rectOnWall(x0 * M, y0, x1 * M, y1, SURFACE);
+  g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 2; g.strokeRect(x, y, w, h);
+  g.fillStyle = 'rgba(239,232,218,.06)'; g.fillRect(x, y, w, 3);
+  if (drawers) {
+    for (let i = 1; i < drawers; i++) {
+      const dy = y + (h * i) / drawers;
+      g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(x + 3, dy, w - 6, 2);
+      g.fillStyle = SAGE; g.fillRect(x + w * 0.2, dy - h / drawers / 2, w * 0.6, 3);
+    }
+    g.fillStyle = SAGE; g.fillRect(x + w * 0.2, y + h - h / drawers / 2, w * 0.6, 3);
+  } else {
+    g.fillStyle = SAGE; g.fillRect(x + w - 10, y + h * 0.4, 3, h * 0.2);
+  }
+}
+cabinet(-1.95, -1.35, FLOOR_Y, 0.95, 0);                 // armario alto izquierdo
+cabinet(1.35, 1.95, FLOOR_Y, 0.95, 0);                   // armario alto derecho
+for (const [a, b] of [[-1.3, -0.45], [-0.42, 0.42], [0.45, 1.3]]) {
+  cabinet(a, b, 0.6, 0.95, 0);                           // altillos
+  cabinet(a, b, FLOOR_Y + 0.08, -0.12, a === -0.42 ? 2 : 6); // cajoneras
+}
+// Panel perforado con herramientas
+{
+  const [x, y, w, h] = rectOnWall(-1.3 * M, -0.08, 1.3 * M, 0.58, '#2d3532');
+  g.fillStyle = 'rgba(0,0,0,.35)';
+  for (let px = x + 8; px < x + w - 4; px += 11) for (let py = y + 8; py < y + h - 4; py += 11) g.fillRect(px, py, 2, 2);
+  g.fillStyle = '#5b6560';
+  for (let i = 0; i < 9; i++) {
+    const tx = x + 30 + i * (w - 60) / 8;
+    g.fillRect(tx, y + h * 0.25, 4 + (i % 3), h * (0.25 + (i % 4) * 0.08));
+    g.fillRect(tx - 4, y + h * 0.22, 12, 5);
+  }
+  // Tira LED bajo los altillos
+  g.save();
+  g.shadowColor = 'rgba(239,232,218,.9)'; g.shadowBlur = 16; g.fillStyle = CREAM;
+  g.fillRect(x, y - 3, w, 3);
+  g.restore();
+  g.fillStyle = lin(0, y, 0, y + h, [[0, 'rgba(239,232,218,.18)'], [0.6, 'rgba(239,232,218,0)']]);
+  g.fillRect(x, y, w, h);
+}
+// Encimera de acero
+rectOnWall(-1.32 * M, -0.12, 1.32 * M, -0.07, '#9aa39e');
+
+// Derecha: estantes con cajas de exposición y radiador
+{
+  for (const sy of [0.55, 0.15]) {
+    const [x, y, w] = rectOnWall(3.5, sy, 5.6, sy + 0.04, '#0c1210');
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = 'rgba(239,232,218,.12)';
+      g.fillRect(x + 10 + i * (w - 20) / 5, y - 26, (w - 20) / 5 - 8, 26);
+    }
+  }
+  const [x, y, w, h] = rectOnWall(3.7, -0.95, 5.3, -0.35, '#1d2522');
+  g.fillStyle = 'rgba(0,0,0,.35)';
+  for (let px = x + 6; px < x + w; px += 9) g.fillRect(px, y + 4, 3, h - 8);
+}
+
+// Luz del techo sobre la parte alta de la pared
+g.fillStyle = lin(0, wy, 0, wy + wh * 0.6, [[0, 'rgba(239,232,218,.10)'], [1, 'rgba(239,232,218,0)']]);
+g.fillRect(wx, wy, ww, wh);
+
+// ---- LED hexagonales del techo (y su reflejo en el suelo)
+const GRID = { x0: -5.2, x1: 5.2, z0: 1.6, z1: 7.2 };
+function clip([ax, az], [bx, bz]) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dz = bz - az;
+  for (const [p, q] of [[-dx, ax - GRID.x0], [dx, GRID.x1 - ax], [-dz, az - GRID.z0], [dz, GRID.z1 - az]]) {
+    if (p === 0) { if (q < 0) return null; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; }
+  }
+  return [[ax + t0 * dx, az + t0 * dz], [ax + t1 * dx, az + t1 * dz]];
+}
+const segments = [];
+const R = 0.6, HX = 1.5 * R, HZ = Math.sqrt(3) * R;
+for (let i = -10; i <= 10; i++) {
+  for (let j = -2; j <= 8; j++) {
+    const cx = i * HX, cz = GRID.z0 + j * HZ + (i % 2 ? HZ / 2 : 0);
+    const pts = Array.from({ length: 6 }, (_, k) => [cx + R * Math.cos((Math.PI / 3) * k), cz + R * Math.sin((Math.PI / 3) * k)]);
+    for (let k = 0; k < 6; k++) {
+      const s = clip(pts[k], pts[(k + 1) % 6]);
+      if (s) segments.push(s);
+    }
+  }
+}
+for (const s of [[[GRID.x0, GRID.z0], [GRID.x1, GRID.z0]], [[GRID.x0, GRID.z1], [GRID.x1, GRID.z1]], [[GRID.x0, GRID.z0], [GRID.x0, GRID.z1]], [[GRID.x1, GRID.z0], [GRID.x1, GRID.z1]]]) segments.push(s);
+
+// Los tubos se dibujan nítidos en una capa aparte y el brillo se hace
+// difuminando esa capa entera (mucho más rápido que un brillo por tubo).
+function tubeLayer(y) {
+  const t = document.createElement('canvas');
+  t.width = c.width; t.height = c.height;
+  const k = t.getContext('2d');
+  k.scale(S, S);
+  k.lineCap = 'round';
+  k.strokeStyle = '#FBF8F0';
+  for (const [[ax, az], [bx, bz]] of segments) {
+    const [x0, y0] = P(ax, y, az), [x1, y1] = P(bx, y, bz);
+    k.lineWidth = 0.035 * F / ((az + bz) / 2);
+    k.beginPath(); k.moveTo(x0, y0); k.lineTo(x1, y1); k.stroke();
+  }
+  return t;
+}
+function glow(layer, passes) {
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  for (const [blur, alpha] of passes) {
+    g.filter = blur ? `blur(${blur * S}px)` : 'none';
+    g.globalAlpha = alpha;
+    g.drawImage(layer, 0, 0);
+  }
+  g.restore();
+}
+// Reflejo en el suelo (simétrico respecto al suelo), suave y difuminado
+g.save();
+g.beginPath();
+for (const [x, y] of [P(-HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, NEAR), P(-HALF_W, FLOOR_Y, NEAR)]) g.lineTo(x, y);
+g.closePath(); g.clip();
+glow(tubeLayer(2 * FLOOR_Y - CEIL_Y), [[14, 0.12], [4, 0.14]]);
+g.restore();
+glow(tubeLayer(CEIL_Y), [[28, 0.9], [10, 0.9], [3, 0.8], [0, 1]]);
+
+// ---- Viñeta para fundirse con el fondo de la web arriba y abajo
+g.fillStyle = lin(0, 0, 0, 700, [[0, BG], [1, 'rgba(15,42,34,0)']]);
+g.fillRect(0, 0, W, 700);
+g.fillStyle = lin(0, H - 700, 0, H, [[0, 'rgba(15,42,34,0)'], [1, BG]]);
+g.fillRect(0, H - 700, W, 700);
+document.title = 'listo';
+</script>

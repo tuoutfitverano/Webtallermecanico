@@ -69,7 +69,7 @@ npm run test:e2e     # navegador → web → Supabase Auth real + PostgREST → 
 npm run test:mcp     # comprueba el servidor Playwright MCP
 ```
 
-Vista previa navegable para el propietario (panel y portal con datos de demostración, sin servidor): `VISTA_PREVIA_DIR=<carpeta> bash scripts/test-e2e.sh e2e/vista-previa.spec.ts --project escritorio` y después `scripts/vista-previa/build.py` (instrucciones en ese archivo). El propietario quiere ver la web actualizada tras cada cambio.
+Vista previa navegable para el propietario (panel y portal con datos de demostración, sin servidor): `VISTA_PREVIA_DIR=<carpeta> bash scripts/test-e2e.sh e2e/vista-previa.spec.ts --project escritorio` y después `scripts/vista-previa/build.py` (instrucciones en ese archivo). **Tras CADA petición del propietario, vuelve a publicar la vista previa completa (web + panel + portal) en el mismo artifact; nunca le mandes capturas en su lugar.**
 
 En la nube de Claude Code, PostgreSQL puede estar parado: `pg_ctlcluster 16 main start`. Astro 7 arranca `astro dev` en segundo plano en este entorno: páralo con `npx astro dev stop` (desde `apps/web`).
 
@@ -91,11 +91,12 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 
 - Código en TypeScript estricto; identificadores en inglés, textos visibles y comentarios en español.
 - Valores de dominio en español (`'cita'`, `'nueva'`, `'gasolina'`) y sincronizados entre `packages/core` y los tipos de la base de datos.
-- La web pública usa `src/styles/site.css` (estética "cristal líquido": fondo negro, Instrument Serif cursiva para titulares, Barlow para texto) y fuentes alojadas en la propia web (`@fontsource/*`), sin Google Fonts. Tailwind queda disponible para el futuro panel.
+- Paleta de la plataforma (web, área privada, panel y portal): `#0F2A22` fondo, `#1F4536` superficies, `#8A9A7B` salvia (acento; para texto secundario sobre tarjetas, aclarada con crema por contraste), `#EFE8DA` crema (texto). Variables en `site.css` (`--bg`, `--surface`, `--sage`, `--fg`, `--ink`) y `panel.css` (`--p-*`). El acento de cada taller sigue viniendo de `theme.accent`.
+- La web pública usa `src/styles/site.css` (estética "cristal líquido", Instrument Serif cursiva para titulares, Barlow para texto) y fuentes alojadas en la propia web (`@fontsource/*`), sin Google Fonts. Tailwind queda disponible para el futuro panel.
 - Animaciones sin librerías: `BlurText.astro` (palabra a palabra) y la clase `.reveal` + `data-reveal`. El estado oculto inicial solo se aplica con la clase `anim` en `<html>` (la pone un script en línea): sin JavaScript o con "reducir movimiento" todo se ve. Nunca ocultes contenido con CSS sin esa condición.
 - `[hidden]` siempre oculta (`display:none !important`). No lo quites: el panel de "Solicitud recibida" depende de ello.
 - Vídeos de fondo opcionales por taller en `workshop_sites.theme` (`heroVideo`, `servicesVideo`, solo `https`). `FadingVideo.astro` no los descarga sin JavaScript, con "reducir movimiento" o con ahorro de datos; entonces se ve el fondo animado. Una web real debe usar vídeos propios o con licencia.
-- Coche que gira con el scroll: `theme.scrollFrames` (`src` con `{n}`, `count`, `poster`, `focusX/focusY` = punto del zoom final). `ScrollStage.astro` + `scripts/scroll-stage.ts` dibujan fotogramas en un canvas: portada → vuelta completa → servicios → zoom hasta la ventanilla tintada → «Cómo trabajamos». Sin JavaScript, con «reducir movimiento» o ahorro de datos: solo la imagen fija y sin huecos. Fotogramas del taller demo (AutoValue) en `public/demo/autovalue/` (vídeo aportado por el propietario; lleva la marca de agua de KlingAI).
+- Coche que gira con el scroll: `theme.scrollFrames` (`src` con `{n}`, `count`, `poster`, `focusX/focusY` = punto del zoom final; `backdrop` + `frameTop` = fondo opcional, p. ej. el garaje, con los fotogramas transparentes encima). `ScrollStage.astro` + `scripts/scroll-stage.ts` dibujan fotogramas en un canvas: portada → vuelta completa → servicios → zoom hasta la ventanilla tintada → «Cómo trabajamos». Sin JavaScript, con «reducir movimiento» o ahorro de datos: solo la imagen fija y sin huecos. Fotogramas del taller demo (AutoValue) en `public/demo/autovalue/` (vídeo aportado por el propietario; lleva la marca de agua de KlingAI). Se regeneran con `scripts/demo-autovalue/` (`render-garage.mjs` dibuja el garaje de `garage.html`; `frames.py` recorta el coche, añade sombra y reflejo y compone la portada).
 - React solo cuando una pantalla lo necesite de verdad (todavía no se usa).
 - Variables de entorno: `apps/web/.env` en local (plantilla en `.env.example`); en producción, secretos de Cloudflare.
 
