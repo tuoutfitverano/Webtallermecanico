@@ -17,19 +17,21 @@ import Icon from '../components/Icon.astro';
 import type { Panel } from '../lib/server/panel.ts';
 import { ROLE_LABELS } from '../lib/auth/validate.ts';
 
-export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo';
+export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos';
 interface Props {
   panel: Panel;
   title: string;
   section?: PanelSection;
 }
 const { panel, title, section } = Astro.props;
-const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' | 'clipboard' | 'car' | 'users' | 'user' }> = [
+const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' }> = [
   { id: 'inicio', href: '/panel', label: 'Inicio', icon: 'home' },
   { id: 'ordenes', href: '/panel/ordenes', label: 'Órdenes', icon: 'clipboard' },
   { id: 'vehiculos', href: '/panel/vehiculos', label: 'Vehículos', icon: 'car' },
   { id: 'clientes', href: '/panel/clientes', label: 'Clientes', icon: 'user' },
   { id: 'equipo', href: '/panel/equipo', label: 'Equipo', icon: 'users' },
+  // Avisos a clientes: solo propietario y administradores (la base de datos tampoco se los enseña a nadie más).
+  ...(panel.isManager ? [{ id: 'avisos' as const, href: '/panel/avisos', label: 'Avisos', icon: 'bell' as const }] : []),
 ];
 const w = panel.workshop;
 ---
@@ -98,7 +100,7 @@ const w = panel.workshop;
     </div>
 
     {w && (
-      <nav class="pnl-tabs" aria-label="Secciones">
+      <nav class:list={['pnl-tabs', { 'pnl-tabs-6': nav.length === 6 }]} aria-label="Secciones">
         {nav.map(n => (
           <a href={n.href} class:list={['pnl-tab', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
             <Icon name={n.icon} /><span>{n.label}</span>

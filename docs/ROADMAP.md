@@ -82,10 +82,15 @@ Pendiente: envío automático del enlace de invitación por correo (hoy se copia
 - Pruebas: 368 comprobaciones SQL, 26 unitarias nuevas y 5 de navegador con proveedor **simulado**.
 - Pendiente: contratar Openapi, revisar sus términos, confirmar los campos con una consulta de prueba y configurar el token (`docs/CONSULTA_MATRICULAS.md`).
 
-## Fase 7 · Notificaciones y automatizaciones
+## ✅ Fase 7 · Notificaciones y automatizaciones (email pendiente de credenciales)
 
-- Correo transaccional (confirmación de solicitud al cliente, aviso al taller, invitaciones), cambios de estado, recordatorios.
-- WhatsApp Business (plantillas aprobadas) cuando haya volumen.
+- Avisos automáticos por cada cambio real de estado (patrón outbox en la base de datos), con reglas por taller.
+- Portal: `/portal/avisos` con no leídos, marcar como leído y enlace a la reparación.
+- Email con Resend: plantilla HTML + texto, idempotencia, reintentos limitados, webhook firmado de entrega, proceso programado.
+- Panel → Avisos: registro con estado real, motivo del fallo, reintento manual y ajustes.
+- Preferencias del cliente y consentimiento comercial separado (solo lo da el cliente), con registro.
+- Pruebas: 449 comprobaciones SQL, 18 unitarias nuevas y 4 de navegador con email **simulado**.
+- Pendiente: cuenta de Resend y dominio, webhook, Supabase Cron, revisión legal; WhatsApp/SMS sin implementar (`docs/NOTIFICACIONES.md`).
 
 ## Fase 8 · Administración de la plataforma y SEO
 

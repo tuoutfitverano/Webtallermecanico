@@ -224,3 +224,29 @@ a.vcard:hover { border-color: var(--p-line-2); }
 .lookup-info { font-size: .875rem; color: var(--fg-90); }
 .lookup-conflict { color: #fde68a; }
 .lookup-review .btn { align-self: flex-start; }
+
+/* ---------- Avisos (Fase 7) ---------- */
+.pnl-tabs-6 { grid-template-columns: repeat(6, 1fr); }
+.pnl-tabs-6 .pnl-tab { font-size: .625rem; }
+.pnl-nav-link, .pnl-tab { position: relative; }
+.pnl-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: #fde68a; color: #0a0a0b; font-size: .6875rem; font-weight: 600; text-align: center; line-height: 1.5; }
+.pnl-badge-tab { position: absolute; top: 6px; left: calc(50% + 6px); margin: 0; min-width: 18px; padding: 0 5px; font-size: .625rem; }
+.notice-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.notice { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 14px 16px; border: 1px solid var(--p-line); border-radius: 14px; background: rgb(255 255 255 / .02); }
+.notice.is-unread { border-color: rgb(253 230 138 / .45); background: rgb(253 230 138 / .05); }
+.notice-dot { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: transparent; border: 1px solid var(--p-line-2); }
+.notice.is-unread .notice-dot { background: #fde68a; border-color: #fde68a; }
+.notice-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.notice-title { font-weight: 600; }
+.notice-body { white-space: pre-line; color: var(--fg-90); font-size: .9375rem; }
+.notice-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.data-table th, .data-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--p-line); vertical-align: top; }
+.data-table th { font-weight: 500; color: var(--p-muted); white-space: nowrap; }
+.nstatus { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--p-line-2); font-size: .75rem; white-space: nowrap; }
+.nstatus-entregado, .nstatus-enviado { color: #86efac; border-color: rgb(134 239 172 / .45); }
+.nstatus-pendiente, .nstatus-procesando { color: #fcd34d; border-color: rgb(252 211 77 / .4); }
+.nstatus-fallido { color: #fca5a5; border-color: rgb(252 165 165 / .45); }
+.nstatus-cancelado { color: #a1a1aa; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; }

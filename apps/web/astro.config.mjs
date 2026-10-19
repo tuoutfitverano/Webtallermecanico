@@ -33,6 +33,13 @@ export default defineConfig({
       OPENAPI_AUTOMOTIVE_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
       OPENAPI_AUTOMOTIVE_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
       VEHICLE_LOOKUP_TIMEOUT_MS: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Notificaciones por email (Fase 7). Ver docs/NOTIFICACIONES.md.
+      EMAIL_PROVIDER: envField.string({ context: 'server', access: 'secret', optional: true }),
+      EMAIL_FROM: envField.string({ context: 'server', access: 'secret', optional: true }),
+      RESEND_API_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      RESEND_API_URL: envField.string({ context: 'server', access: 'secret', optional: true }),
+      RESEND_WEBHOOK_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
+      NOTIFICATIONS_CRON_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
     validateSecrets: false,
   },

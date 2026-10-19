@@ -76,3 +76,39 @@ test('capturas de las fases 5 y 6', async ({ page, browser, isMobile }) => {
   await expect(page.getByRole('status')).toContainText('Vehículo registrado.');
   await page.screenshot({ path: `${DIR}/f6-vehiculo-procedencia-${sfx}.png`, fullPage: true });
 });
+
+test('capturas de la fase 7', async ({ page, browser, isMobile }) => {
+  test.setTimeout(120_000);
+  const sfx = isMobile ? 'movil' : 'escritorio';
+  const owner = await token('propietaria@e2e.test');
+  await patch(`/workshop_notification_settings?workshop_id=eq.${DEMO}`, owner, { email_enabled: true, reply_to: 'taller@e2e.test' });
+  const email = `marta-${Date.now()}@e2e.test`;
+  const [c] = await post('/customers', owner, { workshop_id: DEMO, full_name: 'Marta Ruiz', email });
+  await fetch(`${PROXY}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: JSON.stringify({ email, password: PASSWORD, email_confirm: true }) });
+  const [inv] = await post('/rpc/create_customer_invitation', owner, { p_customer_id: c!.id });
+  await post('/rpc/accept_customer_invitation', await token(email), { p_token: inv!.token });
+  const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}MRT`, make: 'Renault', model: 'Clio' });
+  const [o] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v!.id, customer_id: c!.id, problem_description: 'Cambio de aceite y filtros' });
+  const [c2] = await post('/customers', owner, { workshop_id: DEMO, full_name: 'Jorge Díaz', email: `rechazo-${Date.now()}@e2e.test` });
+  const [v2] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c2!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}JRD`, make: 'Ford', model: 'Focus' });
+  const [o2] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v2!.id, customer_id: c2!.id, problem_description: 'Revisión' });
+
+  await login(page, 'propietaria@e2e.test', `/panel/ordenes/${o!.id}`);
+  for (const [id, label, msg] of [[o!.id, 'Esperando recambios', 'Hemos pedido el filtro; llega mañana.'], [o!.id, 'Listo para recoger', 'Ya puedes pasar a recogerlo.'], [o2!.id, 'Listo para recoger', '']] as const) {
+    await page.goto(`/panel/ordenes/${id}`);
+    if (msg) await page.getByLabel(/Mensaje para el cliente con el cambio de estado/).fill(msg);
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Estado actualizado.');
+  }
+  if (!isMobile) {
+    await page.goto('/panel/avisos?estado=todos&canal=email');
+    await page.screenshot({ path: `${DIR}/f7-panel-avisos-${sfx}.png`, fullPage: true });
+  }
+  const client = await (await browser.newContext({ ...(isMobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1280, height: 860 } }), locale: 'es-ES', timezoneId: 'Europe/Madrid' })).newPage();
+  await login(client, email, '/portal/avisos');
+  await client.screenshot({ path: `${DIR}/f7-portal-avisos-${sfx}.png`, fullPage: true });
+  if (!isMobile) {
+    await client.goto('/portal/datos');
+    await client.screenshot({ path: `${DIR}/f7-portal-preferencias-${sfx}.png`, fullPage: true });
+  }
+});

@@ -30,13 +30,18 @@ export interface Portal {
   isPost: boolean;
   form: FormData | null;
   loadError: boolean;
+  /** Avisos sin leer (para el indicador del menú). */
+  unread: number;
 }
 
 export async function portalPage(Astro: AstroGlobal): Promise<Portal | Response> {
   const page = await authPage(Astro);
   if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
   if (!page.user || !page.supabase) return redirectToLogin(Astro);
-  const { data, error } = await page.supabase.rpc('portal_profile');
+  const [{ data, error }, unread] = await Promise.all([
+    page.supabase.rpc('portal_profile'),
+    page.supabase.rpc('portal_unread_notifications'),
+  ]);
   if (error) logAuth('portal_profile_error', error.code);
   return {
     supabase: page.supabase,
@@ -45,6 +50,7 @@ export async function portalPage(Astro: AstroGlobal): Promise<Portal | Response>
     isPost: page.isPost,
     form: page.form,
     loadError: Boolean(error),
+    unread: typeof unread.data === 'number' ? unread.data : 0,
   };
 }
 

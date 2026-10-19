@@ -1,0 +1,96 @@
+---
+/**
+ * Avisos del cliente: los genera la base de datos con cada cambio real de
+ * estado. Solo los suyos (portal_notifications); marcar como leído solo
+ * afecta a los suyos (portal_mark_notifications_read).
+ */
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import Icon from '../../components/Icon.astro';
+import Flash from '../../components/panel/Flash.astro';
+import NotLinked from '../../components/portal/NotLinked.astro';
+import { portalPage } from '../../lib/server/portal.ts';
+import { field, isUuid } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDateTime } from '../../lib/panel/format.ts';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+let error = false;
+if (portal.form && portal.records.length > 0) {
+  const action = field(portal.form, 'action');
+  const id = field(portal.form, 'id');
+  if (action === 'abrir' && isUuid(id)) {
+    // Se marca como leído y se abre la reparación (si la puede ver: el portal lo vuelve a comprobar).
+    await portal.supabase.rpc('portal_mark_notifications_read', { p_id: id });
+    const order = field(portal.form, 'order');
+    return Astro.redirect(isUuid(order) ? `/portal/reparaciones/${order}` : '/portal/avisos', 303);
+  }
+  if (action === 'leido' || action === 'todos') {
+    const { error: e } = await portal.supabase.rpc('portal_mark_notifications_read', { p_id: action === 'leido' && isUuid(id) ? id : null });
+    if (e) { logAuth('portal_notifications_read_error', e.code); error = true; }
+    else return Astro.redirect('/portal/avisos', 303);
+  }
+}
+
+interface Notice { id: string; created_at: string; title: string; body: string; read_at: string | null; order_id: string | null; workshop_name: string }
+let notices: Notice[] = [];
+if (portal.records.length > 0) {
+  const { data, error: e } = await portal.supabase.rpc('portal_notifications', { p_limit: 100 });
+  if (e) { logAuth('portal_notifications_error', e.code); error = true; }
+  notices = (data ?? []) as Notice[];
+}
+const unread = notices.filter(n => !n.read_at).length;
+const many = portal.records.length > 1;
+---
+<PortalLayout portal={portal} title="Avisos" section="avisos">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Avisos</h1>
+      <p class="pnl-sub">Te avisamos aquí cada vez que cambia el estado de una reparación.</p>
+    </div>
+    {unread > 0 && (
+      <form method="post" class="pnl-actions" data-busy="Marcando…">
+        <input type="hidden" name="action" value="todos" />
+        <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Marcar todo como leído</span></button>
+      </form>
+    )}
+  </header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <>
+      {error && <Flash kind="bad" text="No hemos podido cargar o actualizar tus avisos. Recarga la página." />}
+      {notices.length === 0 ? (
+        <div class="empty"><strong>Todavía no tienes avisos.</strong><span>Cuando el taller cambie el estado de una reparación, lo verás aquí.</span></div>
+      ) : (
+        <ul class="notice-list" aria-label={`${notices.length} avisos, ${unread} sin leer`}>
+          {notices.map(n => (
+            <li class:list={['notice', { 'is-unread': !n.read_at }]}>
+              <span class="notice-dot" aria-hidden="true"></span>
+              <div class="notice-main">
+                <span class="notice-title">{n.title}{!n.read_at && <span class="sr-only"> (sin leer)</span>}</span>
+                <span class="when">{formatDateTime(n.created_at)}{many && <> · {n.workshop_name}</>}</span>
+                <p class="notice-body">{n.body}</p>
+                <div class="notice-actions">
+                  {n.order_id && (
+                    <form method="post">
+                      <input type="hidden" name="action" value="abrir" /><input type="hidden" name="id" value={n.id} /><input type="hidden" name="order" value={n.order_id} />
+                      <button class="btn btn-sm" type="submit"><Icon name="clipboard" />Ver la reparación</button>
+                    </form>
+                  )}
+                  {!n.read_at && (
+                    <form method="post">
+                      <input type="hidden" name="action" value="leido" /><input type="hidden" name="id" value={n.id} />
+                      <button class="btn btn-sm" type="submit"><Icon name="check" />Marcar como leído</button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )}
+</PortalLayout>

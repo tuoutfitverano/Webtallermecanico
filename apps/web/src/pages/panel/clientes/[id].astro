@@ -90,6 +90,19 @@ if (panel.form && panel.workshop && isUuid(id)) {
       flash = { kind: 'bad', text: dbErrorMessage(error) };
       Astro.response.status = 400;
     } else flash = { kind: 'ok', text: 'Acceso al portal retirado. La ficha y su historial se conservan.' };
+  } else if (action === 'comunicaciones') {
+    // Solo a petición del cliente: el taller puede desactivar o reactivar los avisos por email y RETIRAR
+    // el consentimiento comercial, nunca darlo (lo impide set_contact_preferences).
+    const { error } = await panel.supabase.rpc('set_contact_preferences', {
+      p_customer_id: id,
+      p_operational_email: field(panel.form, 'operational_email') === '1',
+      p_marketing_email: field(panel.form, 'marketing_email') === '1',
+    });
+    if (error) {
+      logAuth('panel_customer_prefs_error', error.code);
+      flash = { kind: 'bad', text: dbErrorMessage(error) };
+      Astro.response.status = 400;
+    } else flash = { kind: 'ok', text: 'Preferencias de comunicación actualizadas.' };
   } else if (action === 'pedir-borrar') {
     askDelete = true;
   } else if (action === 'borrar') {
@@ -110,8 +123,9 @@ let customer: Customer | null = null;
 let vehicles: Array<{ id: string; plate: string; make: string; model: string }> = [];
 let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
 let invitations: Invitation[] = [];
+let prefs = { operational_email: true, marketing_email: false, updated_at: null as string | null };
 if (panel.workshop && isUuid(id)) {
-  const [c, v, o, i] = await Promise.all([
+  const [c, v, o, i, pr] = await Promise.all([
     panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
     panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
     panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
@@ -120,7 +134,9 @@ if (panel.workshop && isUuid(id)) {
       ? panel.supabase.from('customer_invitations').select('id, email, expires_at, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
         .eq('status', 'pendiente').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
+    panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email, updated_at').eq('customer_id', id).maybeSingle(),
   ]);
+  if (pr.data) prefs = pr.data as typeof prefs;
   customer = (c.data as Customer | null) ?? null;
   vehicles = (v.data ?? []) as typeof vehicles;
   orders = (o.data ?? []) as unknown as typeof orders;
@@ -227,6 +243,32 @@ const values = editValues ?? customer ?? {};
                 )}
               </>
             )}
+          </section>
+          <section class="card" aria-labelledby="comunicaciones">
+            <h2 id="comunicaciones" class="card-title"><Icon name="bell" />Comunicaciones</h2>
+            <dl class="facts">
+              <dt>Avisos de reparaciones por email</dt><dd>{!customer.email ? 'Sin correo en la ficha' : prefs.operational_email ? 'Sí' : 'No (desactivados)'}</dd>
+              <dt>Promociones por email</dt><dd>{prefs.marketing_email ? `Sí, consentimiento dado por el cliente${prefs.updated_at ? ` (${formatDate(prefs.updated_at)})` : ''}` : 'No'}</dd>
+            </dl>
+            {panel.isManager && (
+              <div class="pnl-actions" style="margin-top:12px">
+                <form method="post" data-busy="Guardando…">
+                  <input type="hidden" name="action" value="comunicaciones" />
+                  <input type="hidden" name="operational_email" value={prefs.operational_email ? '0' : '1'} />
+                  <input type="hidden" name="marketing_email" value={prefs.marketing_email ? '1' : '0'} />
+                  <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>{prefs.operational_email ? 'Desactivar avisos por email' : 'Reactivar avisos por email'}</span></button>
+                </form>
+                {prefs.marketing_email && (
+                  <form method="post" data-busy="Guardando…">
+                    <input type="hidden" name="action" value="comunicaciones" />
+                    <input type="hidden" name="operational_email" value={prefs.operational_email ? '1' : '0'} />
+                    <input type="hidden" name="marketing_email" value="0" />
+                    <button class="btn btn-sm btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Retirar consentimiento de promociones</span></button>
+                  </form>
+                )}
+              </div>
+            )}
+            <p class="hint" style="margin-top:10px">Cámbialo solo si el cliente te lo pide. El consentimiento para promociones solo puede darlo el propio cliente desde su portal.</p>
           </section>
           <section class="card" aria-labelledby="rep">
             <h2 id="rep" class="card-title"><Icon name="clipboard" />Reparaciones</h2>

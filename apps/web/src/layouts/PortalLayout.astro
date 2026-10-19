@@ -1,7 +1,7 @@
 ---
 /**
  * Plantilla del portal del cliente: misma identidad visual que el panel,
- * pero con solo cuatro secciones y textos pensados para quien no es mecánico.
+ * pero con pocas secciones y textos pensados para quien no es mecánico.
  */
 import { ClientRouter } from 'astro:transitions';
 import '@fontsource/instrument-serif/latin-400-italic.css';
@@ -14,17 +14,18 @@ import '../styles/panel.css';
 import Icon from '../components/Icon.astro';
 import type { Portal } from '../lib/server/portal.ts';
 
-export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'datos';
+export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'avisos' | 'datos';
 interface Props {
   portal: Portal;
   title: string;
   section?: PortalSection;
 }
 const { portal, title, section } = Astro.props;
-const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'user' }> = [
+const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'bell' | 'user' }> = [
   { id: 'inicio', href: '/portal', label: 'Inicio', icon: 'home' },
   { id: 'vehiculos', href: '/portal/vehiculos', label: 'Mis vehículos', icon: 'car' },
   { id: 'reparaciones', href: '/portal/reparaciones', label: 'Reparaciones', icon: 'clipboard' },
+  { id: 'avisos', href: '/portal/avisos', label: 'Avisos', icon: 'bell' },
   { id: 'datos', href: '/portal/datos', label: 'Mis datos', icon: 'user' },
 ];
 const linked = portal.records.length > 0;
@@ -55,6 +56,7 @@ const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_
           {nav.map(n => (
             <a href={n.href} class:list={['pnl-nav-link', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
               <Icon name={n.icon} /><span>{n.label}</span>
+              {n.id === 'avisos' && portal.unread > 0 && <span class="pnl-badge" aria-label={`${portal.unread} sin leer`}>{portal.unread > 99 ? '99+' : portal.unread}</span>}
             </a>
           ))}
         </nav>
@@ -81,10 +83,11 @@ const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_
     </div>
 
     {linked && (
-      <nav class="pnl-tabs pnl-tabs-4" aria-label="Secciones">
+      <nav class="pnl-tabs" aria-label="Secciones">
         {nav.map(n => (
           <a href={n.href} class:list={['pnl-tab', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
             <Icon name={n.icon} /><span>{n.label}</span>
+            {n.id === 'avisos' && portal.unread > 0 && <span class="pnl-badge pnl-badge-tab" aria-label={`${portal.unread} sin leer`}>{portal.unread > 99 ? '99+' : portal.unread}</span>}
           </a>
         ))}
       </nav>

@@ -10,6 +10,7 @@ import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import { field, isUuid, loadTeam, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { dispatchOrderEmails } from '../../../lib/server/notify.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { localInputToDb, toLocalInput } from '../../../lib/panel/format.ts';
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
@@ -75,7 +76,10 @@ if (panel.form && panel.workshop && panel.isManager) {
       problem_description: d.problemDescription,
       internal_notes: d.internalNotes,
     }).select('id').single();
-    if (!e && data) return Astro.redirect(`/panel/ordenes/${data.id}?creada=1`, 303);
+    if (!e && data) {
+      await dispatchOrderEmails(Astro, data.id);
+      return Astro.redirect(`/panel/ordenes/${data.id}?creada=1`, 303);
+    }
     logAuth('panel_order_create_error', e?.code);
     error = e?.code === '23503'
       ? (e.message?.includes('equipo activo') ? e.message : 'El vehículo, el cliente o la persona asignada no son de tu taller.')

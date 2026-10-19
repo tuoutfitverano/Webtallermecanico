@@ -1,33 +1,89 @@
 ---
-/** Mis datos: lo que cada taller tiene registrado del cliente (solo lectura) y la cuenta. */
+/**
+ * Mis datos: lo que cada taller tiene registrado del cliente (solo lectura), la
+ * cuenta y las preferencias de comunicación. Los avisos de las reparaciones
+ * (operativos) y las comunicaciones comerciales van por separado: aceptar unos
+ * nunca activa los otros, y lo comercial nace desactivado.
+ */
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import Icon from '../../components/Icon.astro';
+import Flash from '../../components/panel/Flash.astro';
 import NotLinked from '../../components/portal/NotLinked.astro';
 import { portalPage } from '../../lib/server/portal.ts';
+import { field, isUuid } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
 import { formatDate } from '../../lib/panel/format.ts';
 
 export const prerender = false;
 
 const portal = await portalPage(Astro);
 if (portal instanceof Response) return portal;
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+if (portal.form && field(portal.form, 'action') === 'preferencias') {
+  const customerId = field(portal.form, 'customer_id');
+  // La base de datos comprueba que la ficha es del propio cliente.
+  const { error } = isUuid(customerId)
+    ? await portal.supabase.rpc('set_contact_preferences', {
+        p_customer_id: customerId,
+        p_operational_email: portal.form.get('operational_email') === 'on',
+        p_marketing_email: portal.form.get('marketing_email') === 'on',
+      })
+    : { error: { code: '22023' } };
+  if (error) {
+    logAuth('portal_preferences_error', error.code);
+    flash = { kind: 'bad', text: 'No se han guardado tus preferencias. Inténtalo de nuevo.' };
+    Astro.response.status = 400;
+  } else flash = { kind: 'ok', text: 'Preferencias guardadas.' };
+}
+
+interface Prefs { customer_id: string; workshop_name: string; has_email: boolean; operational_email: boolean; marketing_email: boolean }
+let prefs: Prefs[] = [];
+if (portal.records.length > 0) {
+  const { data, error } = await portal.supabase.rpc('portal_contact_preferences');
+  if (error) logAuth('portal_preferences_load_error', error.code);
+  prefs = (data ?? []) as Prefs[];
+}
+const prefsOf = (customerId: string) => prefs.find(p => p.customer_id === customerId);
 ---
 <PortalLayout portal={portal} title="Mis datos" section="datos">
   <header class="pnl-head"><div><h1 class="pnl-title">Mis datos</h1><p class="pnl-sub">Los datos que tu taller tiene registrados. Si alguno no es correcto, díselo al taller.</p></div></header>
+  <Flash kind={flash.kind} text={flash.text} />
   <section class="card" aria-labelledby="cuenta">
     <h2 id="cuenta" class="card-title"><Icon name="shield" />Tu cuenta</h2>
     <dl class="facts"><dt>Correo de acceso</dt><dd>{portal.user.email}</dd></dl>
     <nav class="auth-links" style="justify-content:flex-start"><a href="/cuenta/contrasena">Cambiar la contraseña</a><a href="/cuenta">Mi cuenta</a></nav>
   </section>
-  {portal.records.length === 0 ? <div style="margin-top:16px"><NotLinked loadError={portal.loadError} /></div> : portal.records.map(r => (
-    <section class="card" aria-label={`Ficha en ${r.workshop_name}`}>
-      <h2 class="card-title"><Icon name="user" />{r.workshop_name}</h2>
-      <dl class="facts">
-        <dt>Nombre</dt><dd>{r.full_name}</dd>
-        <dt>Teléfono</dt><dd>{r.phone ?? 'No registrado'}</dd>
-        <dt>Correo</dt><dd>{r.email ?? 'No registrado'}</dd>
-        {r.linked_at && <><dt>Portal vinculado</dt><dd>desde el {formatDate(r.linked_at)}</dd></>}
-        {r.workshop_phone && <><dt>Teléfono del taller</dt><dd>{r.workshop_phone}</dd></>}
-      </dl>
-    </section>
-  ))}
+  {portal.records.length === 0 ? <div style="margin-top:16px"><NotLinked loadError={portal.loadError} /></div> : portal.records.map(r => {
+    const p = prefsOf(r.customer_id);
+    return (
+      <section class="card" aria-label={`Ficha en ${r.workshop_name}`}>
+        <h2 class="card-title"><Icon name="user" />{r.workshop_name}</h2>
+        <dl class="facts">
+          <dt>Nombre</dt><dd>{r.full_name}</dd>
+          <dt>Teléfono</dt><dd>{r.phone ?? 'No registrado'}</dd>
+          <dt>Correo</dt><dd>{r.email ?? 'No registrado'}</dd>
+          {r.linked_at && <><dt>Portal vinculado</dt><dd>desde el {formatDate(r.linked_at)}</dd></>}
+          {r.workshop_phone && <><dt>Teléfono del taller</dt><dd>{r.workshop_phone}</dd></>}
+        </dl>
+        {p && (
+          <form method="post" class="form-stack" style="margin-top:16px" data-busy="Guardando…" aria-label={`Comunicaciones de ${r.workshop_name}`}>
+            <input type="hidden" name="action" value="preferencias" />
+            <input type="hidden" name="customer_id" value={r.customer_id} />
+            <h3 class="card-title" style="margin:0"><Icon name="bell" />Comunicaciones</h3>
+            <label class="check">
+              <input type="checkbox" name="operational_email" checked={p.operational_email} />
+              <span><strong>Avisos de mis reparaciones por email</strong> (vehículo recibido, listo para recoger…).
+                {p.has_email ? ' Los avisos dentro de este portal se mantienen siempre.' : ' El taller no tiene tu correo: de momento solo recibirás avisos en este portal.'}</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" name="marketing_email" checked={p.marketing_email} />
+              <span><strong>Ofertas y promociones de {r.workshop_name} por email.</strong> Opcional y separado de los avisos de tus reparaciones. Puedes retirarlo cuando quieras.</span>
+            </label>
+            <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar preferencias</span></button>
+          </form>
+        )}
+      </section>
+    );
+  })}
 </PortalLayout>

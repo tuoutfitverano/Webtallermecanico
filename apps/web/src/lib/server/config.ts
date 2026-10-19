@@ -13,6 +13,10 @@ import type { SubmissionDeps } from '../requests/handler.ts';
 import { createOpenapiProvider } from '../vehicle-lookup/openapi.ts';
 import type { LookupDeps, LookupRow } from '../vehicle-lookup/service.ts';
 import type { VehicleLookupProvider } from '../vehicle-lookup/types.ts';
+import { createResendSender } from '../notifications/resend.ts';
+import { dispatchEmails, type DispatchDeps, type DispatchSummary } from '../notifications/dispatcher.ts';
+import type { ClaimedNotification } from '../notifications/templates.ts';
+import type { ChannelSender } from '../notifications/types.ts';
 
 export const isDev = import.meta.env.DEV;
 
@@ -165,4 +169,76 @@ export function vehicleLookupDeps(userClient: SupabaseClient): LookupDeps {
     },
     log,
   };
+}
+
+// ---------------------------------------------------------------- notificaciones (Fase 7)
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/**
+ * Canal email, o null si no está configurado. Sin proveedor, los avisos por
+ * email se quedan "pendientes": nunca se dan por enviados.
+ */
+function emailSender(): ChannelSender | null {
+  const kind = env('EMAIL_PROVIDER').trim().toLowerCase();
+  if (!kind || !getServiceClient()) return null;
+  const from = env('EMAIL_FROM').trim();
+  if (!EMAIL_RE.test(from)) return null;
+  if (kind === 'resend') {
+    const apiKey = env('RESEND_API_KEY');
+    const baseUrl = providerUrl(env('RESEND_API_URL'));
+    if (!apiKey || baseUrl === null) return null;
+    return createResendSender({ apiKey, fromAddress: from, baseUrl });
+  }
+  log('email_unknown_provider');
+  return null;
+}
+
+/** ¿Hay email configurado en la plataforma? (para el panel: no se puede activar si no). */
+export function emailAvailable(): boolean {
+  return emailSender() !== null;
+}
+
+/** Envía los emails pendientes (de una orden o de todos). Solo con la clave secreta, desde el servidor. */
+export async function dispatchPendingEmails(opts: { orderId?: string | null; limit?: number; origin?: string | null } = {}): Promise<DispatchSummary> {
+  const service = getServiceClient();
+  const deps: DispatchDeps = {
+    sender: service ? emailSender() : null,
+    async claim({ limit, orderId }) {
+      const { data, error } = await service!.rpc('claim_email_notifications', { p_limit: limit, p_order_id: orderId });
+      return { data: (data ?? null) as ClaimedNotification[] | null, error };
+    },
+    async record(id, outcome, provider) {
+      const { error } = await service!.rpc('record_email_result', {
+        p_id: id,
+        p_result: outcome.kind,
+        p_provider: provider,
+        p_message_id: outcome.kind === 'aceptado' ? outcome.messageId || null : null,
+        p_error_code: outcome.kind === 'aceptado' ? null : outcome.code,
+      });
+      return { error };
+    },
+    portalOrigin: appOrigin() ?? opts.origin ?? null,
+    log,
+  };
+  return dispatchEmails(deps, { orderId: opts.orderId ?? null, limit: opts.limit });
+}
+
+/** Anota una confirmación del proveedor (webhook ya verificado). */
+export async function recordEmailDelivery(provider: string, messageId: string, outcome: string): Promise<boolean> {
+  const service = getServiceClient();
+  if (!service) return false;
+  const { error } = await service.rpc('record_email_delivery', { p_provider: provider, p_message_id: messageId, p_outcome: outcome });
+  if (error) log('email_delivery_error', { code: error.code ?? 'desconocido' });
+  return !error;
+}
+
+export function resendWebhookSecret(): string {
+  return env('RESEND_WEBHOOK_SECRET');
+}
+
+/** Secreto del aviso programado (cron). Vacío = el endpoint de proceso está desactivado. */
+export function notificationsCronSecret(): string {
+  const s = env('NOTIFICATIONS_CRON_SECRET');
+  return s.length >= 24 ? s : '';
 }

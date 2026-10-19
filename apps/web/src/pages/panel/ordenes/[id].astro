@@ -14,6 +14,7 @@ import Flash from '../../../components/panel/Flash.astro';
 import StatusBadge from '../../../components/panel/StatusBadge.astro';
 import { field, isUuid, loadTeam, memberName, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { dispatchOrderEmails } from '../../../lib/server/notify.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { FIELD_LABELS, formatDateTime } from '../../../lib/panel/format.ts';
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
@@ -107,6 +108,7 @@ if (panel.form && panel.workshop && order) {
     } else {
       flash = { kind: 'ok', text: action === 'estado' ? 'Estado actualizado.' : 'Cambios guardados.' };
       draft = null;
+      await dispatchOrderEmails(Astro, order.id);
       order = await loadOrder();
     }
   }

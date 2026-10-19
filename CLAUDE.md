@@ -10,6 +10,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Plan por fases y estado: `docs/ROADMAP.md`
 - Navegador para Claude (Playwright MCP): `docs/PLAYWRIGHT_MCP.md`
 - Consulta por matrícula (proveedor, costes, activación): `docs/CONSULTA_MATRICULAS.md`
+- Notificaciones (portal, email, reintentos, consentimiento): `docs/NOTIFICACIONES.md`
 
 ## Estructura
 
@@ -18,7 +19,8 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/pages/              index (web del taller), privacidad, aviso-legal, api/solicitudes.ts
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
-                          portal/ (inicio, vehiculos/, reparaciones/, datos, invitacion) — portal del cliente
+                          portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
+                          panel/avisos (avisos a clientes), api/notificaciones/ (procesar = cron, webhook = Resend)
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
   src/middleware.ts       Área privada: dominio APP_URL y cabeceras anti-caché
   src/components/         Secciones de la web y formularios (RequestForm.astro)
@@ -34,6 +36,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/layouts/PortalLayout, src/components/portal/  Plantilla y piezas del portal del cliente
   src/lib/panel/          Formatos de fecha (Europe/Madrid) y lectura del formulario de vehículos
   src/lib/vehicle-lookup/ Consulta por matrícula: tipos, cliente de Openapi, lógica (service) y revisión — solo servidor
+  src/lib/notifications/  Avisos: canal email (Resend), plantilla, despachador, webhook firmado — solo servidor
   src/components/panel/   Piezas del panel (estado, avisos, campos de cliente y vehículo)
   src/styles/panel.css    Estilos del panel (más denso y opaco que la web pública)
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
@@ -131,6 +134,15 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - La consulta no crea el vehículo. Lo escrito a mano no se sustituye sin marcarlo. Al guardar con `lookup_id`, la base de datos calcula `lookup_fields` (confirmado/modificado/no_usado) y el origen.
 - Respuestas reutilizables solo dentro del mismo taller (24 h). Nunca compartas resultados entre talleres.
 - En pruebas e2e el proveedor es SIMULADO (`scripts/e2e/plate-provider-mock.mjs`); no presentes esas pruebas como consultas reales.
+
+## Notificaciones (Fase 7)
+
+- Los avisos los crea la BASE DE DATOS a partir de `repair_order_events` (disparador `repair_order_events_notify`, misma transacción). No crees avisos desde la interfaz ni desde el servidor.
+- `enviado` = aceptado por el proveedor; `entregado` = confirmado por webhook firmado. Nunca marques un email como enviado sin respuesta real del proveedor; sin proveedor, quedan `pendiente`.
+- El envío es del servidor con la clave secreta (`claim_email_notifications` → proveedor con `Idempotency-Key` = id del aviso → `record_email_result`). Reintentos: 5 automáticos con espera, 3 manuales (solo gestores), nunca sobre lo ya enviado.
+- Avisos operativos ≠ comerciales. Lo comercial exige consentimiento del PROPIO cliente (`set_contact_preferences` desde el portal); el taller solo puede retirarlo. Lo impone `notifications_guard`.
+- El contenido del aviso solo lleva lo que el cliente ya ve en su portal. Los textos de estado de `private.status_customer_text` deben coincidir con `REPAIR_STATUS_CUSTOMER_TEXT` (lo comprueba una prueba).
+- En e2e el email es SIMULADO (`scripts/e2e/email-provider-mock.mjs`): no lo presentes como envío real.
 
 ## Formularios y solicitudes (Fase 2)
 

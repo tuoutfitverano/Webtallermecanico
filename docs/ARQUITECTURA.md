@@ -156,6 +156,10 @@ repair_order_events.customer_message ── mensajes en el historial que ve el c
 - **Solo gestores** deciden qué ve el cliente (lo impone `repair_orders_guard`) y gestionan invitaciones.
 - **Rutas**: `/mi-area` reparte tras el acceso (personal → `/panel`, cliente → `/portal`, resto → `/cuenta`). `panelPage` muestra "acceso denegado" (403) a un cliente sin membresía.
 
+### Notificaciones (Fase 7)
+
+Patrón outbox: cada cambio real de estado (`repair_order_events`) crea en la misma transacción el aviso del portal y, si procede, un email pendiente en `notifications`. El servidor envía la cola (al guardar y con un proceso programado cada minuto) y el proveedor confirma la entrega por webhook firmado. Detalle, estados, reintentos y consentimiento: `docs/NOTIFICACIONES.md`.
+
 ## 8. Vehículos
 
 - La matrícula se guarda **normalizada** (`1950 bxf` → `1950BXF`) y es única dentro de cada taller.
