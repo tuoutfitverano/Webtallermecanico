@@ -1,0 +1,24 @@
+---
+/** Condiciones del servicio para los talleres que usan la plataforma: texto pendiente (no se inventa). */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+export const prerender = false;
+const items = [
+  'Quién presta el servicio (titular de la plataforma, NIF y domicilio) y cómo contactar.',
+  'Qué incluye el servicio (web del taller, panel, portal de clientes, avisos) y qué no.',
+  'Precio, facturación, duración y baja del servicio.',
+  'Contrato de encargado del tratamiento (art. 28 RGPD): la plataforma trata los datos de los clientes del taller por cuenta del taller.',
+  'Subencargados (Supabase, Cloudflare y, si se activan, el proveedor de email y el de datos por matrícula) y transferencias internacionales.',
+  'Disponibilidad, copias de seguridad y qué ocurre con los datos al terminar el contrato (devolución y borrado).',
+  'Responsabilidades, uso aceptable y legislación aplicable.',
+];
+---
+<AuthLayout title="Condiciones del servicio">
+  <section class="auth-card liquid-glass-strong legal" aria-labelledby="titulo">
+    <p class="label">// Información legal</p>
+    <h1 id="titulo" class="auth-title heading">Condiciones del servicio</h1>
+    <div class="alert alert-warn" role="note"><Icon name="alert" /><span><strong>Texto pendiente.</strong> El titular de la plataforma debe redactarlo con su asesor legal antes de dar de alta talleres reales.</span></div>
+    <p>Este documento deberá incluir, al menos:</p>
+    <ul>{items.map(i => <li>{i}</li>)}</ul>
+  </section>
+</AuthLayout>

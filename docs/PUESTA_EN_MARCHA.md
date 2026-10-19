@@ -35,6 +35,7 @@ Las migraciones se aplican en orden y **ninguna borra datos**:
 | `20261021090000_portal_clientes.sql` | Portal del cliente: invitaciones de clientes, mensaje para el cliente, funciones `portal_*` |
 | `20261022090000_consultas_matricula.sql` | Consultas de matrícula a un proveedor externo, límites y procedencia de los datos |
 | `20261023090000_notificaciones.sql` | Avisos a clientes (portal y email), preferencias y consentimientos |
+| `20261024090000_endurecimiento_auditoria.sql` | Correcciones de la auditoría: destinatario de los avisos, campos de auditoría, mantenimiento, derechos RGPD, permisos |
 
 `db push` modifica la base de datos de producción. Solo aplica las migraciones que falten.
 
@@ -149,6 +150,8 @@ Los avisos del portal funcionan sin configurar nada. Para el email: cuenta en Re
 
 ## 7. Publicar en Cloudflare
 
+Guía completa por entornos (desarrollo, pruebas, producción), reversión y comprobaciones: `docs/DESPLIEGUE.md`. Checklist: `docs/CHECKLIST_LANZAMIENTO.md`.
+
 En Cloudflare → **Workers & Pages**, configura las variables. Las claves secretas, como **Secret**:
 
 | Variable | Tipo |
@@ -174,7 +177,7 @@ Antes de abrir al público:
 
 ## 8. Ver las solicitudes recibidas
 
-El panel todavía no tiene bandeja de solicitudes web (llegará en una fase siguiente): de momento se ven en Supabase → **Table Editor → web_requests**. Las nuevas tienen `status = nueva` (pendientes de confirmar).
+En el panel: **Solicitudes web** (propietario y administradores; en el móvil, desde el contador del inicio). Las nuevas están «sin atender»; una cita solicitada no está confirmada hasta que hables con la persona.
 
 ## 9. Pruebas
 

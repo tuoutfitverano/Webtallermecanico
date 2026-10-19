@@ -17,14 +17,14 @@ import Icon from '../components/Icon.astro';
 import type { Panel } from '../lib/server/panel.ts';
 import { ROLE_LABELS } from '../lib/auth/validate.ts';
 
-export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos';
+export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos' | 'solicitudes';
 interface Props {
   panel: Panel;
   title: string;
   section?: PanelSection;
 }
 const { panel, title, section } = Astro.props;
-const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' }> = [
+const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' | 'mail'; tab?: false }> = [
   { id: 'inicio', href: '/panel', label: 'Inicio', icon: 'home' },
   { id: 'ordenes', href: '/panel/ordenes', label: 'Órdenes', icon: 'clipboard' },
   { id: 'vehiculos', href: '/panel/vehiculos', label: 'Vehículos', icon: 'car' },
@@ -32,7 +32,10 @@ const nav: Array<{ id: PanelSection; href: string; label: string; icon: 'home' |
   { id: 'equipo', href: '/panel/equipo', label: 'Equipo', icon: 'users' },
   // Avisos a clientes: solo propietario y administradores (la base de datos tampoco se los enseña a nadie más).
   ...(panel.isManager ? [{ id: 'avisos' as const, href: '/panel/avisos', label: 'Avisos', icon: 'bell' as const }] : []),
+  // Solicitudes de la web: en móvil se llega desde el inicio (no caben más pestañas).
+  ...(panel.isManager ? [{ id: 'solicitudes' as const, href: '/panel/solicitudes', label: 'Solicitudes web', icon: 'mail' as const, tab: false as const }] : []),
 ];
+const tabs = nav.filter(n => n.tab !== false);
 const w = panel.workshop;
 ---
 <!doctype html>
@@ -90,7 +93,7 @@ const w = panel.workshop;
         </div>
         <form method="post" action="/salir" class="pnl-top-user" data-astro-reload>
           <span class="pnl-user" title={panel.user.email}>{panel.user.email}</span>
-          <button class="btn btn-sm" type="submit" aria-label="Cerrar sesión"><Icon name="logout" /><span class="pnl-hide-sm">Salir</span></button>
+          <button class="btn btn-sm" type="submit" aria-label="Salir (cerrar sesión)" title="Cerrar sesión"><Icon name="logout" /><span class="pnl-hide-sm">Salir</span></button>
         </form>
       </header>
 
@@ -100,8 +103,8 @@ const w = panel.workshop;
     </div>
 
     {w && (
-      <nav class:list={['pnl-tabs', { 'pnl-tabs-6': nav.length === 6 }]} aria-label="Secciones">
-        {nav.map(n => (
+      <nav class:list={['pnl-tabs', { 'pnl-tabs-6': tabs.length === 6 }]} aria-label="Secciones">
+        {tabs.map(n => (
           <a href={n.href} class:list={['pnl-tab', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
             <Icon name={n.icon} /><span>{n.label}</span>
           </a>

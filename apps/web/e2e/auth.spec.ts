@@ -35,8 +35,8 @@ async function login(page: Page, email: string, password = PASSWORD, next = '') 
 }
 
 async function logout(page: Page) {
-  // En el área de cuenta el botón dice "Salir"; en el panel, "Cerrar sesión".
-  await page.getByRole('button', { name: /^(Salir|Cerrar sesión)$/ }).click();
+  // En el área de cuenta el botón dice "Salir"; en el panel y el portal, "Salir (cerrar sesión)".
+  await page.getByRole('button', { name: /^Salir/ }).click();
   await expect(page).toHaveURL(/\/acceso\?salida=1/);
 }
 

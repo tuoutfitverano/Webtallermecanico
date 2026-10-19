@@ -30,7 +30,8 @@ export function createAuthClient(ctx: AuthRequestContext): SupabaseClient | null
   const env = authEnv();
   if (!env) return null;
   return createServerClient(env.url, env.publishableKey, {
-    cookieOptions: { path: '/', sameSite: 'lax', secure: ctx.url.protocol === 'https:' },
+    // httpOnly: el JavaScript del navegador nunca lee la sesión (todo pasa por el servidor).
+    cookieOptions: { path: '/', sameSite: 'lax', secure: ctx.url.protocol === 'https:', httpOnly: true },
     cookies: {
       getAll() {
         return parseCookieHeader(ctx.request.headers.get('cookie') ?? '').map(c => ({ name: c.name, value: c.value ?? '' }));
@@ -43,7 +44,7 @@ export function createAuthClient(ctx: AuthRequestContext): SupabaseClient | null
             expires: options.expires,
             sameSite: options.sameSite,
             secure: options.secure,
-            httpOnly: options.httpOnly,
+            httpOnly: true,
           });
         }
         // Evita que una CDN guarde una respuesta con la sesión de otra persona.

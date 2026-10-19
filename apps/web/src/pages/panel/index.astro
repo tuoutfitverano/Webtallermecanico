@@ -25,13 +25,19 @@ let summary: Summary | null = null;
 let recent: OrderRow[] = [];
 let error = false;
 let team: Awaited<ReturnType<typeof loadTeam>> = [];
+let newRequests: number | null = null;
 if (panel.workshop) {
   const id = panel.workshop.id;
-  const [s, r, t] = await Promise.all([
+  const [s, r, t, w] = await Promise.all([
     panel.supabase.rpc('workshop_dashboard', { p_workshop_id: id }),
     panel.supabase.rpc('search_repair_orders', { p_workshop_id: id, p_query: '', p_limit: 8 }),
     loadTeam(panel),
+    // Solo gestores leen las solicitudes (RLS); para un mecánico no se pregunta.
+    panel.isManager
+      ? panel.supabase.from('web_requests').select('id', { count: 'exact', head: true }).eq('workshop_id', id).eq('status', 'nueva')
+      : Promise.resolve({ count: null }),
   ]);
+  newRequests = w.count;
   if (s.error || r.error) {
     logAuth('panel_dashboard_error', s.error?.code ?? r.error?.code);
     error = true;
@@ -46,6 +52,7 @@ const kpis = summary ? [
   { value: summary.pending_diagnosis, label: 'Pendientes de diagnosis', href: '/panel/ordenes?estado=diagnosis' },
   { value: summary.waiting_parts, label: 'Esperando recambios', href: '/panel/ordenes?estado=esperando_recambios' },
   { value: summary.ready, label: 'Listos para recoger', href: '/panel/ordenes?estado=listo' },
+  ...(newRequests !== null ? [{ value: newRequests, label: 'Solicitudes web sin atender', href: '/panel/solicitudes' }] : []),
 ] : [];
 ---
 <PanelLayout panel={panel} title="Inicio" section="inicio">

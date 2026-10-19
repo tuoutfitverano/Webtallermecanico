@@ -74,7 +74,7 @@ const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_
         </div>
         <form method="post" action="/salir" class="pnl-top-user" data-astro-reload>
           <span class="pnl-user" title={portal.user.email}>{portal.user.email}</span>
-          <button class="btn btn-sm" type="submit" aria-label="Cerrar sesión"><Icon name="logout" /><span class="pnl-hide-sm">Salir</span></button>
+          <button class="btn btn-sm" type="submit" aria-label="Salir (cerrar sesión)" title="Cerrar sesión"><Icon name="logout" /><span class="pnl-hide-sm">Salir</span></button>
         </form>
       </header>
       <main id="contenido" class="pnl-content" tabindex="-1">

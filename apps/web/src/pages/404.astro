@@ -1,0 +1,14 @@
+---
+/** Página no encontrada (sin datos de ningún taller ni detalles técnicos). */
+import AuthLayout from '../layouts/AuthLayout.astro';
+export const prerender = false;
+Astro.response.status = 404;
+---
+<AuthLayout title="Página no encontrada">
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">// Error 404</p>
+    <h1 id="titulo" class="auth-title heading">Página no encontrada</h1>
+    <p class="auth-lead">La dirección no existe o ha cambiado.</p>
+    <nav class="auth-links"><a href="/">Ir al inicio</a><a href="/mi-area">Mi área</a></nav>
+  </section>
+</AuthLayout>

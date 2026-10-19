@@ -11,6 +11,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Navegador para Claude (Playwright MCP): `docs/PLAYWRIGHT_MCP.md`
 - Consulta por matrícula (proveedor, costes, activación): `docs/CONSULTA_MATRICULAS.md`
 - Notificaciones (portal, email, reintentos, consentimiento): `docs/NOTIFICACIONES.md`
+- Auditoría, despliegue y lanzamiento: `docs/AUDITORIA_FASE8.md`, `docs/DESPLIEGUE.md`, `docs/CHECKLIST_LANZAMIENTO.md`, `docs/DATOS_PERSONALES.md`
 
 ## Estructura
 
@@ -20,9 +21,11 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
-                          panel/avisos (avisos a clientes), api/notificaciones/ (procesar = cron, webhook = Resend)
+                          panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web)
+                          api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend)
+                          cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
-  src/middleware.ts       Área privada: dominio APP_URL y cabeceras anti-caché
+  src/middleware.ts       Cabeceras de seguridad en todo (CSP frame-ancestors, nosniff, HSTS…); área privada: APP_URL y anti-caché
   src/components/         Secciones de la web y formularios (RequestForm.astro)
   src/scripts/            JavaScript del navegador (request-forms.ts)
   src/lib/site/           Contenido del taller, resolución por dominio, demo local
@@ -143,6 +146,14 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Avisos operativos ≠ comerciales. Lo comercial exige consentimiento del PROPIO cliente (`set_contact_preferences` desde el portal); el taller solo puede retirarlo. Lo impone `notifications_guard`.
 - El contenido del aviso solo lleva lo que el cliente ya ve en su portal. Los textos de estado de `private.status_customer_text` deben coincidir con `REPAIR_STATUS_CUSTOMER_TEXT` (lo comprueba una prueba).
 - En e2e el email es SIMULADO (`scripts/e2e/email-provider-mock.mjs`): no lo presentes como envío real.
+
+## Auditoría y producción (Fase 8)
+
+- `supabase/tests/12_auditoria.test.sql` vigila reglas del esquema (RLS en todas las tablas, nada para `anon` salvo `get_public_site`, `search_path` fijado, sin escrituras directas en avisos/historial/consentimientos). Si una migración nueva lo rompe, corrige la migración, no la prueba.
+- `e2e/calidad.spec.ts` pasa axe (WCAG A/AA, fallos graves/críticos), consola, red, enlaces y móvil por las pantallas principales: añade ahí las pantallas nuevas.
+- Mantenimiento periódico en `public.run_maintenance()` (lo llama `/api/notificaciones/procesar`). Derechos RGPD: `private.export_customer_data` y `private.anonymize_customer` (solo SQL Editor). Ver `docs/DATOS_PERSONALES.md`.
+- Los nombres accesibles de botones y enlaces deben contener el texto visible (WCAG 2.5.3).
+- Nada de desplegar, aplicar migraciones en producción ni contratar servicios sin confirmación expresa (`docs/DESPLIEGUE.md`).
 
 ## Formularios y solicitudes (Fase 2)
 

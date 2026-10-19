@@ -92,7 +92,14 @@ Pendiente: envío automático del enlace de invitación por correo (hoy se copia
 - Pruebas: 449 comprobaciones SQL, 18 unitarias nuevas y 4 de navegador con email **simulado**.
 - Pendiente: cuenta de Resend y dominio, webhook, Supabase Cron, revisión legal; WhatsApp/SMS sin implementar (`docs/NOTIFICACIONES.md`).
 
-## Fase 8 · Administración de la plataforma y SEO
+## ✅ Fase 8 · Auditoría, seguridad y preparación para producción
+
+- Auditoría completa (`docs/AUDITORIA_FASE8.md`): sin exposición de datos. Corregidos 2 hallazgos altos (destinatario de los emails al cambiar cliente o correo; bandeja de solicitudes web en el panel) y 9 medios (cabeceras, cookies HttpOnly, campos de auditoría, mantenimiento, derechos RGPD, accesibilidad, páginas legales, pruebas intermitentes, permisos por columna).
+- Pruebas: 477 comprobaciones SQL, 138 unitarias y pruebas de navegador ampliadas (calidad y accesibilidad en 31 pantallas).
+- Guía de despliegue, checklist de lanzamiento e inventario de datos personales.
+- Pendiente: configuración real (Supabase de producción, copias de seguridad, SMTP, Cloudflare, cron, proveedores) y textos legales.
+
+## Fase 9 · Administración de la plataforma y SEO
 
 - Panel de alta de talleres, dominios personalizados (Cloudflare for SaaS), publicación y suspensión.
 - Páginas por servicio para SEO local, datos estructurados `AutoRepair`, sitemap, banner de cookies si se usan cookies no esenciales.

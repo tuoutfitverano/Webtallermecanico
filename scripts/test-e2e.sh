@@ -173,6 +173,23 @@ if [ "$ready" != 1 ]; then
   exit 1
 fi
 
+# Calentamiento: la primera visita a cada página hace que Vite prepare sus dependencias y
+# reinicie el entorno de Workers; si eso pasa en mitad de una prueba, la petición falla
+# ("fetch failed"). Se visitan las páginas principales hasta que todas respondan bien
+# dos rondas seguidas.
+WARM=(/ /privacidad /cookies /acceso /registro /recuperar /cuenta /panel /panel/ordenes /panel/vehiculos/nuevo /panel/avisos /portal /portal/avisos /mi-area /invitacion /condiciones)
+stable=0
+for round in $(seq 1 15); do
+  ok=1
+  for path in "${WARM[@]}"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H "host: demo.localhost:$WEB_PORT" "http://127.0.0.1:$WEB_PORT$path" || echo 000)
+    case "$code" in 2*|3*) ;; *) ok=0 ;; esac
+  done
+  if [ "$ok" = 1 ]; then stable=$((stable + 1)); else stable=0; fi
+  [ "$stable" -ge 2 ] && break
+  sleep 2
+done
+
 # Vídeo de prueba local para comprobar el vídeo de la portada (los reales están en otro servidor).
 TEST_VIDEO=""
 if command -v ffmpeg >/dev/null 2>&1; then

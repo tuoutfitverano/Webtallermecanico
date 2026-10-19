@@ -1,0 +1,40 @@
+---
+/**
+ * Cookies: inventario técnico real de lo que guarda la aplicación (sacado del
+ * código) y texto legal pendiente. No se inventa texto legal.
+ */
+import SiteLayout from '../layouts/SiteLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { siteForHost } from '../lib/server/config.ts';
+export const prerender = false;
+const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
+if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
+const rows = [
+  { name: 'sb-…-auth-token (y partes .0, .1…)', where: 'Solo en el área privada (acceso, panel y portal)', what: 'Mantiene la sesión iniciada. Sin ella no se puede entrar.', when: 'Mientras dura la sesión (la renueva Supabase Auth)', who: 'Propia (Supabase Auth)' },
+  { name: 'sb-…-auth-token-code-verifier', where: 'Solo en el área privada', what: 'Protege el inicio de sesión y la recuperación de contraseña por enlace.', when: 'Unos minutos, hasta completar el proceso', who: 'Propia (Supabase Auth)' },
+  { name: 'panel_taller', where: 'Solo en el panel del taller', what: 'Recuerda qué taller tenías abierto si trabajas en varios.', when: '1 año', who: 'Propia' },
+];
+---
+<SiteLayout site={site} title={`Cookies · ${site.name}`} noindex>
+  <SiteHeader site={site} />
+  <main class="section legal-page glow">
+    <div class="wrap legal">
+      <p class="label">// Información legal</p>
+      <h1 class="heading">Cookies</h1>
+      <div class="alert alert-warn" role="note">
+        <span><strong>Texto pendiente de revisión legal.</strong> Debajo está la lista técnica de lo que guarda la aplicación. El titular de la web debe validarla con su asesor antes de publicar la web.</span>
+      </div>
+      <p>Esta web no usa cookies de publicidad ni de analítica. Las páginas públicas no guardan cookies propias. Solo se guardan estas, necesarias para el área privada:</p>
+      <div class="table-scroll">
+        <table class="legal-table">
+          <thead><tr><th scope="col">Nombre</th><th scope="col">Dónde</th><th scope="col">Para qué</th><th scope="col">Duración</th><th scope="col">De quién</th></tr></thead>
+          <tbody>{rows.map(r => <tr><td><code>{r.name}</code></td><td>{r.where}</td><td>{r.what}</td><td>{r.when}</td><td>{r.who}</td></tr>)}</tbody>
+        </table>
+      </div>
+      <p>Los formularios públicos usan Cloudflare Turnstile para frenar el spam. Antes de publicar hay que confirmar en la documentación de Cloudflare qué almacena en el navegador y reflejarlo aquí.</p>
+      <p><a href="/">Volver a la web</a></p>
+    </div>
+  </main>
+  <SiteFooter site={site} />
+</SiteLayout>

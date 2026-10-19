@@ -242,3 +242,15 @@ export function notificationsCronSecret(): string {
   const s = env('NOTIFICATIONS_CRON_SECRET');
   return s.length >= 24 ? s : '';
 }
+
+/** Tareas de mantenimiento (huellas antispam caducadas, consultas a medias). Solo recuentos. */
+export async function runMaintenance(): Promise<Record<string, number> | null> {
+  const service = getServiceClient();
+  if (!service) return null;
+  const { data, error } = await service.rpc('run_maintenance');
+  if (error) {
+    log('maintenance_error', { code: error.code ?? 'desconocido' });
+    return null;
+  }
+  return (data ?? {}) as Record<string, number>;
+}

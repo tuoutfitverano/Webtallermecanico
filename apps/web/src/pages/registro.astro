@@ -114,7 +114,7 @@ const qsNext = next === DEFAULT_AFTER_LOGIN ? '' : `?next=${encodeURIComponent(n
           <div class={`field ${errors.privacy ? 'has-error' : ''}`}>
             <label class="check">
               <input type="checkbox" name="privacy" required aria-describedby={errors.privacy ? 'privacy-err' : undefined} />
-              <span>He leído la <a href="/privacidad-cuenta" target="_blank">política de privacidad</a> y acepto que se usen mis datos para gestionar mi cuenta.</span>
+              <span>He leído la <a href="/privacidad-cuenta" target="_blank" rel="noopener">política de privacidad</a> y acepto que se usen mis datos para gestionar mi cuenta.</span>
             </label>
             {errors.privacy && <p class="field-error" id="privacy-err">{errors.privacy}</p>}
           </div>

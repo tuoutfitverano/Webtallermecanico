@@ -22,6 +22,18 @@ export const REQUEST_KIND_LABELS: Readonly<Record<RequestKind, string>> = {
   contacto: 'Contacto',
 };
 
+/** Estados de una solicitud (igual que el tipo request_status de la base de datos). */
+export const REQUEST_STATUSES = ['nueva', 'en_gestion', 'aceptada', 'rechazada', 'cerrada', 'spam'] as const;
+export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+export const REQUEST_STATUS_LABELS: Readonly<Record<RequestStatus, string>> = {
+  nueva: 'Nueva (sin atender)',
+  en_gestion: 'En gestión',
+  aceptada: 'Aceptada',
+  rechazada: 'Rechazada',
+  cerrada: 'Cerrada',
+  spam: 'Spam',
+};
+
 /** Motivos del formulario de contacto. */
 export const CONTACT_TOPICS = ['informacion', 'cita', 'presupuesto', 'estado_vehiculo', 'otro'] as const;
 export type ContactTopic = (typeof CONTACT_TOPICS)[number];

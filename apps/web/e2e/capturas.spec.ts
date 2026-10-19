@@ -112,3 +112,22 @@ test('capturas de la fase 7', async ({ page, browser, isMobile }) => {
     await client.screenshot({ path: `${DIR}/f7-portal-preferencias-${sfx}.png`, fullPage: true });
   }
 });
+
+test('capturas de la fase 8', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Escritorio');
+  await page.goto('/#solicitar');
+  await page.getByRole('tab', { name: 'Pedir cita' }).click();
+  const form = page.locator('#solicitar-cita');
+  await form.getByLabel('Nombre').fill('Laura Gómez');
+  await form.getByLabel('Teléfono').fill('611 222 333');
+  await form.getByLabel('Servicio').selectOption({ index: 1 });
+  await form.getByRole('checkbox').check();
+  await form.getByRole('button', { name: 'Enviar solicitud de cita' }).click();
+  await expect(form.getByRole('heading', { name: /recibida/ })).toBeVisible();
+  await page.goto('/cookies');
+  await page.screenshot({ path: `${DIR}/f8-cookies-escritorio.png`, fullPage: true });
+  await login(page, 'propietaria@e2e.test', '/panel');
+  await page.screenshot({ path: `${DIR}/f8-panel-inicio-escritorio.png`, fullPage: true });
+  await page.goto('/panel/solicitudes');
+  await page.screenshot({ path: `${DIR}/f8-panel-solicitudes-escritorio.png`, fullPage: true });
+});

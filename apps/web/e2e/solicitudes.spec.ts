@@ -238,3 +238,49 @@ test.describe('Servidor y permisos', () => {
     expect((await site.json()).workshop.slug).toBe('taller-demo');
   });
 });
+
+test.describe('Bandeja de solicitudes en el panel (Fase 8)', () => {
+  const PASSWORD = process.env.E2E_PASSWORD ?? '';
+  test.skip(!PASSWORD, 'Lanza estas pruebas con scripts/test-e2e.sh');
+  const login = async (page: Page, email: string, next: string) => {
+    await page.goto(`/acceso?next=${encodeURIComponent(next)}`);
+    await page.getByLabel('Correo electrónico').fill(email);
+    await page.locator('#password').fill(PASSWORD);
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await page.waitForURL(u => u.pathname === next);
+  };
+
+  test('la solicitud enviada desde la web llega al panel y el taller cambia su estado', async ({ page, browser }) => {
+    const name = unique('Bandeja');
+    await openTab(page, 'Pedir presupuesto');
+    const form = page.locator('#solicitar-presupuesto');
+    await form.getByLabel('Nombre').fill(name);
+    await form.getByLabel('Teléfono').fill('633 444 555');
+    await form.getByLabel('Servicio').selectOption({ label: 'Embrague' });
+    await form.getByLabel('Describe qué le pasa al vehículo').fill('Patina al acelerar.');
+    await form.getByRole('checkbox').check();
+    await form.getByRole('button', { name: 'Pedir presupuesto' }).click();
+    await expect(form.getByRole('heading', { name: 'Solicitud de presupuesto recibida' })).toBeVisible();
+
+    const owner = await (await browser.newContext()).newPage();
+    await login(owner, 'propietaria@e2e.test', '/panel');
+    await expect(owner.locator('.kpi', { hasText: 'Solicitudes web sin atender' })).toBeVisible();
+    await owner.goto('/panel/solicitudes');
+    const item = owner.getByRole('listitem').filter({ hasText: name });
+    await expect(item).toContainText('Solicitud de presupuesto');
+    await expect(item).toContainText('633 444 555');
+    await item.getByLabel(`Estado de la solicitud de ${name}`).selectOption('en_gestion');
+    await item.getByRole('button', { name: 'Cambiar estado' }).click();
+    await expect(owner.getByRole('status')).toContainText('En gestión');
+    expect((await rowsNamed(name))[0]).toMatchObject({ status: 'en_gestion' });
+    await owner.context().close();
+
+    // Un mecánico no ve las solicitudes (ni en la página ni por la API).
+    const mech = await (await browser.newContext()).newPage();
+    await login(mech, 'mecanico@e2e.test', '/panel');
+    await mech.goto('/panel/solicitudes');
+    await expect(mech.getByText('Solo el propietario o un administrador ven las solicitudes de la web.')).toBeVisible();
+    await expect(mech.locator('body')).not.toContainText(name);
+    await mech.context().close();
+  });
+});

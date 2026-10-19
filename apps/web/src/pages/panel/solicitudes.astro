@@ -1,0 +1,120 @@
+---
+/**
+ * Solicitudes que llegan desde la web pública (cita, presupuesto, contacto).
+ * Solo propietario y administradores (RLS). Una cita solicitada NO es una
+ * cita confirmada: el taller contacta con la persona y cambia el estado.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, isUuid, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDate, formatDateTime } from '../../lib/panel/format.ts';
+import {
+  CONTACT_CHANNEL_LABELS, CONTACT_TOPIC_LABELS, formatPlate, REQUEST_KIND_LABELS, REQUEST_STATUS_LABELS, REQUEST_STATUSES, TIME_SLOT_LABELS,
+  type ContactChannel, type ContactTopic, type RequestKind, type RequestStatus, type TimeSlot,
+} from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+if (panel.form && panel.workshop && panel.isManager && field(panel.form, 'action') === 'estado') {
+  const id = field(panel.form, 'id');
+  const status = field(panel.form, 'status') as RequestStatus;
+  if (!isUuid(id) || !REQUEST_STATUSES.includes(status)) {
+    flash = { kind: 'bad', text: 'Solicitud o estado no válidos.' };
+    Astro.response.status = 422;
+  } else {
+    const { data, error } = await panel.supabase.from('web_requests').update({ status }).eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+    if (error || !data?.length) {
+      logAuth('panel_request_status_error', error?.code);
+      flash = { kind: 'bad', text: 'No se ha guardado: la solicitud no existe o no tienes permiso.' };
+      Astro.response.status = 400;
+    } else flash = { kind: 'ok', text: `Solicitud marcada como «${REQUEST_STATUS_LABELS[status]}».` };
+  }
+}
+
+const FILTERS = [
+  { id: 'nuevas', label: 'Sin atender', statuses: ['nueva'] },
+  { id: 'en_gestion', label: 'En gestión', statuses: ['en_gestion'] },
+  { id: 'cerradas', label: 'Cerradas', statuses: ['aceptada', 'rechazada', 'cerrada'] },
+  { id: 'spam', label: 'Spam', statuses: ['spam'] },
+  { id: 'todas', label: 'Todas', statuses: null },
+] as const;
+// El servicio se guarda como identificador ("cambio_aceite"): se muestra legible.
+const serviceLabel = (s: string) => (s === 'otro' ? 'Otro' : s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' '));
+const filter = FILTERS.find(f => f.id === Astro.url.searchParams.get('estado')) ?? FILTERS[0];
+
+interface Req {
+  id: string; kind: RequestKind; status: RequestStatus; name: string; phone: string | null; email: string | null;
+  preferred_contact: ContactChannel | null; plate: string | null; vehicle_make: string | null; vehicle_model: string | null;
+  service: string | null; topic: string | null;
+  preferred_date: string | null; preferred_time: TimeSlot | null; message: string | null; created_at: string; handled_at: string | null;
+}
+let rows: Req[] = [];
+let loadError = false;
+if (panel.workshop && panel.isManager) {
+  let q = panel.supabase.from('web_requests')
+    .select('id, kind, status, name, phone, email, preferred_contact, plate, vehicle_make, vehicle_model, service, topic, preferred_date, preferred_time, message, created_at, handled_at')
+    .eq('workshop_id', panel.workshop.id).order('created_at', { ascending: false }).limit(100);
+  if (filter.statuses) q = q.in('status', [...filter.statuses]);
+  const { data, error } = await q;
+  if (error) { logAuth('panel_requests_error', error.code); loadError = true; }
+  rows = (data ?? []) as Req[];
+}
+---
+<PanelLayout panel={panel} title="Solicitudes web" section="solicitudes">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Solicitudes web</h1>
+      <p class="pnl-sub">Lo que llega desde los formularios de tu web. Una cita solicitada no está confirmada hasta que hables con la persona.</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isManager ? (
+    <div class="empty"><strong>Solo el propietario o un administrador ven las solicitudes de la web.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No se han podido cargar las solicitudes. Recarga la página." />}
+      <nav class="filter-tabs" aria-label="Filtrar solicitudes">
+        {FILTERS.map(f => <a href={`/panel/solicitudes?estado=${f.id}`} aria-current={f.id === filter.id ? 'page' : undefined}>{f.label}</a>)}
+      </nav>
+      {rows.length === 0 ? <div class="empty"><strong>No hay solicitudes en este apartado.</strong></div> : (
+        <ul class="notice-list" aria-label="Solicitudes">
+          {rows.map(r => (
+            <li class:list={['notice', { 'is-unread': r.status === 'nueva' }]}>
+              <span class="notice-dot" aria-hidden="true"></span>
+              <div class="notice-main">
+                <span class="notice-title">{REQUEST_KIND_LABELS[r.kind]} · {r.name}</span>
+                <span class="when">Recibida el {formatDateTime(r.created_at)} · {REQUEST_STATUS_LABELS[r.status]}</span>
+                <dl class="facts">
+                  {r.phone && <><dt>Teléfono</dt><dd>{r.phone}</dd></>}
+                  {r.email && <><dt>Correo</dt><dd>{r.email}</dd></>}
+                  {r.preferred_contact && <><dt>Prefiere</dt><dd>{CONTACT_CHANNEL_LABELS[r.preferred_contact]}</dd></>}
+                  {(r.plate || r.vehicle_make || r.vehicle_model) && <><dt>Vehículo</dt><dd>{r.plate && <span class="plate">{formatPlate(r.plate)}</span>} {r.vehicle_make} {r.vehicle_model}</dd></>}
+                  {r.service && <><dt>Servicio</dt><dd>{serviceLabel(r.service)}</dd></>}
+                  {r.topic && <><dt>Motivo</dt><dd>{CONTACT_TOPIC_LABELS[r.topic as ContactTopic] ?? r.topic}</dd></>}
+                  {r.preferred_date && <><dt>Fecha deseada</dt><dd>{formatDate(r.preferred_date)}{r.preferred_time && ` · ${TIME_SLOT_LABELS[r.preferred_time]}`}</dd></>}
+                </dl>
+                {r.message && <p class="notice-body">{r.message}</p>}
+                <form method="post" class="notice-actions" data-busy="Guardando…">
+                  <input type="hidden" name="action" value="estado" /><input type="hidden" name="id" value={r.id} />
+                  <label class="sr-only" for={`st-${r.id}`}>Estado de la solicitud de {r.name}</label>
+                  <select class="select" id={`st-${r.id}`} name="status" style="max-width:240px">
+                    {REQUEST_STATUSES.map(s => <option value={s} selected={s === r.status}>{REQUEST_STATUS_LABELS[s]}</option>)}
+                  </select>
+                  <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cambiar estado</span></button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p class="hint" style="margin-top:12px">Para borrar los datos de una persona que lo pida, sigue el procedimiento de <code>docs/DATOS_PERSONALES.md</code>.</p>
+    </>
+  )}
+</PanelLayout>
