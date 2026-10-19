@@ -69,6 +69,8 @@ npm run test:e2e     # navegador → web → Supabase Auth real + PostgREST → 
 npm run test:mcp     # comprueba el servidor Playwright MCP
 ```
 
+Vista previa navegable para el propietario (panel y portal con datos de demostración, sin servidor): `VISTA_PREVIA_DIR=<carpeta> bash scripts/test-e2e.sh e2e/vista-previa.spec.ts --project escritorio` y después `scripts/vista-previa/build.py` (instrucciones en ese archivo). El propietario quiere ver la web actualizada tras cada cambio.
+
 En la nube de Claude Code, PostgreSQL puede estar parado: `pg_ctlcluster 16 main start`. Astro 7 arranca `astro dev` en segundo plano en este entorno: páralo con `npx astro dev stop` (desde `apps/web`).
 
 Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test && npm run build && npm run test:db` y, si toca formularios o base de datos, `npm run test:e2e`.
