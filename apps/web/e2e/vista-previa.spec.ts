@@ -93,7 +93,9 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   const [wInv] = await rest('POST', '/rpc/create_workshop_invitation', owner.tok, { p_workshop_id: DEMO, p_email: WORKER, p_role: 'mecanico' });
   await rest('POST', '/rpc/accept_workshop_invitation', worker.tok, { p_token: wInv!.token });
 
-  // ---- Clientes y vehículos de demostración (nombres y datos ficticios)
+  // ---- Clientes y vehículos de demostración (nombres y datos ficticios).
+  // Matrículas de la serie «X…», que en España no se emitirá hasta dentro de muchos
+  // años: no pueden coincidir con ningún coche real (los modelos son de ejemplo).
   const people = [
     { full_name: 'María López Sanz', phone: '612 345 678', email: 'maria.lopez@correo.test' },
     { full_name: 'Javier Ruiz Moreno', phone: '623 456 789', email: 'javier.ruiz@correo.test' },
@@ -105,17 +107,17 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   const customers = [];
   for (const p of people) customers.push((await rest('POST', '/customers', owner.tok, { workshop_id: DEMO, ...p }))[0]!);
   const cars = [
-    { c: 0, plate: '4821KLM', make: 'Seat', model: 'León 1.5 TSI', year: 2019, fuel: 'gasolina' },
-    { c: 1, plate: '7395JHT', make: 'Renault', model: 'Clio dCi', year: 2016, fuel: 'diesel' },
-    { c: 2, plate: '1250LPR', make: 'Toyota', model: 'Corolla Hybrid', year: 2021, fuel: 'hibrido' },
-    { c: 3, plate: '9034HZS', make: 'Ford', model: 'Transit Custom', year: 2015, fuel: 'diesel' },
-    { c: 3, plate: '2267KCV', make: 'Ford', model: 'Transit Connect', year: 2018, fuel: 'diesel' },
-    { c: 4, plate: '5518MBN', make: 'Peugeot', model: '308 PureTech', year: 2023, fuel: 'gasolina' },
-    // Coches de «Prueba Cliente» (matrículas de ejemplo con el formato y la serie de su año;
-    // el combustible no se rellena: no se inventa ningún dato que nadie haya dado)
-    { c: 5, plate: '4721KTX', make: 'Volkswagen', model: 'Golf GTI', year: 2019, fuel: null },
-    { c: 5, plate: '8352HWZ', make: 'Citroën', model: 'C3', year: 2014, fuel: null },
-    { c: 5, plate: '6147LPD', make: 'Mercedes-Benz', model: 'Clase A', year: 2022, fuel: null },
+    { c: 0, plate: '4821XKL', make: 'Seat', model: 'León 1.5 TSI', year: 2019, fuel: 'gasolina' },
+    { c: 1, plate: '7395XJH', make: 'Renault', model: 'Clio dCi', year: 2016, fuel: 'diesel' },
+    { c: 2, plate: '1250XLR', make: 'Toyota', model: 'Corolla Hybrid', year: 2021, fuel: 'hibrido' },
+    { c: 3, plate: '9034XHZ', make: 'Ford', model: 'Transit Custom', year: 2015, fuel: 'diesel' },
+    { c: 3, plate: '2267XKC', make: 'Ford', model: 'Transit Connect', year: 2018, fuel: 'diesel' },
+    { c: 4, plate: '5518XMB', make: 'Peugeot', model: '308 PureTech', year: 2023, fuel: 'gasolina' },
+    // Coches de «Prueba Cliente» (modelo y año pedidos por el propietario; el combustible
+    // no se rellena: no se inventa ningún dato que nadie haya dado)
+    { c: 5, plate: '4721XKT', make: 'Volkswagen', model: 'Golf GTI', year: 2019, fuel: null },
+    { c: 5, plate: '8352XHW', make: 'Citroën', model: 'C3', year: 2014, fuel: null },
+    { c: 5, plate: '6147XLP', make: 'Mercedes-Benz', model: 'Clase A', year: 2022, fuel: null },
   ];
   const vehicles = [];
   for (const v of cars) {

@@ -3,7 +3,7 @@
   Garaje del taller demo (AutoValue), visto de lado para que el coche quede
   aparcado de perfil delante de la pared del fondo. Dibujo propio inspirado en
   la referencia del propietario (paredes negras, techo de LED hexagonal,
-  armarios de acero, panel perforado, suelo de hormigón pulido): no usa su foto.
+  puerta de garaje seccional, armarios de acero, panel perforado, suelo de hormigón pulido): no usa su foto.
   Lo convierte en imagen scripts/demo-autovalue/render-garage.mjs.
 
   Coordenadas en «px de imagen» de 1280×2560 (se dibuja a escala ?s=, p. ej.
@@ -89,28 +89,6 @@ for (const side of [-1, 1]) {
   s.fillRect(x, y, w, h);
 }
 
-// Panel de piedra pizarra (izquierda) con tira LED en los cantos
-{
-  const [x, y, w, h] = wallRect(s, -5.5, FLOOR_Y, -3.8, CEIL_Y - 0.04);
-  s.fillStyle = '#1b1c1e'; s.fillRect(x, y, w, h);
-  const rows = 30;
-  for (let r = 0; r < rows; r++) {
-    let bx = x - (r % 2) * (w / 6);
-    while (bx < x + w) {
-      const bw = w / (2.4 + rnd() * 1.6);
-      const v = 28 + Math.floor(rnd() * 22);
-      s.fillStyle = `rgb(${v},${v + 1},${v + 3})`;
-      const x0 = Math.max(bx, x), x1 = Math.min(bx + bw - 1.2, x + w);
-      if (x1 > x0) s.fillRect(x0, y + r * (h / rows), x1 - x0, h / rows - 1.2);
-      bx += bw;
-    }
-  }
-  // Luz rasante de la tira LED sobre la piedra
-  s.fillStyle = lin(s, x, 0, x + w, 0, [[0, 'rgba(255,255,255,.22)'], [0.18, 'rgba(255,255,255,0)'], [0.82, 'rgba(255,255,255,0)'], [1, 'rgba(255,255,255,.22)']]);
-  s.fillRect(x, y, w, h);
-}
-
-// Puesto de trabajo (centro): armarios de acero gris, encimera inox, panel perforado
 function steel(k, x, y, w, h, base = 58) {
   k.fillStyle = lin(k, 0, y, 0, y + h, [[0, `rgb(${base + 22},${base + 24},${base + 27})`], [0.5, `rgb(${base},${base + 2},${base + 5})`], [1, `rgb(${base - 18},${base - 17},${base - 15})`]]);
   k.fillRect(x, y, w, h);
@@ -122,6 +100,44 @@ function handle(k, x, y, w) {
   k.fillStyle = lin(k, 0, y, 0, y + 3, [[0, '#e9ebee'], [1, '#7d8186']]);
   k.fillRect(x, y, w, 2.6);
 }
+// Puerta de garaje seccional (izquierda): paneles horizontales de acero con
+// nervios, fila de ventanillas arriba, guías laterales y burlete negro abajo.
+{
+  const [fx, fy, fw, fh] = wallRect(s, -5.75, FLOOR_Y, -3.35, 1.2);   // marco
+  s.fillStyle = '#060606'; s.fillRect(fx, fy, fw, fh);
+  const [x, y, w, h] = wallRect(s, -5.65, FLOOR_Y, -3.45, 1.12);      // hoja
+  const panels = 5, ph = h / panels;
+  for (let i = 0; i < panels; i++) {
+    const py = y + i * ph;
+    s.fillStyle = lin(s, 0, py, 0, py + ph, [[0, '#3d4044'], [0.12, '#55595e'], [0.5, '#45484c'], [0.88, '#34373a'], [1, '#1f2123']]);
+    s.fillRect(x, py, w, ph);
+    // Nervios horizontales
+    for (const r of [0.33, 0.66]) {
+      s.fillStyle = 'rgba(0,0,0,.35)'; s.fillRect(x, py + ph * r, w, 0.9);
+      s.fillStyle = 'rgba(255,255,255,.09)'; s.fillRect(x, py + ph * r + 0.9, w, 0.6);
+    }
+    // Junta entre paneles
+    s.fillStyle = 'rgba(0,0,0,.7)'; s.fillRect(x, py + ph - 0.8, w, 0.8);
+  }
+  // Ventanillas en el panel superior
+  for (let k = 0; k < 4; k++) {
+    const wx = x + w * (0.08 + k * 0.23), wy = y + ph * 0.28;
+    s.fillStyle = lin(s, wx, wy, wx + w * 0.16, wy + ph * 0.44, [[0, '#0b0c0d'], [0.6, '#16181a'], [1, '#2a2d30']]);
+    s.fillRect(wx, wy, w * 0.16, ph * 0.44);
+    s.strokeStyle = 'rgba(255,255,255,.12)'; s.lineWidth = 0.6; s.strokeRect(wx, wy, w * 0.16, ph * 0.44);
+  }
+  // Tirador y burlete
+  handle(s, x + w * 0.46, y + h - ph * 0.55, w * 0.08);
+  s.fillStyle = '#050505'; s.fillRect(x, y + h - 1.6, w, 1.6);
+  // Guías laterales
+  s.fillStyle = lin(s, x - 3, 0, x, 0, [[0, '#1a1b1d'], [1, '#3a3d40']]); s.fillRect(x - 3, y, 3, h);
+  s.fillStyle = lin(s, x + w, 0, x + w + 3, 0, [[0, '#3a3d40'], [1, '#1a1b1d']]); s.fillRect(x + w, y, 3, h);
+  // Luz del techo cayendo sobre la puerta
+  s.fillStyle = lin(s, 0, y, 0, y + h, [[0, 'rgba(255,255,255,.10)'], [0.5, 'rgba(255,255,255,0)'], [1, 'rgba(0,0,0,.25)']]);
+  s.fillRect(x, y, w, h);
+}
+
+// Puesto de trabajo (centro): armarios de acero gris, encimera inox, panel perforado
 {
   const BENCH = [-2.9, 2.9];
   // Armarios altos

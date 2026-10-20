@@ -44,11 +44,21 @@ def style_file(css):
     return f'<link rel="stylesheet" href="{name}">'
 
 
+# Los identificadores (UUID) cambian cada vez que se generan los datos de demostración:
+# se sustituyen por números según el orden en que aparecen en el recorrido, para que los
+# nombres de archivo sean estables y una nueva publicación sustituya a la anterior.
+ids = {}
+
+
+def short(m):
+    return ids.setdefault(m.group(0), f'n{len(ids) + 1}')
+
+
 def filename(prefix, path):
     path, _, query = path.partition('?')
-    slug = re.sub(r'[^a-z0-9]+', '-', UUID.sub(lambda m: m.group(0)[:8], path.lower())).strip('-')
+    slug = re.sub(r'[^a-z0-9]+', '-', UUID.sub(short, path.lower())).strip('-')
     if query:
-        slug += '__' + re.sub(r'[^a-z0-9]+', '-', UUID.sub(lambda m: m.group(0)[:8], query.lower())).strip('-')
+        slug += '__' + re.sub(r'[^a-z0-9]+', '-', UUID.sub(short, query.lower())).strip('-')
     return f'{prefix}-{slug}.html'
 
 

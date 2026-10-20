@@ -9,8 +9,10 @@ Prepara las imágenes del coche que gira (taller demo AutoValue).
   2. Recorta el coche: el negro conectado con los bordes pasa a transparente; los
      huecos pequeños (pasos de rueda, bajos) se rellenan para que no se vea el
      garaje a través del coche. Ventanillas y neumáticos se conservan.
-  3. Añade sombra de contacto y reflejo suave en el suelo pulido.
-  4. Guarda giro/000.webp… (1920 px, con transparencia) y, si los fotogramas son
+  3. Quita la marca de agua del vídeo de origen (esquina inferior derecha, fuera
+     del coche), oscurece las lunas (tintado) y enfoca ligeramente cada fotograma.
+  4. Añade sombra de contacto y reflejo suave en el suelo pulido.
+  5. Guarda giro/000.webp… (1920 px, con transparencia) y, si los fotogramas son
      4K, giro-4k/000.webp… (3840 px); garaje.webp (+ garaje-4k.webp) y
      portada.webp (garaje + primer fotograma: la imagen fija sin JavaScript).
 
@@ -25,6 +27,20 @@ SRC, GARAGE, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 GARAGE_4K = sys.argv[4] if len(sys.argv) > 4 else None
 MW, MH = 1280, 720          # el recorte se calcula a esta resolución (rápido) y se escala
 FRAME_TOP = 920 / 2560
+# Marca de agua «KlingAI 4.0» del vídeo de origen (fracciones del fotograma); el coche nunca llega ahí.
+WATERMARK = (0.86, 0.92, 0.99, 0.985)
+
+
+def tint_windows(rgb: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+    """Lunas más tintadas: oscurece los grises poco saturados del coche (cristales,
+    gomas), no la carrocería blanca ni los pilotos (saturados)."""
+    lum = rgb.max(axis=2)
+    sat = lum - rgb.min(axis=2)
+    gray = np.clip((40 - sat) / 20, 0, 1)                 # 1 = gris
+    f = np.clip(lum / 140, 0, 1)
+    factor = 0.4 + 0.6 * f ** 2                             # 60 → ~31, 100 → ~71, ≥140 igual
+    k = 1 - (1 - factor) * gray * (alpha > 0.9)
+    return rgb * k[..., None]
 
 
 def matte(rgb: np.ndarray) -> np.ndarray:
@@ -52,10 +68,14 @@ def matte(rgb: np.ndarray) -> np.ndarray:
 def frame(img: Image.Image) -> Image.Image:
     W, H = img.size
     k = W / MW
-    rgb = np.asarray(img.convert('RGB')).astype(np.float32)
+    sharp = img.convert('RGB').filter(ImageFilter.UnsharpMask(radius=1.6 * k, percent=55, threshold=2))
+    rgb = np.asarray(sharp).astype(np.float32)
     small = np.asarray(img.convert('RGB').resize((MW, MH), Image.LANCZOS))
     a_small = matte(small)
+    x0, y0, x1, y1 = (round(v * d) for v, d in zip(WATERMARK, (MW, MH, MW, MH)))
+    a_small[y0:y1, x0:x1] = 0
     a = np.asarray(Image.fromarray((a_small * 255).astype('uint8')).resize((W, H), Image.BICUBIC)).astype(np.float32) / 255
+    rgb = tint_windows(rgb, a)
     rows = np.where(a_small[: int(MH * 0.9)].max(axis=1) > 0.5)[0]
     cols = np.where(a_small[: int(MH * 0.9)].max(axis=0) > 0.5)[0]
     bottom, left, right = int(rows.max() * k), int(cols.min() * k), int(cols.max() * k)
