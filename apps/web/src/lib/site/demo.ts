@@ -27,6 +27,8 @@ export const DEMO_SITE: PublicSite = {
     focusY: 0.41,
     backdrop: '/demo/autovalue/garaje.webp',
     frameTop: 0.359375,
+    srcHd: null,
+    backdropHd: null,
   },
   content: {
     tagline: 'Mecánica y electrónica del automóvil',

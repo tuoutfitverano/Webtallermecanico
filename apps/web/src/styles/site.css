@@ -1,6 +1,6 @@
 /* =========================================================
    Web pública del taller — estética "cristal líquido"
-   Paleta: verde muy oscuro (#0F2A22) de fondo, verde (#1F4536) en
+   Paleta: fondo negro, verde (#1F4536) en
    superficies, salvia (#8A9A7B) de acento y crema (#EFE8DA) para el texto.
    Titulares en serif cursiva
    (Instrument Serif) y texto en Barlow ligera. Los elementos de
@@ -10,7 +10,7 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0F2A22;
+  --bg: #000;
   --surface: #1F4536;
   --sage: #8A9A7B;
   --fg: #EFE8DA;
@@ -217,7 +217,7 @@ html.anim-done .blur-word {
 .nav-bar::before {
   content: ""; position: absolute; z-index: -1; pointer-events: none;
   inset: calc(-1 * env(safe-area-inset-top, 0px)) 0 -28px;
-  background: linear-gradient(180deg, var(--bg) 0%, rgb(15 42 34 / .85) 55%, rgb(15 42 34 / 0) 100%);
+  background: linear-gradient(180deg, var(--bg) 0%, rgb(0 0 0 / .85) 55%, rgb(0 0 0 / 0) 100%);
   opacity: 0; transition: opacity .3s;
 }
 .site-header.is-scrolled .nav-bar::before { opacity: 1; }
@@ -347,8 +347,8 @@ html.anim-done .blur-word {
 
 .hero-shade,
 .section-shade { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-.hero-shade { background: linear-gradient(180deg, rgb(15 42 34 / .35) 0%, rgb(15 42 34 / .05) 35%, rgb(15 42 34 / .25) 70%, var(--bg) 100%); }
-.section-shade { background: linear-gradient(180deg, var(--bg) 0%, rgb(15 42 34 / .25) 18%, rgb(15 42 34 / .35) 70%, var(--bg) 100%); }
+.hero-shade { background: linear-gradient(180deg, rgb(0 0 0 / .35) 0%, rgb(0 0 0 / .05) 35%, rgb(0 0 0 / .25) 70%, var(--bg) 100%); }
+.section-shade { background: linear-gradient(180deg, var(--bg) 0%, rgb(0 0 0 / .25) 18%, rgb(0 0 0 / .35) 70%, var(--bg) 100%); }
 
 /* ---------- Portada ---------- */
 .hero {

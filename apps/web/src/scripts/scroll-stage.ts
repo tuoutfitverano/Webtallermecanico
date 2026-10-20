@@ -33,7 +33,9 @@ function start(stage: HTMLElement) {
   const turnGap = stage.querySelector<HTMLElement>('.stage-gap-turn');
   const zoomGap = stage.querySelector<HTMLElement>('.stage-gap-zoom');
   const ctx = canvas?.getContext('2d');
-  const src = stage.dataset.src ?? '';
+  // Pantallas grandes (más de 2000 px reales de ancho): versión 4K si el taller la tiene.
+  const big = innerWidth * Math.min(devicePixelRatio || 1, 2) > 2000;
+  const src = (big && stage.dataset.srcHd) || stage.dataset.src || '';
   const count = Number(stage.dataset.count);
   const fx = Number(stage.dataset.focusX ?? 0.5);
   const fy = Number(stage.dataset.focusY ?? 0.5);
@@ -47,13 +49,14 @@ function start(stage: HTMLElement) {
 
   // ---- Fondo opcional (garaje): los fotogramas, con transparencia, van encima
   let backdrop: HTMLImageElement | null = null;
-  const wantsBackdrop = Boolean(stage.dataset.backdrop);
+  const backdropUrl = (big && stage.dataset.backdropHd) || stage.dataset.backdrop || '';
+  const wantsBackdrop = Boolean(backdropUrl);
   const ready = () => frames[0] && (!wantsBackdrop || backdrop);
   if (wantsBackdrop) {
     const img = new Image();
     img.decoding = 'async';
     img.onload = () => { backdrop = img; if (ready()) stage.classList.add('is-live'); queue(); };
-    img.src = stage.dataset.backdrop!;
+    img.src = backdropUrl;
   }
 
   // ---- Fotogramas (en orden: el primero, el que se ve al cargar)
@@ -70,6 +73,22 @@ function start(stage: HTMLElement) {
     img.src = url(i);
   };
   for (let k = 0; k < 4; k++) loadNext();
+
+  // ---- Cristal de la ventanilla: colores medios de su mitad de arriba y de abajo
+  // (del último fotograma). Al acercarse, la foto se sustituye por este cristal
+  // dibujado, que no se pixela a ningún tamaño.
+  let glass: [string, string] | null = null;
+  const sampleGlass = (img: HTMLImageElement) => {
+    const probe = document.createElement('canvas');
+    probe.width = 1; probe.height = 2;
+    const p = probe.getContext('2d', { willReadFrequently: true });
+    if (!p) return;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const w = TARGET_W * iw * 0.6, h = TARGET_H * ih * 0.6;
+    p.drawImage(img, fx * iw - w / 2, fy * ih - h / 2, w, h, 0, 0, 1, 2);
+    const d = p.getImageData(0, 0, 1, 2).data;
+    glass = [`rgb(${d[0]},${d[1]},${d[2]})`, `rgb(${d[4]},${d[5]},${d[6]})`];
+  };
   const nearest = (i: number) => {
     for (let d = 0; d < count; d++) {
       const a = frames[i - d] ?? frames[i + d];
@@ -79,13 +98,14 @@ function start(stage: HTMLElement) {
   };
 
   // ---- Tamaño del lienzo
-  let vw = 0, vh = 0;
+  let vw = 0, vh = 0, dpr = 1;
   const resize = () => {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
+    dpr = Math.min(devicePixelRatio || 1, 2);
     vw = innerWidth; vh = innerHeight;
     canvas.width = Math.round(vw * dpr);
     canvas.height = Math.round(vh * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
     last = '';
     queue();
   };
@@ -151,6 +171,31 @@ function start(stage: HTMLElement) {
     const ox = px - focusX * scale, oy = py - focusY * scale;
     if (backdrop) ctx!.drawImage(backdrop, ox, oy, sw * scale, sh * scale);
     ctx!.drawImage(img, ox, oy + fTop * scale, sw * scale, fH * scale);
+
+    // Cuando cada píxel de la foto ya ocupa más de ~1,5 píxeles de pantalla, el cristal
+    // dibujado la va tapando (a los ~3 px la cubre del todo): sin granulado.
+    const pixel = (dpr * fH * scale) / img.naturalHeight;
+    const cover = zoom > 0 ? clamp((pixel - 1.5) / 1.5) : 0;
+    if (cover > 0) {
+      if (!glass) sampleGlass(img);
+      if (glass) {
+        ctx!.globalAlpha = cover;
+        const tint = ctx!.createLinearGradient(0, 0, 0, vh);
+        tint.addColorStop(0, glass[0]);
+        tint.addColorStop(1, glass[1]);
+        ctx!.fillStyle = tint;
+        ctx!.fillRect(0, 0, vw, vh);
+        // Reflejo suave en diagonal, como el de un cristal tintado
+        const shine = ctx!.createLinearGradient(0, 0, vw, vh);
+        shine.addColorStop(0.25, 'rgba(255,255,255,0)');
+        shine.addColorStop(0.42, 'rgba(255,255,255,.07)');
+        shine.addColorStop(0.5, 'rgba(255,255,255,.02)');
+        shine.addColorStop(0.62, 'rgba(255,255,255,0)');
+        ctx!.fillStyle = shine;
+        ctx!.fillRect(0, 0, vw, vh);
+        ctx!.globalAlpha = 1;
+      }
+    }
   }
 
   addEventListener('scroll', queue, { passive: true });

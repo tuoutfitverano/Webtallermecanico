@@ -21,8 +21,13 @@ const DEMO = 'd0000000-0000-0000-0000-000000000001';
 test.skip(!DIR || !PROXY, 'Solo para generar la vista previa (VISTA_PREVIA_DIR)');
 test.setTimeout(10 * 60_000);
 
-async function token(email: string) {
-  const r = await fetch(`${PROXY}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: ANON, 'content-type': 'application/json' }, body: JSON.stringify({ email, password: PASSWORD }) });
+/** Contraseña de las cuentas «Prueba Trabajador» y «Prueba Cliente» (solo datos de demostración). */
+const DEMO_PASSWORD = 'PruebaAuto2026';
+const WORKER = 'prueba.trabajador@autovalue.test';
+const CLIENT = 'prueba.cliente@autovalue.test';
+
+async function token(email: string, password = PASSWORD) {
+  const r = await fetch(`${PROXY}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: ANON, 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) });
   const body = (await r.json()) as { access_token: string; user: { id: string } };
   return { tok: body.access_token, id: body.user.id };
 }
@@ -35,11 +40,16 @@ async function rest(method: string, path: string, tok: string, body?: unknown) {
   if (r.status >= 400) throw new Error(`${method} ${path}: ${r.status} ${text}`);
   return (text ? JSON.parse(text) : []) as Array<Record<string, string>>;
 }
-async function login(page: Page, email: string, next: string) {
+async function createUser(email: string, fullName: string) {
+  const r = await fetch(`${PROXY}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: JSON.stringify({ email, password: DEMO_PASSWORD, email_confirm: true, user_metadata: { full_name: fullName } }) });
+  expect(r.status).toBeLessThan(300);
+  return token(email, DEMO_PASSWORD);
+}
+async function login(page: Page, email: string, next: string, password = PASSWORD) {
   await page.context().clearCookies();
   await page.goto(`/acceso?next=${encodeURIComponent(next)}`);
   await page.getByLabel('Correo electrónico').fill(email);
-  await page.locator('#password').fill(PASSWORD);
+  await page.locator('#password').fill(password);
   await page.getByRole('button', { name: 'Entrar' }).click();
   await page.waitForURL(u => u.pathname === next);
 }
@@ -78,6 +88,11 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   const owner = await token('propietaria@e2e.test');
   const mech = await token('mecanico@e2e.test');
 
+  // ---- Cuenta «Prueba Trabajador»: mecánico del taller, por invitación (como en la realidad)
+  const worker = await createUser(WORKER, 'Prueba Trabajador');
+  const [wInv] = await rest('POST', '/rpc/create_workshop_invitation', owner.tok, { p_workshop_id: DEMO, p_email: WORKER, p_role: 'mecanico' });
+  await rest('POST', '/rpc/accept_workshop_invitation', worker.tok, { p_token: wInv!.token });
+
   // ---- Clientes y vehículos de demostración (nombres y datos ficticios)
   const people = [
     { full_name: 'María López Sanz', phone: '612 345 678', email: 'maria.lopez@correo.test' },
@@ -85,6 +100,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { full_name: 'Lucía Fernández Gil', phone: '634 567 890', email: null },
     { full_name: 'Transportes Henares (demo)', phone: '949 123 456', email: 'flota@henares.test', internal_notes: 'Flota de furgonetas. Facturar a fin de mes.' },
     { full_name: 'Carlos Martín Ortega', phone: '645 678 901', email: 'carlos.martin@correo.test' },
+    { full_name: 'Prueba Cliente', phone: '600 000 001', email: CLIENT },
   ];
   const customers = [];
   for (const p of people) customers.push((await rest('POST', '/customers', owner.tok, { workshop_id: DEMO, ...p }))[0]!);
@@ -95,6 +111,11 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { c: 3, plate: '9034HZS', make: 'Ford', model: 'Transit Custom', year: 2015, fuel: 'diesel' },
     { c: 3, plate: '2267KCV', make: 'Ford', model: 'Transit Connect', year: 2018, fuel: 'diesel' },
     { c: 4, plate: '5518MBN', make: 'Peugeot', model: '308 PureTech', year: 2023, fuel: 'gasolina' },
+    // Coches de «Prueba Cliente» (matrículas de ejemplo con el formato y la serie de su año;
+    // el combustible no se rellena: no se inventa ningún dato que nadie haya dado)
+    { c: 5, plate: '4721KTX', make: 'Volkswagen', model: 'Golf GTI', year: 2019, fuel: null },
+    { c: 5, plate: '8352HWZ', make: 'Citroën', model: 'C3', year: 2014, fuel: null },
+    { c: 5, plate: '6147LPD', make: 'Mercedes-Benz', model: 'Clase A', year: 2022, fuel: null },
   ];
   const vehicles = [];
   for (const v of cars) {
@@ -103,11 +124,10 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     }))[0]!);
   }
 
-  // ---- Portal: María tiene cuenta vinculada a su ficha (por invitación, como en la realidad)
-  await fetch(`${PROXY}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: JSON.stringify({ email: 'maria.lopez@correo.test', password: PASSWORD, email_confirm: true, user_metadata: { full_name: 'María López Sanz' } }) });
-  const maria = await token('maria.lopez@correo.test');
-  const [inv] = await rest('POST', '/rpc/create_customer_invitation', owner.tok, { p_customer_id: customers[0]!.id });
-  await rest('POST', '/rpc/accept_customer_invitation', maria.tok, { p_token: inv!.token });
+  // ---- Cuenta «Prueba Cliente» vinculada a su ficha por invitación (como en la realidad)
+  const client = await createUser(CLIENT, 'Prueba Cliente');
+  const [inv] = await rest('POST', '/rpc/create_customer_invitation', owner.tok, { p_customer_id: customers[5]!.id });
+  await rest('POST', '/rpc/accept_customer_invitation', client.tok, { p_token: inv!.token });
 
   // ---- Órdenes en distintos estados (el historial y los avisos los crea la base de datos)
   const flow = ['recibido', 'diagnosis', 'esperando_recambios', 'en_reparacion', 'listo', 'entregado'];
@@ -118,10 +138,15 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { v: 2, c: 2, to: 'diagnosis', problem: 'El aire acondicionado no enfría.', diagnosis: '', work: '', notes: '', details: false },
     { v: 3, c: 3, to: 'en_reparacion', problem: 'Embrague patina en cuestas.', diagnosis: 'Kit de embrague y volante bimasa desgastados.', work: '', notes: '', details: false },
     { v: 5, c: 4, to: 'recibido', problem: 'Primera revisión y ruido en la suspensión trasera.', diagnosis: '', work: '', notes: '', details: false },
+    // Prueba Cliente
+    { v: 6, c: 5, to: 'listo', problem: 'Revisión anual y ruido en la dirección al girar.', diagnosis: 'Rótula de dirección izquierda con holgura.', work: 'Sustitución de la rótula, alineado y revisión anual.', notes: 'Tu Golf ya está listo. Puedes recogerlo de 9:00 a 19:00.', details: true, worker: true },
+    { v: 7, c: 5, to: 'en_reparacion', problem: 'Le cuesta arrancar en frío.', diagnosis: 'Batería agotada y bujías desgastadas.', work: '', notes: 'Estamos cambiando la batería; mañana te contamos.', details: true, worker: true },
+    { v: 8, c: 5, to: 'diagnosis', problem: 'Testigo de neumáticos encendido.', diagnosis: '', work: '', notes: '', details: false, worker: true },
   ];
   for (const j of jobs) {
     const [o] = await rest('POST', '/repair_orders', owner.tok, {
-      workshop_id: DEMO, vehicle_id: vehicles[j.v]!.id, customer_id: customers[j.c]!.id, problem_description: j.problem, assigned_to: mech.id,
+      workshop_id: DEMO, vehicle_id: vehicles[j.v]!.id, customer_id: customers[j.c]!.id, problem_description: j.problem,
+      assigned_to: 'worker' in j || j.c <= 1 ? worker.id : mech.id,
     });
     for (const s of flow.slice(1, flow.indexOf(j.to) + 1)) await rest('PATCH', `/repair_orders?id=eq.${o!.id}`, owner.tok, { status: s });
     await rest('PATCH', `/repair_orders?id=eq.${o!.id}`, owner.tok, {
@@ -149,8 +174,11 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   // ---- Recorrido de pantallas
   await login(page, 'propietaria@e2e.test', '/panel');
   const t = await crawl(page, 'taller', ['/panel', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 170);
-  await login(page, 'maria.lopez@correo.test', '/portal');
+  await login(page, WORKER, '/panel', DEMO_PASSWORD);
+  const w = await crawl(page, 'trabajador', ['/panel', '/panel/ordenes', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
+  await login(page, CLIENT, '/portal', DEMO_PASSWORD);
   const c = await crawl(page, 'cliente', ['/portal', '/portal/avisos', '/portal/datos', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 60);
   expect(t).toBeGreaterThan(20);
+  expect(w).toBeGreaterThan(5);
   expect(c).toBeGreaterThan(5);
 });

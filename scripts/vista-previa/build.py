@@ -18,7 +18,7 @@ ROOT = '/home/user/Webtallermecanico'
 os.makedirs(f'{OUT}/assets', exist_ok=True)
 shutil.copy(PREVIEW_JS, f'{OUT}/assets/preview.js')
 
-ROLES = {'taller': ('t', '/panel'), 'cliente': ('c', '/portal')}
+ROLES = {'taller': ('t', '/panel'), 'trabajador': ('w', '/panel'), 'cliente': ('c', '/portal')}
 PUBLIC = {'': 'index.html', 'acceso': 'acceso.html', 'registro': 'registro.html', 'recuperar': 'recuperar.html',
           'privacidad': 'privacidad.html', 'aviso-legal': 'aviso-legal.html', 'cookies': 'cookies.html',
           'condiciones': 'condiciones.html', 'privacidad-cuenta': 'privacidad-cuenta.html'}

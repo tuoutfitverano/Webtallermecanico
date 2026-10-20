@@ -53,6 +53,9 @@ export const scrollFramesSchema = z.object({
    */
   backdrop: assetUrl.nullable().default(null),
   frameTop: z.number().min(0).max(1).default(0),
+  /** Versiones 4K opcionales (mismos encuadres) para pantallas de más de 2000 px reales. */
+  srcHd: assetUrl.refine(v => v.includes('{n}')).nullable().default(null),
+  backdropHd: assetUrl.nullable().default(null),
 });
 export type ScrollFrames = z.output<typeof scrollFramesSchema>;
 

@@ -4,7 +4,7 @@
    superficies opacas, buen contraste y objetivos táctiles grandes.
    ========================================================= */
 :root {
-  --p-bg: #0F2A22;
+  --p-bg: #000;
   --p-surface: #1F4536;
   --p-surface-2: color-mix(in srgb, #1F4536 82%, #8A9A7B);
   --p-line: rgb(239 232 218 / .12);

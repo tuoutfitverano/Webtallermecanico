@@ -2,11 +2,13 @@
 <!--
   Garaje del taller demo (AutoValue), visto de lado para que el coche quede
   aparcado de perfil delante de la pared del fondo. Dibujo propio inspirado en
-  la referencia del propietario (techo de LED hexagonal, armarios, suelo pulido):
-  no usa su foto. Lo convierte en imagen scripts/demo-autovalue/build.mjs.
+  la referencia del propietario (paredes negras, techo de LED hexagonal,
+  armarios de acero, panel perforado, suelo de hormigón pulido): no usa su foto.
+  Lo convierte en imagen scripts/demo-autovalue/render-garage.mjs.
 
-  Coordenadas en «px de imagen» de 1280×2560: la franja central (y 920–1640)
-  coincide con los fotogramas del coche (1280×720). Perspectiva de un punto.
+  Coordenadas en «px de imagen» de 1280×2560 (se dibuja a escala ?s=, p. ej.
+  3 → 3840×7680): la franja central (y 920–1640) coincide con los fotogramas
+  del coche. Perspectiva de un punto.
 -->
 <meta charset="utf-8">
 <canvas id="c"></canvas>
@@ -14,151 +16,212 @@
 const S = Number(new URLSearchParams(location.search).get('s') || 1.5);
 const W = 1280, H = 2560;
 const c = document.getElementById('c');
-c.width = W * S; c.height = H * S;
+c.width = Math.round(W * S); c.height = Math.round(H * S);
 const g = c.getContext('2d');
 g.scale(S, S);
 
-// ---- Cámara: punto de fuga, distancia focal, alturas (metros)
-// El coche de los fotogramas (4,75 m ≈ 1233 px) queda a ~2,3 m de la cámara y la
-// pared del fondo a 7,6 m: plano abierto para que se vea el techo de LED.
+// ---- Cámara (metros): el coche (4,75 m ≈ 1233 px) a ~2,3 m; la pared del fondo a 7,6 m.
 const VX = 640, VY = 1239, F = 600;
 const WALL_Z = 7.6, FLOOR_Y = -1.1, CEIL_Y = 1.5, HALF_W = 6, NEAR = 0.25;
-const M = 1.35; // los muebles, repartidos a lo ancho de la pared
 const P = (x, y, z) => [VX + F * x / z, VY - F * y / z];
+const [, WALL_TOP] = P(0, CEIL_Y, WALL_Z);
+const [, WALL_BOTTOM] = P(0, FLOOR_Y, WALL_Z);
 
-const BG = '#0F2A22', SURFACE = '#1F4536', SAGE = '#8A9A7B', CREAM = '#EFE8DA';
+// Semilla fija: el dibujo sale siempre igual.
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
-function poly(points, fill) {
-  g.beginPath();
-  points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
-  g.closePath();
-  g.fillStyle = fill;
-  g.fill();
+function layer() {
+  const t = document.createElement('canvas');
+  t.width = c.width; t.height = c.height;
+  const k = t.getContext('2d');
+  k.scale(S, S);
+  return [t, k];
 }
-function rectOnWall(x0, y0, x1, y1, fill) {
-  const [a, b] = P(x0, y1, WALL_Z), [cc, d] = P(x1, y0, WALL_Z);
-  g.fillStyle = fill;
-  g.fillRect(a, b, cc - a, d - b);
-  return [a, b, cc - a, d - b];
+function poly(k, points, fill) {
+  k.beginPath();
+  points.forEach(([x, y], i) => (i ? k.lineTo(x, y) : k.moveTo(x, y)));
+  k.closePath();
+  k.fillStyle = fill;
+  k.fill();
 }
-function lin(x0, y0, x1, y1, stops) {
-  const gr = g.createLinearGradient(x0, y0, x1, y1);
+function lin(k, x0, y0, x1, y1, stops) {
+  const gr = k.createLinearGradient(x0, y0, x1, y1);
   stops.forEach(([o, col]) => gr.addColorStop(o, col));
   return gr;
 }
+function wallRect(k, x0, y0, x1, y1) {
+  const [a, b] = P(x0, y1, WALL_Z), [cc, d] = P(x1, y0, WALL_Z);
+  return [a, b, cc - a, d - b];
+}
+function blit(dst, src, { blur = 0, alpha = 1, op = 'source-over' } = {}) {
+  dst.save();
+  dst.setTransform(1, 0, 0, 1, 0, 0);
+  dst.filter = blur ? `blur(${blur * S}px)` : 'none';
+  dst.globalAlpha = alpha;
+  dst.globalCompositeOperation = op;
+  dst.drawImage(src, 0, 0);
+  dst.restore();
+}
+const floorPoly = [P(-HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, NEAR), P(-HALF_W, FLOOR_Y, NEAR)];
 
-// ---- Fondo
-g.fillStyle = '#08130f';
-g.fillRect(0, 0, W, H);
+// =====================================================================
+// 1. Escena de arriba: techo, paredes y muebles (sin suelo)
+// =====================================================================
+const [scene, s] = layer();
+s.fillStyle = '#000'; s.fillRect(0, 0, W, H);
 
-// ---- Techo (iluminado por los LED)
-const [cx0, cy0] = P(-HALF_W, CEIL_Y, WALL_Z), [cx1] = P(HALF_W, CEIL_Y, WALL_Z);
-poly([P(-HALF_W, CEIL_Y, WALL_Z), P(HALF_W, CEIL_Y, WALL_Z), P(HALF_W, CEIL_Y, NEAR), P(-HALF_W, CEIL_Y, NEAR)],
-  lin(0, cy0, 0, 0, [[0, '#26302c'], [0.35, '#2f3935'], [1, '#141b18']]));
+// Techo gris claro, iluminado por los propios LED (más claro cerca de la rejilla)
+poly(s, [P(-HALF_W, CEIL_Y, WALL_Z), P(HALF_W, CEIL_Y, WALL_Z), P(HALF_W, CEIL_Y, NEAR), P(-HALF_W, CEIL_Y, NEAR)],
+  lin(s, 0, WALL_TOP, 0, 0, [[0, '#4a4b4d'], [0.25, '#6c6e71'], [0.6, '#55575a'], [1, '#1c1c1d']]));
 
-// ---- Paredes laterales (los extremos del garaje)
+// Paredes laterales negras
 for (const side of [-1, 1]) {
-  poly([P(side * HALF_W, CEIL_Y, WALL_Z), P(side * HALF_W, FLOOR_Y, WALL_Z), P(side * HALF_W, FLOOR_Y, NEAR), P(side * HALF_W, CEIL_Y, NEAR)],
-    lin(side < 0 ? 0 : W, 0, side < 0 ? cx0 : cx1, 0, [[0, '#0a1411'], [1, '#17221e']]));
+  const [ex] = P(side * HALF_W, 0, WALL_Z);
+  poly(s, [P(side * HALF_W, CEIL_Y, WALL_Z), P(side * HALF_W, FLOOR_Y, WALL_Z), P(side * HALF_W, FLOOR_Y, NEAR), P(side * HALF_W, CEIL_Y, NEAR)],
+    lin(s, side < 0 ? 0 : W, 0, ex, 0, [[0, '#050505'], [1, '#141415']]));
 }
 
-// ---- Suelo de hormigón pulido
-const [, fy] = P(0, FLOOR_Y, WALL_Z);
-poly([P(-HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, NEAR), P(-HALF_W, FLOOR_Y, NEAR)],
-  lin(0, fy, 0, H, [[0, '#2a3430'], [0.2, '#38423d'], [0.6, '#252e2a'], [1, '#121a17']]));
-// Juntas del suelo hacia el punto de fuga
-g.strokeStyle = 'rgba(239,232,218,.05)'; g.lineWidth = 1.5;
-for (let x = -HALF_W; x <= HALF_W; x += 1.5) {
-  const [a, b] = P(x, FLOOR_Y, WALL_Z), [cc, d] = P(x, FLOOR_Y, NEAR);
-  g.beginPath(); g.moveTo(a, b); g.lineTo(cc, d); g.stroke();
-}
-
-// ---- Pared del fondo
-const [wx, wy, ww, wh] = rectOnWall(-HALF_W, FLOOR_Y, HALF_W, CEIL_Y, lin(0, 0, 0, 0, [[0, '#18221e']]));
-g.fillStyle = lin(0, wy, 0, wy + wh, [[0, '#26302c'], [0.25, '#1a2420'], [1, '#121a17']]);
-g.fillRect(wx, wy, ww, wh);
-
-// Panel de piedra (izquierda) con tira LED en los cantos
+// Pared del fondo: negra mate, con la luz del techo bañando la parte alta
 {
-  const [x, y, w, h] = rectOnWall(-5.6, FLOOR_Y, -3.7, CEIL_Y - 0.05, '#20272a');
-  for (let r = 0; r < 26; r++) {
-    for (let k = 0; k < 4; k++) {
-      const bw = w / 4, bx = x + k * bw + (r % 2 ? bw / 2 : 0), by = y + r * (h / 26);
-      const v = 30 + ((r * 7 + k * 13) % 15);
-      g.fillStyle = `rgb(${v},${v + 4},${v + 3})`;
-      g.fillRect(Math.min(bx, x + w - 2), by, Math.min(bw - 3, x + w - bx), h / 26 - 3);
+  const [x, y, w, h] = wallRect(s, -HALF_W, FLOOR_Y, HALF_W, CEIL_Y);
+  s.fillStyle = lin(s, 0, y, 0, y + h, [[0, '#2b2c2e'], [0.18, '#18191a'], [0.6, '#0f0f10'], [1, '#0b0b0c']]);
+  s.fillRect(x, y, w, h);
+}
+
+// Panel de piedra pizarra (izquierda) con tira LED en los cantos
+{
+  const [x, y, w, h] = wallRect(s, -5.5, FLOOR_Y, -3.8, CEIL_Y - 0.04);
+  s.fillStyle = '#1b1c1e'; s.fillRect(x, y, w, h);
+  const rows = 30;
+  for (let r = 0; r < rows; r++) {
+    let bx = x - (r % 2) * (w / 6);
+    while (bx < x + w) {
+      const bw = w / (2.4 + rnd() * 1.6);
+      const v = 28 + Math.floor(rnd() * 22);
+      s.fillStyle = `rgb(${v},${v + 1},${v + 3})`;
+      const x0 = Math.max(bx, x), x1 = Math.min(bx + bw - 1.2, x + w);
+      if (x1 > x0) s.fillRect(x0, y + r * (h / rows), x1 - x0, h / rows - 1.2);
+      bx += bw;
     }
   }
-  g.save();
-  g.shadowColor = 'rgba(239,232,218,.9)'; g.shadowBlur = 18;
-  g.fillStyle = CREAM;
-  g.fillRect(x - 3, y, 3, h); g.fillRect(x + w, y, 3, h);
-  g.restore();
+  // Luz rasante de la tira LED sobre la piedra
+  s.fillStyle = lin(s, x, 0, x + w, 0, [[0, 'rgba(255,255,255,.22)'], [0.18, 'rgba(255,255,255,0)'], [0.82, 'rgba(255,255,255,0)'], [1, 'rgba(255,255,255,.22)']]);
+  s.fillRect(x, y, w, h);
 }
 
-// Armarios de herramientas (centro), en el verde de la marca
-function cabinet(x0, x1, y0, y1, drawers) {
-  const [x, y, w, h] = rectOnWall(x0 * M, y0, x1 * M, y1, SURFACE);
-  g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 2; g.strokeRect(x, y, w, h);
-  g.fillStyle = 'rgba(239,232,218,.06)'; g.fillRect(x, y, w, 3);
-  if (drawers) {
-    for (let i = 1; i < drawers; i++) {
-      const dy = y + (h * i) / drawers;
-      g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(x + 3, dy, w - 6, 2);
-      g.fillStyle = SAGE; g.fillRect(x + w * 0.2, dy - h / drawers / 2, w * 0.6, 3);
-    }
-    g.fillStyle = SAGE; g.fillRect(x + w * 0.2, y + h - h / drawers / 2, w * 0.6, 3);
-  } else {
-    g.fillStyle = SAGE; g.fillRect(x + w - 10, y + h * 0.4, 3, h * 0.2);
-  }
+// Puesto de trabajo (centro): armarios de acero gris, encimera inox, panel perforado
+function steel(k, x, y, w, h, base = 58) {
+  k.fillStyle = lin(k, 0, y, 0, y + h, [[0, `rgb(${base + 22},${base + 24},${base + 27})`], [0.5, `rgb(${base},${base + 2},${base + 5})`], [1, `rgb(${base - 18},${base - 17},${base - 15})`]]);
+  k.fillRect(x, y, w, h);
+  k.fillStyle = 'rgba(255,255,255,.10)'; k.fillRect(x, y, w, 1.2);
+  k.fillStyle = 'rgba(0,0,0,.55)'; k.fillRect(x, y + h - 1.2, w, 1.2);
+  k.fillStyle = 'rgba(0,0,0,.4)'; k.fillRect(x, y, 1, h); k.fillRect(x + w - 1, y, 1, h);
 }
-cabinet(-1.95, -1.35, FLOOR_Y, 0.95, 0);                 // armario alto izquierdo
-cabinet(1.35, 1.95, FLOOR_Y, 0.95, 0);                   // armario alto derecho
-for (const [a, b] of [[-1.3, -0.45], [-0.42, 0.42], [0.45, 1.3]]) {
-  cabinet(a, b, 0.6, 0.95, 0);                           // altillos
-  cabinet(a, b, FLOOR_Y + 0.08, -0.12, a === -0.42 ? 2 : 6); // cajoneras
+function handle(k, x, y, w) {
+  k.fillStyle = lin(k, 0, y, 0, y + 3, [[0, '#e9ebee'], [1, '#7d8186']]);
+  k.fillRect(x, y, w, 2.6);
 }
-// Panel perforado con herramientas
 {
-  const [x, y, w, h] = rectOnWall(-1.3 * M, -0.08, 1.3 * M, 0.58, '#2d3532');
-  g.fillStyle = 'rgba(0,0,0,.35)';
-  for (let px = x + 8; px < x + w - 4; px += 11) for (let py = y + 8; py < y + h - 4; py += 11) g.fillRect(px, py, 2, 2);
-  g.fillStyle = '#5b6560';
-  for (let i = 0; i < 9; i++) {
-    const tx = x + 30 + i * (w - 60) / 8;
-    g.fillRect(tx, y + h * 0.25, 4 + (i % 3), h * (0.25 + (i % 4) * 0.08));
-    g.fillRect(tx - 4, y + h * 0.22, 12, 5);
+  const BENCH = [-2.9, 2.9];
+  // Armarios altos
+  for (const [a, b] of [[-3.6, -2.95], [2.95, 3.6]]) {
+    const [x, y, w, h] = wallRect(s, a, FLOOR_Y + 0.04, b, 0.98);
+    steel(s, x, y, w, h, 64);
+    s.fillStyle = 'rgba(0,0,0,.5)'; s.fillRect(x + w / 2 - 0.5, y + 2, 1, h - 4);
+    handle(s, x + w / 2 - 6, y + h * 0.45, 4); handle(s, x + w / 2 + 2, y + h * 0.45, 4);
   }
-  // Tira LED bajo los altillos
-  g.save();
-  g.shadowColor = 'rgba(239,232,218,.9)'; g.shadowBlur = 16; g.fillStyle = CREAM;
-  g.fillRect(x, y - 3, w, 3);
-  g.restore();
-  g.fillStyle = lin(0, y, 0, y + h, [[0, 'rgba(239,232,218,.18)'], [0.6, 'rgba(239,232,218,0)']]);
-  g.fillRect(x, y, w, h);
+  // Altillos
+  const nTop = 4;
+  for (let i = 0; i < nTop; i++) {
+    const a = BENCH[0] + (i * (BENCH[1] - BENCH[0])) / nTop, b = a + (BENCH[1] - BENCH[0]) / nTop;
+    const [x, y, w, h] = wallRect(s, a + 0.01, 0.62, b - 0.01, 0.98);
+    steel(s, x, y, w, h, 60);
+    handle(s, x + w * 0.3, y + h - 7, w * 0.4);
+  }
+  // Panel perforado claro, iluminado por la tira LED de debajo de los altillos
+  {
+    const [x, y, w, h] = wallRect(s, BENCH[0], -0.06, BENCH[1], 0.6);
+    s.fillStyle = '#9c9fa3'; s.fillRect(x, y, w, h);
+    s.fillStyle = 'rgba(30,30,32,.55)';
+    for (let px = x + 3; px < x + w - 2; px += 4.2) for (let py = y + 3; py < y + h - 2; py += 4.2) s.fillRect(px, py, 0.9, 0.9);
+    // Herramientas colgadas (llaves, alicates, destornilladores)
+    for (let i = 0; i < 26; i++) {
+      const tx = x + 8 + i * (w - 16) / 25, top = y + h * (0.22 + (i % 3) * 0.04);
+      const len = h * (0.28 + rnd() * 0.3), red = i % 7 === 3;
+      s.fillStyle = red ? '#9b1c1c' : i % 2 ? '#2a2b2d' : '#4b4e52';
+      s.fillRect(tx, top, 1.6 + (i % 3) * 0.6, len);
+      s.fillRect(tx - 1.6, top - 1.6, 4.8 + (i % 3) * 0.6, 3);
+    }
+    // Luz de la tira LED: muy clara arriba, cae hacia abajo
+    s.fillStyle = lin(s, 0, y, 0, y + h, [[0, 'rgba(255,255,255,.45)'], [0.35, 'rgba(255,255,255,.08)'], [1, 'rgba(0,0,0,.25)']]);
+    s.fillRect(x, y, w, h);
+    s.save(); s.shadowColor = 'rgba(255,255,255,.95)'; s.shadowBlur = 10;
+    s.fillStyle = '#ffffff'; s.fillRect(x, y - 1.6, w, 1.6); s.restore();
+  }
+  // Encimera de acero inoxidable
+  {
+    const [x, y, w, h] = wallRect(s, BENCH[0] - 0.03, -0.12, BENCH[1] + 0.03, -0.06);
+    s.fillStyle = lin(s, 0, y, 0, y + h, [[0, '#f2f3f5'], [0.4, '#b7bbc0'], [1, '#5d6166']]);
+    s.fillRect(x, y, w, h);
+  }
+  // Cajoneras
+  const units = [[BENCH[0], -1.0], [-1.0, 1.0], [1.0, BENCH[1]]];
+  units.forEach(([a, b], u) => {
+    const [x, y, w, h] = wallRect(s, a + 0.02, FLOOR_Y + 0.1, b - 0.02, -0.12);
+    steel(s, x, y, w, h, 56);
+    const n = u === 1 ? 2 : 7;
+    for (let i = 0; i < n; i++) {
+      const dy = y + (i * h) / n;
+      s.fillStyle = 'rgba(0,0,0,.6)'; s.fillRect(x + 2, dy, w - 4, 1);
+      if (u === 1) { s.fillStyle = 'rgba(0,0,0,.6)'; s.fillRect(x + w / 2, y + 2, 1, h - 4); }
+      handle(s, x + w * 0.15, dy + (h / n) * 0.3, u === 1 ? w * 0.25 : w * 0.7);
+      if (u === 1) handle(s, x + w * 0.6, dy + (h / n) * 0.3, w * 0.25);
+    }
+    // Zócalo negro
+    const [zx, zy, zw, zh] = wallRect(s, a + 0.02, FLOOR_Y, b - 0.02, FLOOR_Y + 0.1);
+    s.fillStyle = '#060606'; s.fillRect(zx, zy, zw, zh);
+  });
 }
-// Encimera de acero
-rectOnWall(-1.32 * M, -0.12, 1.32 * M, -0.07, '#9aa39e');
 
-// Derecha: estantes con cajas de exposición y radiador
+// Derecha: radiador, estante con vitrinas iluminadas y un póster
 {
-  for (const sy of [0.55, 0.15]) {
-    const [x, y, w] = rectOnWall(3.5, sy, 5.6, sy + 0.04, '#0c1210');
-    for (let i = 0; i < 5; i++) {
-      g.fillStyle = 'rgba(239,232,218,.12)';
-      g.fillRect(x + 10 + i * (w - 20) / 5, y - 26, (w - 20) / 5 - 8, 26);
+  const [x, y, w, h] = wallRect(s, 4.0, -0.95, 5.4, -0.3);
+  s.fillStyle = '#1d1e20'; s.fillRect(x, y, w, h);
+  for (let px = x + 2; px < x + w - 1; px += 3) {
+    s.fillStyle = lin(s, px, 0, px + 2.4, 0, [[0, '#3a3c3f'], [1, '#121213']]);
+    s.fillRect(px, y + 2, 2.4, h - 4);
+  }
+  for (const sy of [0.55, 0.2]) {
+    const [bx, by, bw] = wallRect(s, 4.0, sy, 5.5, sy + 0.035);
+    s.fillStyle = '#050505'; s.fillRect(bx, by, bw, 3);
+    for (let i = 0; i < 6; i++) {
+      const cx = bx + 4 + i * (bw - 8) / 6;
+      s.fillStyle = 'rgba(255,255,255,.10)'; s.fillRect(cx, by - 17, (bw - 8) / 6 - 3, 17);
+      s.fillStyle = 'rgba(255,255,255,.35)'; s.fillRect(cx, by - 17, (bw - 8) / 6 - 3, 0.8);
+      s.fillStyle = i % 3 === 0 ? '#8e1d1d' : '#c9ccd0'; s.fillRect(cx + 3, by - 6, (bw - 8) / 6 - 9, 4);
     }
   }
-  const [x, y, w, h] = rectOnWall(3.7, -0.95, 5.3, -0.35, '#1d2522');
-  g.fillStyle = 'rgba(0,0,0,.35)';
-  for (let px = x + 6; px < x + w; px += 9) g.fillRect(px, y + 4, 3, h - 8);
+  const [px, py, pw, ph] = wallRect(s, 4.3, 0.75, 5.2, 1.35);
+  s.fillStyle = '#d7d9dc'; s.fillRect(px, py, pw, ph);
+  s.fillStyle = lin(s, px, py, px + pw, py + ph, [[0, '#2b2e33'], [0.5, '#5c636b'], [1, '#1e2024']]);
+  s.fillRect(px + 2, py + 2, pw - 4, ph - 4);
 }
 
-// Luz del techo sobre la parte alta de la pared
-g.fillStyle = lin(0, wy, 0, wy + wh * 0.6, [[0, 'rgba(239,232,218,.10)'], [1, 'rgba(239,232,218,0)']]);
-g.fillRect(wx, wy, ww, wh);
+// Oclusión ambiental: esquinas más oscuras
+{
+  const [x, y, w, h] = wallRect(s, -HALF_W, FLOOR_Y, HALF_W, CEIL_Y);
+  s.fillStyle = lin(s, 0, y + h - 40, 0, y + h, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.65)']]);
+  s.fillRect(x, y + h - 40, w, 40);
+  s.fillStyle = lin(s, x, 0, x + 60, 0, [[0, 'rgba(0,0,0,.7)'], [1, 'rgba(0,0,0,0)']]);
+  s.fillRect(x, y, 60, h);
+  s.fillStyle = lin(s, x + w - 60, 0, x + w, 0, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.7)']]);
+  s.fillRect(x + w - 60, y, 60, h);
+}
 
-// ---- LED hexagonales del techo (y su reflejo en el suelo)
+// =====================================================================
+// 2. LED hexagonales del techo
+// =====================================================================
 const GRID = { x0: -5.2, x1: 5.2, z0: 1.6, z1: 7.2 };
 function clip([ax, az], [bx, bz]) {
   let t0 = 0, t1 = 1;
@@ -177,52 +240,106 @@ for (let i = -10; i <= 10; i++) {
     const cx = i * HX, cz = GRID.z0 + j * HZ + (i % 2 ? HZ / 2 : 0);
     const pts = Array.from({ length: 6 }, (_, k) => [cx + R * Math.cos((Math.PI / 3) * k), cz + R * Math.sin((Math.PI / 3) * k)]);
     for (let k = 0; k < 6; k++) {
-      const s = clip(pts[k], pts[(k + 1) % 6]);
-      if (s) segments.push(s);
+      const sg = clip(pts[k], pts[(k + 1) % 6]);
+      if (sg) segments.push(sg);
     }
   }
 }
-for (const s of [[[GRID.x0, GRID.z0], [GRID.x1, GRID.z0]], [[GRID.x0, GRID.z1], [GRID.x1, GRID.z1]], [[GRID.x0, GRID.z0], [GRID.x0, GRID.z1]], [[GRID.x1, GRID.z0], [GRID.x1, GRID.z1]]]) segments.push(s);
+for (const sg of [[[GRID.x0, GRID.z0], [GRID.x1, GRID.z0]], [[GRID.x0, GRID.z1], [GRID.x1, GRID.z1]], [[GRID.x0, GRID.z0], [GRID.x0, GRID.z1]], [[GRID.x1, GRID.z0], [GRID.x1, GRID.z1]]]) segments.push(sg);
 
-// Los tubos se dibujan nítidos en una capa aparte y el brillo se hace
-// difuminando esa capa entera (mucho más rápido que un brillo por tubo).
-function tubeLayer(y) {
-  const t = document.createElement('canvas');
-  t.width = c.width; t.height = c.height;
-  const k = t.getContext('2d');
-  k.scale(S, S);
+function tubes(y, width = 0.032) {
+  const [t, k] = layer();
   k.lineCap = 'round';
-  k.strokeStyle = '#FBF8F0';
+  k.strokeStyle = '#ffffff';
   for (const [[ax, az], [bx, bz]] of segments) {
     const [x0, y0] = P(ax, y, az), [x1, y1] = P(bx, y, bz);
-    k.lineWidth = 0.035 * F / ((az + bz) / 2);
+    k.lineWidth = width * F / ((az + bz) / 2);
     k.beginPath(); k.moveTo(x0, y0); k.lineTo(x1, y1); k.stroke();
   }
   return t;
 }
-function glow(layer, passes) {
-  g.save();
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  for (const [blur, alpha] of passes) {
-    g.filter = blur ? `blur(${blur * S}px)` : 'none';
-    g.globalAlpha = alpha;
-    g.drawImage(layer, 0, 0);
-  }
-  g.restore();
-}
-// Reflejo en el suelo (simétrico respecto al suelo), suave y difuminado
-g.save();
-g.beginPath();
-for (const [x, y] of [P(-HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, WALL_Z), P(HALF_W, FLOOR_Y, NEAR), P(-HALF_W, FLOOR_Y, NEAR)]) g.lineTo(x, y);
-g.closePath(); g.clip();
-glow(tubeLayer(2 * FLOOR_Y - CEIL_Y), [[14, 0.12], [4, 0.14]]);
-g.restore();
-glow(tubeLayer(CEIL_Y), [[28, 0.9], [10, 0.9], [3, 0.8], [0, 1]]);
+const led = tubes(CEIL_Y);
+// La luz de los tubos ilumina el techo alrededor
+blit(s, led, { blur: 40, alpha: 0.55 });
 
-// ---- Viñeta para fundirse con el fondo de la web arriba y abajo
-g.fillStyle = lin(0, 0, 0, 700, [[0, BG], [1, 'rgba(15,42,34,0)']]);
-g.fillRect(0, 0, W, 700);
-g.fillStyle = lin(0, H - 700, 0, H, [[0, 'rgba(15,42,34,0)'], [1, BG]]);
-g.fillRect(0, H - 700, W, 700);
+// =====================================================================
+// 3. Suelo de hormigón pulido con reflejos
+// =====================================================================
+const [floor, f] = layer();
+poly(f, floorPoly, lin(f, 0, WALL_BOTTOM, 0, H, [[0, '#262729'], [0.15, '#2f3032'], [0.45, '#222325'], [1, '#0e0e0f']]));
+// Manchas suaves del hormigón
+f.save();
+f.beginPath(); floorPoly.forEach(([x, y], i) => (i ? f.lineTo(x, y) : f.moveTo(x, y))); f.closePath(); f.clip();
+for (let i = 0; i < 260; i++) {
+  const x = rnd() * W, y = WALL_BOTTOM + rnd() * (H - WALL_BOTTOM);
+  const depth = (y - VY) / 600;
+  const r = 10 + rnd() * 70 * depth;
+  const gr = f.createRadialGradient(x, y, 0, x, y, r);
+  const a = 0.05 + rnd() * 0.06;
+  gr.addColorStop(0, rnd() > 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`);
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  f.fillStyle = gr;
+  f.beginPath(); f.ellipse(x, y, r * 1.8, r * 0.5, 0, 0, Math.PI * 2); f.fill();
+}
+f.restore();
+
+// Reflejo: la pared del fondo vista en el suelo (simetría respecto a la junta pared-suelo)
+const [mirror, m] = layer();
+m.save();
+m.setTransform(1, 0, 0, -1, 0, 2 * WALL_BOTTOM * S);
+m.drawImage(scene, 0, 0);
+m.restore();
+// Los LED reflejados en el suelo (simétricos respecto al plano del suelo)
+blit(m, tubes(2 * FLOOR_Y - CEIL_Y), { alpha: 1 });
+// Desvanecido del reflejo hacia la cámara
+m.save();
+m.globalCompositeOperation = 'destination-in';
+m.fillStyle = lin(m, 0, WALL_BOTTOM, 0, H, [[0, 'rgba(0,0,0,1)'], [0.35, 'rgba(0,0,0,.55)'], [1, 'rgba(0,0,0,.15)']]);
+m.fillRect(0, WALL_BOTTOM, W, H - WALL_BOTTOM);
+m.restore();
+f.save();
+f.beginPath(); floorPoly.forEach(([x, y], i) => (i ? f.lineTo(x, y) : f.moveTo(x, y))); f.closePath(); f.clip();
+blit(f, mirror, { blur: 6, alpha: 0.42, op: 'screen' });
+blit(f, mirror, { blur: 22, alpha: 0.25, op: 'screen' });
+f.restore();
+
+// =====================================================================
+// 4. Composición final
+// =====================================================================
+g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(scene, 0, 0); g.restore();
+g.save();
+g.beginPath(); floorPoly.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.clip();
+g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(floor, 0, 0);
+g.restore();
+// Junta pared-suelo
+g.fillStyle = lin(g, 0, WALL_BOTTOM - 2, 0, WALL_BOTTOM + 10, [[0, 'rgba(0,0,0,.8)'], [1, 'rgba(0,0,0,0)']]);
+g.fillRect(0, WALL_BOTTOM - 2, W, 12);
+// LED con resplandor (bloom)
+blit(g, led, { blur: 30, alpha: 0.7, op: 'screen' });
+blit(g, led, { blur: 10, alpha: 0.8, op: 'screen' });
+blit(g, led, { blur: 2.5, alpha: 0.9, op: 'screen' });
+blit(g, led, { alpha: 1 });
+
+// Viñeta: arriba y abajo se funde con el negro de la web; bordes laterales algo más oscuros
+g.fillStyle = lin(g, 0, 0, 0, 760, [[0, '#000'], [1, 'rgba(0,0,0,0)']]);
+g.fillRect(0, 0, W, 760);
+g.fillStyle = lin(g, 0, H - 760, 0, H, [[0, 'rgba(0,0,0,0)'], [1, '#000']]);
+g.fillRect(0, H - 760, W, 760);
+{
+  const v = g.createRadialGradient(VX, VY, 300, VX, VY, 1100);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.45)');
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
+}
+
+// Grano fino (aspecto fotográfico, evita bandas en los degradados)
+{
+  const img = g.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (rnd() - 0.5) * 7;
+    d[i] += n; d[i + 1] += n; d[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+}
 document.title = 'listo';
 </script>
