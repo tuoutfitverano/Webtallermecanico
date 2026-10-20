@@ -86,14 +86,19 @@ async function audit(page: Page, paths: string[], isMobile: boolean) {
 }
 
 test('web pública: accesibilidad, consola, enlaces y móvil', async ({ page, isMobile }) => {
-  await audit(page, ['/', '/privacidad', '/aviso-legal', '/cookies', '/acceso', '/registro', '/recuperar', '/privacidad-cuenta', '/condiciones'], isMobile);
-  // Enlaces internos de la portada: ninguno roto.
-  await page.goto('/');
-  const hrefs = await page.locator('a[href^="/"]').evaluateAll(as => [...new Set(as.map(a => (a as HTMLAnchorElement).getAttribute('href')!.split('#')[0]!))]);
-  for (const href of hrefs.filter(Boolean)) {
-    // Node no resuelve *.localhost: se pide a 127.0.0.1 con la cabecera Host de la web.
-    const r = await fetch(`${WEB}${href}`, { headers: { host: HOST }, redirect: 'manual' });
-    expect(r.status, `enlace ${href}`).toBeLessThan(400);
+  await audit(page, ['/', '/premium', '/privacidad', '/aviso-legal', '/cookies', '/acceso', '/registro', '/recuperar', '/privacidad-cuenta', '/condiciones'], isMobile);
+  // Enlaces internos de las dos portadas (actual y premium): ninguno roto.
+  for (const home of ['/', '/premium']) {
+    await page.goto(home);
+    const hrefs = await page.locator('a[href^="/"]').evaluateAll(as => [...new Set(as.map(a => (a as HTMLAnchorElement).getAttribute('href')!.split('#')[0]!))]);
+    for (const href of hrefs.filter(Boolean)) {
+      // Node no resuelve *.localhost: se pide a 127.0.0.1 con la cabecera Host de la web.
+      const r = await fetch(`${WEB}${href}`, { headers: { host: HOST }, redirect: 'manual' });
+      expect(r.status, `enlace ${href} (${home})`).toBeLessThan(400);
+    }
+    // Las anclas (#servicios, #solicitar…) apuntan a secciones que existen.
+    const anchors = await page.locator('a[href^="#"]').evaluateAll(as => [...new Set(as.map(a => a.getAttribute('href')!.slice(1)))]);
+    for (const id of anchors.filter(Boolean)) await expect(page.locator(`[id="${id}"]`), `ancla #${id} (${home})`).toHaveCount(1);
   }
 });
 

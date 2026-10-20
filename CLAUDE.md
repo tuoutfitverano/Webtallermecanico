@@ -18,7 +18,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 
 ```
 apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego panel y portal)
-  src/pages/              index (web del taller), privacidad, aviso-legal, api/solicitudes.ts
+  src/pages/              index (web del taller), premium (diseño alternativo para comparar; styles/premium.css + scripts/premium.ts), privacidad, aviso-legal, api/solicitudes.ts
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
