@@ -4,6 +4,7 @@
  */
 import '../../apps/web/src/scripts/panel.ts';
 import '../../apps/web/src/scripts/panel-color.ts';
+import '../../apps/web/src/scripts/theme.ts';
 
 function toast(text: string) {
   let box = document.getElementById('vp-toast');

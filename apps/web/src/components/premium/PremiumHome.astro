@@ -46,11 +46,11 @@ const showSoftware = s.software && Object.values(site.software).some(Boolean);
 const showContact = s.contacto && Boolean(c.address || c.phone || c.email || c.hours.length);
 const sales = site.salesEnabled;
 
-// Colores del taller (si no los define, los del diseño).
+// Colores del taller (si no los define, los del diseño). Solo en modo oscuro: ver premium.css.
 const vars = [
-  site.colors.background && `--pm-bg:${site.colors.background};--bg:${site.colors.background}`,
-  site.colors.surface && `--pm-graphite:${site.colors.surface}`,
-  site.colors.text && `--pm-fg:${site.colors.text}`,
+  site.colors.background && `--pm-bg-taller:${site.colors.background}`,
+  site.colors.surface && `--pm-graphite-taller:${site.colors.surface}`,
+  site.colors.text && `--pm-fg-taller:${site.colors.text}`,
 ].filter(Boolean).join(';');
 
 // En la demo, el formulario del taller se presenta como lo que es: una prueba.

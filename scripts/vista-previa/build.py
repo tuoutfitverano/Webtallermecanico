@@ -90,7 +90,7 @@ for role, (prefix, home) in ROLES.items():
         html = re.sub(r'href="(/[^"]*)"', link, html)
         html = re.sub(r'(<form[^>]*action="/salir"[^>]*)>', r'\1 data-vp-logout>', html)
         html = html.replace('<main id="contenido" class="pnl-content" tabindex="-1">',
-                            '<main id="contenido" class="pnl-content" tabindex="-1"><p class="vp-bar" role="note" style="margin:0 0 18px;padding:10px 14px;border:1px solid rgb(252 211 77 / .45);border-radius:12px;background:rgb(252 211 77 / .08);color:#fde68a;font-size:.875rem;line-height:1.45"><strong>Vista previa</strong> con datos de demostración: los cambios no se guardan; el email y la consulta de matrículas son simulados. <a href="index.html" style="color:#fff">Ver la web pública</a></p>', 1)
+                            '<main id="contenido" class="pnl-content" tabindex="-1"><p class="vp-bar" role="note" style="margin:0 0 18px;padding:10px 14px;border:1px solid rgb(252 211 77 / .45);border-radius:12px;background:rgb(252 211 77 / .08);color:var(--alert-warn,#fde68a);font-size:.875rem;line-height:1.45"><strong>Vista previa</strong> con datos de demostración: los cambios no se guardan; el email y la consulta de matrículas son simulados. <a href="index.html" style="color:inherit">Ver la web pública</a></p>', 1)
         html = html.replace('</body>', '<script type="module" src="assets/preview.js"></script></body>', 1)
         assert 'href="/' not in html and '/@vite' not in html, (role, path)
         open(f'{OUT}/{files[path]}', 'w', encoding='utf-8').write(html)

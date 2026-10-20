@@ -15,6 +15,7 @@ const rows = [
   { name: 'sb-…-auth-token (y partes .0, .1…)', where: 'Solo en el área privada (acceso, panel y portal)', what: 'Mantiene la sesión iniciada. Sin ella no se puede entrar.', when: 'Mientras dura la sesión (la renueva Supabase Auth)', who: 'Propia (Supabase Auth)' },
   { name: 'sb-…-auth-token-code-verifier', where: 'Solo en el área privada', what: 'Protege el inicio de sesión y la recuperación de contraseña por enlace.', when: 'Unos minutos, hasta completar el proceso', who: 'Propia (Supabase Auth)' },
   { name: 'panel_taller', where: 'Solo en el panel del taller', what: 'Recuerda qué taller tenías abierto si trabajas en varios.', when: '1 año', who: 'Propia' },
+  { name: 'tema', where: 'En la web y en el área privada, solo si eliges un modo', what: 'Recuerda si elegiste el modo claro o el oscuro (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
   { name: 'color_panel', where: 'Solo en el panel y el portal', what: 'Recuerda el color que elegiste para el panel o el portal (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
 ];
 ---
@@ -28,7 +29,7 @@ const rows = [
       <div class="alert alert-warn" role="note">
         <span><strong>Texto pendiente de revisión legal.</strong> Debajo está la lista técnica de lo que guarda la aplicación. El titular de la web debe validarla con su asesor antes de publicar la web.</span>
       </div>
-      <p>Esta web no usa cookies de publicidad ni de analítica. Las páginas públicas no guardan cookies propias. Solo se guardan estas, necesarias para el área privada:</p>
+      <p>Esta web no usa cookies de publicidad ni de analítica. Solo se guardan estas: las del área privada, necesarias para entrar, y las de tus preferencias (modo claro u oscuro y color), solo si las eliges tú:</p>
       <div class="table-scroll">
         <table class="legal-table">
           <thead><tr><th scope="col">Nombre</th><th scope="col">Dónde</th><th scope="col">Para qué</th><th scope="col">Duración</th><th scope="col">De quién</th></tr></thead>

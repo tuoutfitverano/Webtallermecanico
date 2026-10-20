@@ -1,5 +1,7 @@
 ---
-/** Cabecera del diseño premium: logotipo o nombre, secciones y llamada principal. */
+/** Cabecera del diseño premium: logotipo o nombre, secciones, modo claro/oscuro y llamada principal. */
+import ThemeToggle from '../ThemeToggle.astro';
+import { DEFAULT_THEME, THEME_COOKIE, themeFor } from '../../lib/theme.ts';
 import type { PublicSite } from '../../lib/site/content.ts';
 
 interface Props {
@@ -17,6 +19,7 @@ const links = [
   showContact && { href: '#contacto', label: 'Contacto' },
   { href: '/acceso', label: 'Área de clientes', rel: 'nofollow' },
 ].filter(Boolean) as { href: string; label: string; rel?: string }[];
+const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.web);
 const cta = site.salesEnabled
   ? { href: '#digitalizar', label: 'Digitalizar mi taller' }
   : site.sections.solicitudes ? { href: '#solicitar', label: 'Solicitar cita' } : null;
@@ -29,6 +32,7 @@ const cta = site.salesEnabled
     {links.map(l => <a href={l.href} rel={l.rel}>{l.label}</a>)}
   </nav>
   <div class="pm-header-side">
+    <ThemeToggle current={theme} class="pm-round" />
     {cta && <a href={cta.href} class="pm-btn pm-btn-light pm-hide-sm">{cta.label}</a>}
     <button class="pm-menu" type="button" aria-expanded="false" aria-controls="pm-nav" data-pm-menu>
       <span class="sr-only">Menú</span><span aria-hidden="true"></span>

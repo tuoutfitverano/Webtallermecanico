@@ -72,7 +72,7 @@ El archivo **no se lee en producción**: la web lee la base de datos. El archivo
      - `notice` (aviso si es una demo).
    - `theme`:
      - `design`: `premium` o `clasico`;
-     - `accent` y `colors` (`background`, `surface` y `text`; `null` usa los del diseño);
+     - `accent` y `colors` (`background`, `surface` y `text`; `null` usa los del diseño). Los `colors` son los del modo oscuro: el modo claro, que puede elegir cada visitante con el botón sol/luna, usa su propia paleta (blanco roto y texto casi negro) con el mismo acento;
      - `headingFont`: `archivo` o `instrument`;
      - `logo`: ruta `/…` o `https://…`, SVG o PNG transparente;
      - `sections`: `presentacion`, `servicios`, `software`, `ventajas`, `proceso`, `solicitudes`, `contacto`. `comercial` es solo para demos;

@@ -1,0 +1,17 @@
+---
+/**
+ * En la cabecera de cada plantilla, antes de pintar: aplica el modo guardado.
+ * Si hay cookie, manda ella (es lo que ha pintado el servidor); sin cookie,
+ * localStorage (vista previa sin servidor). Un valor desconocido no cambia nada.
+ */
+import { THEMES } from '../lib/theme.ts';
+---
+<script define:vars={{ themes: THEMES }}>
+  const read = f => { try { return f(); } catch { return null; } };
+  const apply = () => {
+    const t = read(() => /(?:^|;\s*)tema=([^;]*)/.exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem('tema'));
+    if (t && themes.includes(t)) document.documentElement.dataset.theme = t;
+  };
+  apply();
+  document.addEventListener('astro:after-swap', apply);
+</script>

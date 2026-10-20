@@ -3,13 +3,17 @@
    todo va dentro de .pm. Carbón y grafito, blanco roto, gris metálico y el
    acento del taller. Titulares en Archivo ancho (o Instrument Serif si el
    taller lo elige); texto en Barlow. Los colores se pueden cambiar por taller
-   (theme.colors → --pm-bg, --pm-graphite, --pm-fg).
+   (theme.colors → --pm-bg-taller, --pm-graphite-taller, --pm-fg-taller), solo
+   en modo oscuro: el modo claro (data-theme="claro") tiene su propia paleta.
    ========================================================= */
 
 .pm {
-  --pm-bg: #000;
-  --pm-graphite: #141517;
-  --pm-fg: #f2efe8;
+  --pm-bg: var(--pm-bg-taller, #000);
+  --pm-graphite: var(--pm-graphite-taller, #141517);
+  --pm-fg: var(--pm-fg-taller, #f2efe8);
+  /* Sombras de las capturas y aviso «pendiente». */
+  --pm-shadow: rgb(0 0 0 / .8);
+  --pm-warn: #f0d9a0;
   --pm-graphite-2: color-mix(in srgb, var(--pm-graphite) 88%, var(--pm-fg));
   --pm-muted: color-mix(in srgb, var(--pm-fg) 68%, #8d9196);
   --pm-metal: #8d9196;
@@ -21,9 +25,22 @@
   --pm-gutter: max(20px, env(safe-area-inset-left, 0px));
   --pm-gutter-r: max(20px, env(safe-area-inset-right, 0px));
   --pm-wrap: 1320px;
+  /* Lo de site.css que va dentro (formularios, fundido del coche) usa el mismo fondo. */
+  --bg: var(--pm-bg);
   background: var(--pm-bg);
   color: var(--pm-fg);
   overflow-x: clip;
+}
+
+/* Modo claro: blanco roto, grafito claro y texto casi negro (contraste AA en todo). */
+:root[data-theme='claro'] .pm {
+  --pm-bg: #F5F1E9;
+  --pm-graphite: #E8E2D6;
+  --pm-fg: #141517;
+  --pm-metal: #6a6e73;
+  --pm-muted: #4F5358;
+  --pm-shadow: rgb(40 34 22 / .24);
+  --pm-warn: #7a4a00;
 }
 
 .pm .sr-only {
@@ -50,6 +67,10 @@
   font-weight: 800;
   line-height: .92;
   letter-spacing: -.02em;
+}
+/* Móvil en horizontal (poca altura): titulares a escala de la altura, no del ancho. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .pm-display { font-size: clamp(1.75rem, 12vh, 3.25rem); }
 }
 .pm-h2 {
   font-size: clamp(2rem, 4.6vw, 4.2rem);
@@ -94,9 +115,11 @@
   transition: background-color .25s, color .25s, border-color .25s, transform .25s;
 }
 .pm-btn svg { width: 1.05em; height: 1.05em; }
+/* Móviles pequeños: el texto del botón cabe en una línea. */
+@media (max-width: 420px) { .pm-btn { letter-spacing: .06em; padding-inline: 1.1rem; } }
 .pm-btn-light { background: var(--pm-fg); color: var(--pm-bg); }
 .pm-btn-light:hover { background: color-mix(in srgb, var(--pm-fg) 85%, #fff); }
-.pm-btn-ghost { color: var(--pm-fg); border: 1px solid var(--pm-line-2); background: rgb(0 0 0 / .25); }
+.pm-btn-ghost { color: var(--pm-fg); border: 1px solid var(--pm-line-2); background: color-mix(in srgb, var(--pm-bg) 25%, transparent); }
 .pm-btn-ghost:hover { border-color: var(--pm-fg); }
 .pm a:focus-visible, .pm button:focus-visible { outline: 2px solid var(--pm-fg); outline-offset: 3px; }
 .pm-link {
@@ -141,13 +164,21 @@
 .pm-header-side { display: flex; align-items: center; gap: 12px; }
 .pm-header .pm-btn { min-height: 40px; padding: 0 1.1rem; white-space: nowrap; }
 .pm-menu { display: none; }
+.pm-round {
+  display: inline-grid; place-items: center; flex: none;
+  width: 44px; height: 44px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--pm-line-2); background: color-mix(in srgb, var(--pm-bg) 35%, transparent); color: var(--pm-fg);
+  cursor: pointer; transition: border-color .2s;
+}
+.pm-round:hover { border-color: var(--pm-fg); }
+.pm-round .ico { width: 18px; height: 18px; }
 
 @media (max-width: 1180px) {
   .pm-hide-sm { display: none; }
   .pm-menu {
     display: inline-grid; place-items: center;
     width: 44px; height: 44px; border-radius: 50%;
-    border: 1px solid var(--pm-line-2); background: rgb(0 0 0 / .35); color: var(--pm-fg);
+    border: 1px solid var(--pm-line-2); background: color-mix(in srgb, var(--pm-bg) 35%, transparent); color: var(--pm-fg);
     cursor: pointer;
   }
   .pm-menu > span[aria-hidden] {
@@ -192,7 +223,7 @@ html.anim .pm .reveal.is-in, html.anim-done .pm .reveal { transform: none; }
 }
 .pm-hero::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(90deg, rgb(0 0 0 / .7), rgb(0 0 0 / .2) 55%, transparent 75%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pm-bg) 70%, transparent), color-mix(in srgb, var(--pm-bg) 20%, transparent) 55%, transparent 75%);
 }
 .pm-hero > * { position: relative; }
 .pm-hero > .pm-corners { position: static; }
@@ -265,7 +296,7 @@ html.anim .pm .reveal.is-in, html.anim-done .pm .reveal { transform: none; }
 .pm-section > .pm-kicker::before { content: ''; width: 28px; height: 1px; background: var(--pm-accent); }
 
 .pm-over .pm-section { min-height: 100vh; min-height: 100svh; align-content: center; }
-.pm-over .pm-philosophy { text-shadow: 0 1px 24px rgb(0 0 0 / .6); }
+.pm-over .pm-philosophy { text-shadow: 0 1px 24px color-mix(in srgb, var(--pm-bg) 60%, transparent); }
 .pm-cols { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 32px; margin: 20px 0 0; }
 .pm-cols li {
   display: grid; gap: 12px; padding-top: 18px; border-top: 1px solid var(--pm-line-2);
@@ -279,8 +310,10 @@ html.anim .pm .reveal.is-in, html.anim-done .pm .reveal { transform: none; }
 .pm-service {
   display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 20px;
   padding: 22px 0; border-bottom: 1px solid var(--pm-line-2);
-  background: linear-gradient(90deg, rgb(0 0 0 / .5), rgb(0 0 0 / .2));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pm-bg) 50%, transparent), color-mix(in srgb, var(--pm-bg) 20%, transparent));
 }
+/* En claro el coche (blanco) queda detrás del texto oscuro: fila más opaca. */
+:root[data-theme='claro'] .pm-service { background: linear-gradient(90deg, color-mix(in srgb, var(--pm-bg) 86%, transparent), color-mix(in srgb, var(--pm-bg) 62%, transparent)); }
 .pm-service-n { font-family: var(--pm-display); font-size: .8rem; font-weight: 600; color: var(--pm-accent-text); letter-spacing: .1em; padding-left: 4px; }
 .pm-service h3 {
   margin: 0; font-family: var(--pm-display); font-stretch: 112%;
@@ -315,7 +348,7 @@ html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding
   border-radius: 14px; overflow: hidden;
   background: var(--pm-graphite);
   border: 1px solid var(--pm-line-2);
-  box-shadow: 0 40px 80px -20px rgb(0 0 0 / .8), 0 0 0 1px rgb(0 0 0 / .4);
+  box-shadow: 0 40px 80px -20px var(--pm-shadow), 0 0 0 1px var(--pm-line);
 }
 .pm-window img, .pm-phone img { display: block; width: 100%; height: auto; }
 .pm-window-bar {
@@ -333,7 +366,7 @@ html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding
   left: 58%; top: 4%; width: 17%; z-index: 3;
   border-radius: 28px; overflow: hidden;
   border: 6px solid #1f2023;
-  box-shadow: 0 40px 80px -10px rgb(0 0 0 / .85), 0 0 0 1px var(--pm-line-2);
+  box-shadow: 0 40px 80px -10px var(--pm-shadow), 0 0 0 1px var(--pm-line-2);
 }
 .pm-caption { margin: 0; font-size: .82rem; color: var(--pm-muted); }
 
@@ -348,7 +381,7 @@ html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding
 .pm-shot {
   margin: 0; border-radius: 14px; overflow: hidden;
   border: 1px solid var(--pm-line-2);
-  box-shadow: 0 30px 60px -20px rgb(0 0 0 / .7);
+  box-shadow: 0 30px 60px -20px var(--pm-shadow);
   background: var(--pm-bg);
 }
 .pm-shot img { display: block; width: 100%; height: auto; }
@@ -425,9 +458,9 @@ html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding
 .pm-capabilities { padding: 24px; border: 1px solid var(--pm-line-2); border-radius: 16px; }
 .pm-capabilities ul { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
 .pm-capabilities li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; align-items: baseline; line-height: 1.45; }
-.pm-capabilities em { font-style: normal; color: #f0d9a0; }
+.pm-capabilities em { font-style: normal; color: var(--pm-warn); }
 .pm-cap-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pm-accent); transform: translateY(-1px); }
-.pm-capabilities li.is-pending .pm-cap-dot { background: transparent; border: 1px solid #f0d9a0; }
+.pm-capabilities li.is-pending .pm-cap-dot { background: transparent; border: 1px solid var(--pm-warn); }
 .pm-sales-form { padding: clamp(20px, 3vw, 32px); border-radius: 20px; background: color-mix(in srgb, var(--pm-bg) 70%, transparent); border: 1px solid var(--pm-line-2); }
 .pm-form-title { margin: 0; font-family: var(--pm-display); font-stretch: 115%; font-weight: 750; font-size: 1.3rem; text-transform: uppercase; }
 .pm-form-note { margin: 8px 0 20px; color: var(--pm-muted); line-height: 1.5; }

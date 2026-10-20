@@ -48,8 +48,9 @@ function start(stage: HTMLElement) {
   const lastFrame = Math.max(1, Math.round(turnPart * (count - 1)));
   if (!canvas || !ctx || !dim || !hero || !turnGap || !zoomGap || !src.includes('{n}') || !(count >= 2)) return;
   const second = turnGap.nextElementSibling as HTMLElement | null;
-  // Color de fondo de la web (el diseño premium puede redefinirlo): el fundido final acaba en él.
-  const bg = getComputedStyle(stage).getPropertyValue('--bg').trim() || '#000';
+  // Color de fondo de la web (el diseño premium y el modo claro lo cambian): el fundido final acaba en él.
+  const readBg = () => getComputedStyle(stage).getPropertyValue('--bg').trim() || '#000';
+  let bg = readBg();
 
   document.documentElement.classList.add('stage-on');
 
@@ -211,6 +212,8 @@ function start(stage: HTMLElement) {
 
   addEventListener('scroll', queue, { passive: true });
   addEventListener('resize', resize);
+  // Al cambiar a modo claro u oscuro: nuevo fondo y se vuelve a pintar.
+  addEventListener('tema', () => { bg = readBg(); last = ''; queue(); });
   addEventListener('load', queue);
   resize();
 }

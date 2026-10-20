@@ -1,0 +1,32 @@
+---
+/**
+ * Botón de modo claro / oscuro. Sin JavaScript es un formulario (→ /api/preferencias,
+ * vuelve a la misma página); con JavaScript cambia al instante. Se ve el icono del
+ * modo al que se pasa (sol = pasar a claro, luna = pasar a oscuro); el nombre del
+ * botón lo dice con palabras. Solo afecta a este dispositivo.
+ */
+import Icon from './Icon.astro';
+import type { Theme } from '../lib/theme.ts';
+
+interface Props {
+  current: Theme;
+  /** Clases del botón (cada zona usa su estilo de botón). */
+  class?: string;
+  /** Texto visible junto al icono (si no, solo el icono y el texto para lectores de pantalla). */
+  showLabel?: boolean;
+}
+const { current, class: cls = 'btn btn-sm', showLabel = false } = Astro.props;
+const next = `${Astro.url.pathname}${Astro.url.search}`;
+const label = showLabel ? 'theme-toggle-text' : 'sr-only';
+---
+<form method="post" action="/api/preferencias" class="theme-toggle" data-astro-reload>
+  <input type="hidden" name="next" value={next} />
+  <button type="submit" name="tema" value={current === 'claro' ? 'oscuro' : 'claro'} class={`${cls} theme-toggle-btn`} data-theme-toggle>
+    <span class="theme-to-light"><Icon name="sun" /><span class={label}>Modo claro</span></span>
+    <span class="theme-to-dark"><Icon name="moon" /><span class={label}>Modo oscuro</span></span>
+  </button>
+</form>
+
+<script>
+  import '../scripts/theme.ts';
+</script>

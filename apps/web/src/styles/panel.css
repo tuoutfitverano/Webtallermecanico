@@ -36,8 +36,40 @@
   --tone-bad-soft: #fecaca;
 }
 
-/* Tonos pastel: superficies claras, texto oscuro y estados en versión oscura. */
-:root[data-color]:not([data-color='verde']) {
+/*
+  Modo claro (data-theme="claro"; en el panel es el predeterminado): fondo crema
+  claro, texto verde muy oscuro y estados en versión oscura. Con el color «verde»
+  la barra lateral sigue verde y las tarjetas pasan a blanco roto; con un pastel,
+  todo lleva ese pastel.
+*/
+:root[data-theme='claro'] {
+  --p-bg: var(--bg);
+  --p-text: #0F2A22;
+  --p-muted: #4A5C52;
+  --p-line: rgb(15 42 34 / .13);
+  --p-line-2: rgb(15 42 34 / .22);
+  --p-top-bg: rgb(245 241 233 / .92);
+  --p-tabs-bg: rgb(251 249 244 / .97);
+  --p-shadow: rgb(40 34 22 / .18);
+  --tone-slate: #334155;
+  --tone-info: #075985;
+  --tone-warn: #92400e;
+  --tone-warn-soft: #854d0e;
+  --tone-violet: #5b21b6;
+  --tone-ok: #166534;
+  --tone-ok-soft: #14532d;
+  --tone-bad: #9f1239;
+  --tone-bad-soft: #991b1b;
+}
+:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
+  --p-surface: #FFFDF8;
+  --p-surface-2: #F1ECE1;
+  --p-on-muted: #4A5C52;
+}
+
+/* Tonos pastel (y tarjetas claras): superficies claras, texto oscuro y estados en versión oscura. */
+:root[data-color]:not([data-color='verde']),
+:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
   --p-on-rgb: 28 30 29;
   --p-on-ink: var(--p-surface);
   --p-tone-slate: #334155;
@@ -124,10 +156,10 @@
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   min-height: 60px; padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
-  background: rgb(10 10 11 / .92); border-bottom: 1px solid var(--p-line);
+  background: var(--p-top-bg, rgb(10 10 11 / .92)); border-bottom: 1px solid var(--p-line);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
 }
-.pnl-top-workshop { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pnl-top-workshop { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 .pnl-workshop-name { font-family: var(--font-heading); font-style: italic; font-size: 1.375rem; letter-spacing: -.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pnl-switch-select { min-height: 40px; padding: 6px 34px 6px 12px; font-size: .9375rem; max-width: 52vw; }
 .pnl-role { flex: none; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--p-line-2); font-size: .75rem; color: var(--p-muted); }
@@ -150,11 +182,17 @@
   position: fixed; inset: auto 0 0 0; z-index: 40;
   display: grid; grid-template-columns: repeat(5, 1fr);
   padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  background: rgb(18 18 21 / .97); border-top: 1px solid var(--p-line);
+  background: var(--p-tabs-bg, rgb(18 18 21 / .97)); border-top: 1px solid var(--p-line);
 }
 .pnl-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: var(--p-tabs); color: var(--p-muted); text-decoration: none; font-size: .6875rem; font-weight: 500; }
 .pnl-tab .ico { width: 22px; height: 22px; }
 .pnl-tab.is-on { color: var(--p-text); }
+/* Móvil en horizontal: pestañas más bajas (icono y texto en fila) para dejar sitio al contenido. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --p-tabs: 48px; }
+  .pnl-tab { flex-direction: row; gap: 6px; font-size: .75rem; }
+  .pnl-top { min-height: 52px; }
+}
 .pnl-tab.is-on .ico { stroke-width: 2.2; }
 
 /* ---------- Bloques comunes ---------- */
@@ -162,6 +200,8 @@
 .pnl-title { font-family: var(--font-heading); font-style: italic; font-weight: 400; font-size: 2.25rem; line-height: 1; letter-spacing: -1px; }
 @media (min-width: 768px) { .pnl-title { font-size: 2.75rem; } }
 .pnl-sub { color: var(--p-muted); margin-top: 6px; font-size: .9375rem; }
+/* Matrícula y enlaces que pasan a otra línea en móvil: sin pisarse. */
+.pnl-sub:has(.plate) { line-height: 1.9; }
 .pnl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pnl-back { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px 0 12px; margin-bottom: 14px; border: 1px solid var(--p-line-2); border-radius: 999px; background: var(--p-surface); color: var(--p-muted); font-size: .875rem; text-decoration: none; }
 .pnl-back:hover { background: var(--p-surface-2); color: var(--p-text); }
@@ -187,8 +227,8 @@
 .kpi-value { font-family: var(--font-heading); font-style: italic; font-size: 2.75rem; line-height: 1; letter-spacing: -1px; }
 .kpi-label { color: var(--p-muted); font-size: .875rem; line-height: 1.3; }
 
-.quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-@media (min-width: 900px) { .quick { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Tantas columnas como quepan sin partir el texto (una en móvil, dos en tablet, cuatro en PC). */
+.quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
 .quick a { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--p-line-2); text-decoration: none; font-weight: 500; }
 .quick a:hover { background: var(--p-surface-2); }
 .quick .ico { width: 20px; height: 20px; flex: none; }
@@ -337,21 +377,32 @@ a.vcard:hover { border-color: var(--p-line-2); }
 .pnl-more-menu {
   position: absolute; right: max(8px, env(safe-area-inset-right, 0px)); bottom: calc(100% + 8px);
   min-width: 220px; max-width: calc(100vw - 16px); padding: 6px; display: grid; gap: 2px;
-  z-index: 1; background: var(--p-surface-2); border: 1px solid var(--p-line-2); border-radius: 14px; box-shadow: 0 12px 40px rgb(0 0 0 / .5);
+  z-index: 1; background: var(--p-surface-2); border: 1px solid var(--p-line-2); border-radius: 14px; box-shadow: 0 12px 40px var(--p-shadow, rgb(0 0 0 / .5));
 }
 .pnl-more-menu a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--p-muted); text-decoration: none; font-size: .9375rem; }
 .pnl-more-menu a:hover, .pnl-more-menu a.is-on { background: var(--p-surface-2); color: var(--p-text); }
 .pnl-more-menu .ico { width: 20px; height: 20px; }
 
 /* ---------- Color de las tarjetas (elegido por cada persona) ---------- */
-.pnl-top-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* Los botones no se encogen: lo que cede en pantallas estrechas es el nombre del taller. */
+.pnl-top-side { display: flex; align-items: center; gap: 8px; flex: none; }
+@media (max-width: 420px) {
+  .pnl-top { gap: 8px; }
+  .pnl-top-side { gap: 6px; }
+  .pnl-top-side .btn-sm { padding-inline: 12px; }
+}
+@media (max-width: 380px) { .pnl-role { display: none; } }
 .color-pick { position: relative; }
 .color-pick > summary { list-style: none; cursor: pointer; }
 .color-pick > summary::-webkit-details-marker { display: none; }
 .color-pick-menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 50;
   width: min(300px, calc(100vw - 24px)); padding: 14px; display: grid; gap: 10px;
-  background: var(--p-surface); border: 1px solid var(--p-line-2); border-radius: 14px; box-shadow: 0 12px 40px rgb(0 0 0 / .5);
+  background: var(--p-surface); border: 1px solid var(--p-line-2); border-radius: 14px; box-shadow: 0 12px 40px var(--p-shadow, rgb(0 0 0 / .5));
+}
+/* Móvil: el menú ocupa el ancho de la pantalla bajo la barra superior (pegado al botón se saldría por la izquierda). */
+@media (max-width: 600px) {
+  .color-pick-menu { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 64px); left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: auto; }
 }
 .color-pick-title { font-weight: 600; }
 .color-pick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }

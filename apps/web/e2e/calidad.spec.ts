@@ -114,11 +114,14 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
 
 test('panel en cada color pastel: contraste y accesibilidad', async ({ page, context, isMobile }) => {
   test.skip(isMobile, 'El contraste se comprueba en escritorio');
-  test.setTimeout(240_000);
+  test.setTimeout(360_000);
   const f = await fixtures();
   await login(page, 'propietaria@e2e.test', '/panel');
+  // En el panel el modo claro es el predeterminado; el oscuro se comprueba también (menos pantallas).
   for (const c of PANEL_COLORS.filter(x => x.id !== 'verde')) {
-    await context.addCookies([{ name: 'color_panel', value: c.id, url: page.url() }]);
+    await context.addCookies([{ name: 'color_panel', value: c.id, url: page.url() }, { name: 'tema', value: 'oscuro', url: page.url() }]);
+    await audit(page, ['/panel', `/panel/ordenes/${f.order}`], false);
+    await context.addCookies([{ name: 'tema', value: 'claro', url: page.url() }]);
     await audit(page, ['/panel', `/panel/ordenes/${f.order}`, `/panel/clientes/${f.customer}`, '/panel/solicitudes', '/panel/avisos'], false);
     await expect(page.locator('html')).toHaveAttribute('data-color', c.id);
     // El propio selector, abierto, también cumple.
@@ -126,6 +129,119 @@ test('panel en cada color pastel: contraste y accesibilidad', async ({ page, con
     const axe = await new AxeBuilder({ page }).include('[data-color-pick]').withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => `${c.id}: ${v.id}`)).toEqual([]);
   }
+});
+
+test('modo claro y oscuro: accesibilidad de la web, el acceso, el panel y el portal', async ({ page, context, isMobile }) => {
+  test.skip(isMobile, 'El contraste se comprueba en escritorio');
+  test.setTimeout(240_000);
+  const f = await fixtures();
+  for (const tema of ['claro', 'oscuro']) {
+    await context.addCookies([{ name: 'tema', value: tema, url: page.url().startsWith('http') ? page.url() : `http://${HOST}` }]);
+    await audit(page, ['/', '/clasico', '/acceso', '/cookies'], false);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', tema);
+  }
+  await login(page, 'propietaria@e2e.test', '/panel');
+  for (const tema of ['claro', 'oscuro']) {
+    await context.addCookies([{ name: 'tema', value: tema, url: page.url() }]);
+    await audit(page, ['/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/vehiculos/nuevo', '/panel/avisos', '/cuenta'], false);
+  }
+  await context.clearCookies();
+  await login(page, f.email, '/portal');
+  for (const tema of ['claro', 'oscuro']) {
+    await context.addCookies([{ name: 'tema', value: tema, url: page.url() }]);
+    await audit(page, ['/portal', `/portal/reparaciones/${f.order}`, '/portal/datos'], false);
+  }
+});
+
+test('modo claro y oscuro: cambia al momento, se recuerda y cada zona tiene el suyo por defecto', async ({ page, context }) => {
+  const f = await fixtures();
+  // Web pública: oscuro por defecto; el botón cambia sin recargar y se recuerda.
+  await page.goto('/');
+  const html = page.locator('html');
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  await page.getByRole('button', { name: 'Modo claro' }).first().click();
+  await expect(html).toHaveAttribute('data-theme', 'claro');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.pm')!).backgroundColor)).toBe('rgb(245, 241, 233)');
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'claro');
+  await page.getByRole('button', { name: 'Modo oscuro' }).first().click();
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  // Un valor manipulado no rompe nada: el de la zona.
+  await context.addCookies([{ name: 'tema', value: '"><script>', url: page.url() }]);
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  // Panel del taller: claro si no se ha elegido; la elección se mantiene al navegar por el panel.
+  const forget = async () => { await page.evaluate(() => localStorage.clear()); await context.clearCookies(); };
+  await forget();
+  await login(page, 'propietaria@e2e.test', '/panel');
+  await expect(html).toHaveAttribute('data-theme', 'claro');
+  await page.getByRole('button', { name: 'Modo oscuro' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  await page.getByRole('link', { name: 'Órdenes' }).first().click();
+  await page.waitForURL(/\/panel\/ordenes$/);
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  // Portal del cliente: oscuro si no se ha elegido.
+  await forget();
+  await login(page, f.email, '/portal');
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+});
+
+test.describe('modo claro y oscuro sin JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+  test('el botón guarda el modo y vuelve a la misma página', async ({ page }) => {
+    await page.goto('/cookies');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'oscuro');
+    await page.getByRole('button', { name: 'Modo claro' }).first().click();
+    await expect(page).toHaveURL(/\/cookies$/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'claro');
+  });
+});
+
+test('todos los tamaños (móvil, tablet y PC, en vertical y horizontal): nada se sale de la pantalla', async ({ browser, isMobile }) => {
+  test.skip(isMobile, 'Los tamaños se fijan a mano');
+  test.setTimeout(240_000);
+  const f = await fixtures();
+  const sizes = [[320, 568], [360, 740], [412, 915], [740, 360], [768, 1024], [1024, 768], [1180, 820], [1366, 768], [1920, 1080]] as const;
+  const problems: string[] = [];
+  const check = async (page: Page, paths: string[]) => {
+    for (const [w, h] of sizes) {
+      await page.setViewportSize({ width: w, height: h });
+      for (const path of paths) {
+        await page.goto(path);
+        const r = await page.evaluate(() => {
+          const vw = document.documentElement.clientWidth;
+          const out = [...document.querySelectorAll('[data-theme-toggle], .pnl-top button, .pm-header a, .pm-menu')]
+            .filter(el => el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
+            .filter(el => { const b = el.getBoundingClientRect(); return b.right > vw + 1 || b.left < -1; })
+            .map(el => (el.textContent ?? '').trim().slice(0, 30));
+          return { overflow: document.documentElement.scrollWidth - vw, out };
+        });
+        if (r.overflow > 0) problems.push(`${w}×${h} ${path}: desborda ${r.overflow}px`);
+        for (const o of r.out) problems.push(`${w}×${h} ${path}: «${o}» fuera de la pantalla`);
+        const pick = page.locator('[data-color-pick] > summary');
+        if (await pick.count()) {
+          await pick.click();
+          const box = await page.locator('.color-pick-menu').boundingBox();
+          if (!box || box.x < 0 || box.x + box.width > w + 1) problems.push(`${w}×${h} ${path}: el menú de colores se sale (${JSON.stringify(box)})`);
+          await pick.click();
+        }
+      }
+    }
+  };
+  for (const tema of ['oscuro', 'claro']) {
+    const ctx = await browser.newContext({ baseURL: `http://${HOST}` });
+    await ctx.addCookies([{ name: 'tema', value: tema, url: `http://${HOST}` }]);
+    const page = await ctx.newPage();
+    await check(page, ['/', '/acceso']);
+    await login(page, 'propietaria@e2e.test', '/panel');
+    await check(page, ['/panel', `/panel/ordenes/${f.order}`]);
+    await ctx.clearCookies();
+    await ctx.addCookies([{ name: 'tema', value: tema, url: `http://${HOST}` }]);
+    await login(page, f.email, '/portal');
+    await check(page, ['/portal']);
+    await ctx.close();
+  }
+  expect(problems, problems.join('\n')).toEqual([]);
 });
 
 test('portal en cada color pastel: contraste y accesibilidad', async ({ page, context, isMobile }) => {

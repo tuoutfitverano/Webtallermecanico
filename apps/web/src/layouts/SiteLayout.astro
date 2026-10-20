@@ -5,6 +5,8 @@ import '@fontsource/barlow/latin-400.css';
 import '@fontsource/barlow/latin-500.css';
 import '@fontsource/barlow/latin-600.css';
 import '../styles/site.css';
+import ThemeScript from '../components/ThemeScript.astro';
+import { DEFAULT_THEME, THEME_BAR, THEME_COOKIE, themeFor } from '../lib/theme.ts';
 import type { PublicSite } from '../lib/site/content.ts';
 
 interface Props {
@@ -16,20 +18,24 @@ interface Props {
   premium?: boolean;
 }
 const { site, title, description = site.content.intro, noindex = false, premium = false } = Astro.props;
-const rootStyle = [`--accent:${site.accent}`, premium && site.colors.background ? `--bg:${site.colors.background}` : ''].filter(Boolean).join(';');
+// El fondo propio del taller solo se usa en modo oscuro (el claro tiene el suyo, ver site.css).
+const rootStyle = [`--accent:${site.accent}`, premium && site.colors.background ? `--bg-taller:${site.colors.background}` : ''].filter(Boolean).join(';');
+const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.web);
+const darkBar = premium && site.colors.background ? site.colors.background : THEME_BAR.oscuro;
 // Una web de demostración no debe aparecer en buscadores.
 const robots = noindex || site.isDemoContent ? 'noindex, nofollow' : 'index, follow';
 ---
 <!doctype html>
-<html lang="es" style={rootStyle}>
+<html lang="es" style={rootStyle} data-theme={theme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <meta name="robots" content={robots} />
-    <meta name="theme-color" content={premium && site.colors.background ? site.colors.background : '#000000'} />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content={theme === 'claro' ? THEME_BAR.claro : darkBar} data-oscuro={darkBar} data-claro={THEME_BAR.claro} />
+    <meta name="color-scheme" content={theme === 'claro' ? 'light' : 'dark'} />
+    <ThemeScript />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!--
       Animaciones de entrada (desenfoque → nítido). Va en línea para no depender
