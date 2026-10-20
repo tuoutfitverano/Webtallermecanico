@@ -152,6 +152,22 @@ describe('handleSubmission', () => {
     expect(d.store!.submit).toHaveBeenCalledWith(expect.objectContaining({ workshopId: SITE.workshopId }));
   });
 
+  it('guarda una solicitud de digitalización en la web de demostración con sección comercial', async () => {
+    const d = deps();
+    const body = { kind: 'digitalizacion', name: 'Lucía', businessName: 'Taller Lucía', email: 'lucia@correo.test', topic: 'web', privacyAccepted: true, idempotencyKey: KEY, turnstileToken: 'token-ok' };
+    const r = await handleSubmission(input({}, body), d);
+    expect(r.status).toBe(201);
+    expect(d.store!.submit).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ kind: 'digitalizacion', businessName: 'Taller Lucía', topic: 'web' }) }));
+  });
+
+  it('la web de un taller sin sección comercial rechaza las solicitudes de digitalización', async () => {
+    const d = deps({ resolveSite: vi.fn(async () => ({ ...SITE, salesEnabled: false })) });
+    const body = { kind: 'digitalizacion', name: 'Lucía', businessName: 'Taller Lucía', email: 'lucia@correo.test', topic: 'web', privacyAccepted: true, idempotencyKey: KEY, turnstileToken: 'token-ok' };
+    const r = await handleSubmission(input({}, body), d);
+    expect(r.status).toBe(422);
+    expect(d.store!.submit).not.toHaveBeenCalled();
+  });
+
   it('dominio desconocido → 404', async () => {
     const r = await handleSubmission(input(), deps({ resolveSite: vi.fn(async () => null) }));
     expect(r.status).toBe(404);

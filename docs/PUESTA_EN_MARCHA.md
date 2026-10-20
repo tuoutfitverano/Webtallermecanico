@@ -108,7 +108,7 @@ No hay ninguna pantalla pública para crear talleres ni para hacerse propietario
    ```
 
 3. La propietaria entra en `APP_URL/panel` (el panel del taller) y en `APP_URL/cuenta` podrá **invitar** a administradores y mecánicos. Cada invitación genera un enlace que se envía por WhatsApp o correo; solo funciona con el correo invitado, una vez y durante 7 días.
-4. Para publicar la web del taller, rellena su contenido y su dominio:
+4. Para publicar la web del taller, lo más cómodo es preparar su archivo en `talleres/` y generar el SQL con `npm run taller:sql -- talleres/<taller>.json` (ver `docs/PLANTILLA_TALLERES.md`). A mano sería así:
 
    ```sql
    update public.workshop_sites

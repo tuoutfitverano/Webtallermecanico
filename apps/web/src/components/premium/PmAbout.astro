@@ -1,0 +1,16 @@
+---
+/** Presentación del taller (content.about). */
+import type { PublicSite } from '../../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const a = site.content.about;
+const lines = (a.title || `Así trabaja ${site.name}`).split(/(?<=[.!?])\s+/);
+---
+<section class="pm-section pm-philosophy" id="taller" aria-labelledby="taller-t">
+  <p class="pm-kicker">El taller</p>
+  <h2 id="taller-t" class="pm-h2 reveal" data-reveal>{lines.map(l => <><span class="pm-line">{l}</span>{' '}</>)}</h2>
+  {site.content.intro && <p class="pm-lead pm-measure reveal" data-reveal>{site.content.intro}</p>}
+  <ol class="pm-cols">
+    {a.points.map((p, i) => <li class="reveal" data-reveal style={`--d:${i * 0.1}s`}><span class="pm-col-n">{String(i + 1).padStart(2, '0')}</span>{p}</li>)}
+  </ol>
+</section>

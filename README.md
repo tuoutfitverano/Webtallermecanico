@@ -6,6 +6,7 @@ Webs comerciales y herramientas de gestión (vehículos, clientes, empleados y r
 - **Arquitectura y decisiones:** [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)
 - **Plan por fases:** [docs/ROADMAP.md](docs/ROADMAP.md)
 - **Navegador para Claude (Playwright MCP):** [docs/PLAYWRIGHT_MCP.md](docs/PLAYWRIGHT_MCP.md)
+- **Plantilla de webs de taller y demo comercial AutoValue:** [docs/PLANTILLA_TALLERES.md](docs/PLANTILLA_TALLERES.md) · archivos de cada taller en [talleres/](talleres/README.md)
 - **Demo comercial antigua (HTML estático):** [demo/](demo/README.md)
 
 ## Estructura
@@ -13,6 +14,7 @@ Webs comerciales y herramientas de gestión (vehículos, clientes, empleados y r
 ```
 apps/web/          Aplicación Astro (webs de talleres; luego panel y portal)
 packages/core/     Lógica compartida: matrículas, validación de vehículos
+talleres/          Un archivo por taller: identidad, textos, colores y secciones de su web
 supabase/
   migrations/      Base de datos y permisos (RLS)
   tests/           Pruebas de permisos por rol
@@ -38,6 +40,7 @@ npm run check        # comprobación de tipos
 npm run build        # compilar para Cloudflare
 npm run lint         # revisión de estilo y errores (ESLint)
 npm run test:db      # pruebas de base de datos y permisos
+npm run taller:sql -- talleres/x.json  # comprueba el archivo de un taller y genera su SQL
 npm run test:e2e     # formularios en navegador contra una base de datos real
 npm run test:mcp     # comprueba que el navegador de Claude (Playwright MCP) funciona
 ```

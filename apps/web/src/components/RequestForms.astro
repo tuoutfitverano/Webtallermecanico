@@ -10,8 +10,19 @@ interface Props {
   turnstileSiteKey: string | null;
   /** Resultado de un envío sin JavaScript (?solicitud=ok|error). */
   noJsResult: { ok: boolean; ref?: string } | null;
+  /** Textos de la cabecera (el diseño premium usa los suyos). */
+  kicker?: string;
+  title?: string;
+  lead?: string;
+  class?: string;
 }
-const { site, turnstileSiteKey, noJsResult } = Astro.props;
+const {
+  site, turnstileSiteKey, noJsResult,
+  kicker = '// Cita, presupuesto o consulta',
+  title = 'Cuéntanos qué necesitas',
+  lead = 'Te respondemos para confirmar. Solo te pedimos los datos imprescindibles para contestarte.',
+  class: extra = '',
+} = Astro.props;
 const tabs = [
   { kind: 'cita', label: 'Pedir cita' },
   { kind: 'presupuesto', label: 'Pedir presupuesto' },
@@ -19,15 +30,16 @@ const tabs = [
 ] as const;
 const tel = telHref(site.content.phone);
 ---
-<section class="section glow glow-accent" id="solicitar">
+<section class:list={['section glow glow-accent', extra]} id="solicitar">
   <div class="wrap">
     <header class="section-head">
-      <p class="label">// Cita, presupuesto o consulta</p>
-      <BlurText as="h2" text="Cuéntanos qué necesitas" class="display-sm heading" />
+      <p class="label">{kicker}</p>
+      <BlurText as="h2" text={title} class="display-sm heading" />
     </header>
     <div class="booking">
       <aside class="booking-aside">
-        <p class="booking-lead">Te respondemos para confirmar. Solo te pedimos los datos imprescindibles para contestarte.</p>
+        <p class="booking-lead">{lead}</p>
+        <slot name="note" />
         <ul>
           <li><Icon name="calendar" /><span>Una solicitud de cita <strong>no es una reserva</strong>: el taller te llamará o escribirá para confirmarla.</span></li>
           <li><Icon name="shield" /><span>No consultamos tu matrícula en ningún servicio externo: solo la usamos para identificar tu coche.</span></li>

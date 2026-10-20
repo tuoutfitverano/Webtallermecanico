@@ -1,0 +1,46 @@
+---
+/**
+ * Portada: titular del taller (content.hero), llamada principal y rótulo con
+ * el nombre. En la demo, la llamada principal es la comercial.
+ */
+import Icon from '../Icon.astro';
+import type { PublicSite } from '../../lib/site/content.ts';
+
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const c = site.content;
+const title = c.hero.title || site.name;
+// «La mecánica evoluciona. Tu taller también.» → una línea por frase.
+const lines = title.split(/(?<=[.!?])\s+/);
+const lead = c.hero.subtitle || c.tagline;
+const primary = site.salesEnabled
+  ? { href: '#digitalizar', label: 'Quiero digitalizar mi taller' }
+  : site.sections.solicitudes ? { href: '#solicitar', label: 'Solicitar cita' } : null;
+const secondary = site.sections.software
+  ? { href: '#software', label: site.salesEnabled ? 'Ver el software' : 'Cómo trabajamos' }
+  : site.sections.servicios ? { href: '#servicios', label: 'Ver servicios' } : null;
+const corners = [
+  [site.content.brands ? 'Taller multimarca' : 'Taller', c.city].filter(Boolean).join(' · '),
+  site.sections.software ? 'Software de gestión integrado' : '',
+  site.software.portal && site.sections.software ? 'Seguimiento online de cada reparación' : '',
+].filter(Boolean);
+---
+<section class="pm-hero" aria-labelledby="pm-title">
+  <ul class="pm-corners" aria-label="En pocas palabras">
+    {corners.map((t, i) => <li class={`pm-corner pm-corner-${i}`}><span class="pm-tick" aria-hidden="true"></span>{t}</li>)}
+  </ul>
+  <div class="pm-hero-copy">
+    <h1 id="pm-title" class="pm-display">
+      {lines.map((l, i) => <><span class="pm-line reveal" data-reveal style={`--d:${i * 0.12}s`}>{l}</span>{' '}</>)}
+    </h1>
+    {lead && <p class="pm-lead reveal" data-reveal style="--d:.3s">{lead}</p>}
+    {(primary || secondary) && (
+      <div class="pm-actions reveal" data-reveal style="--d:.42s">
+        {primary && <a href={primary.href} class="pm-btn pm-btn-light">{primary.label} <Icon name="arrowUpRight" /></a>}
+        {secondary && <a href={secondary.href} class="pm-btn pm-btn-ghost">{secondary.label}</a>}
+      </div>
+    )}
+  </div>
+  <p class="pm-wordmark" aria-hidden="true">{site.name.toUpperCase()}</p>
+  <a href={site.sections.presentacion && c.about.points.length ? '#taller' : secondary?.href ?? '#inicio'} class="pm-scroll">Desliza<span aria-hidden="true"></span></a>
+</section>

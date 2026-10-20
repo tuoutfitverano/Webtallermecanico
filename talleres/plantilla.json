@@ -1,0 +1,71 @@
+{
+  "slug": "nombre-del-taller",
+  "name": "NOMBRE DEL TALLER",
+  "status": "activo",
+  "ownerEmail": "propietario@correo-del-taller.es",
+  "domains": [
+    "www.dominio-del-taller.es"
+  ],
+  "published": false,
+  "isDemoContent": true,
+  "theme": {
+    "design": "premium",
+    "accent": "#E4572E",
+    "headingFont": "archivo",
+    "logo": null,
+    "colors": {
+      "background": null,
+      "surface": null,
+      "text": null
+    },
+    "sections": {
+      "presentacion": true,
+      "servicios": true,
+      "software": true,
+      "ventajas": true,
+      "proceso": true,
+      "comercial": false,
+      "solicitudes": true,
+      "contacto": true
+    },
+    "software": {
+      "ordenes": true,
+      "clientes": true,
+      "portal": true,
+      "avisos": true,
+      "solicitudes": true,
+      "equipo": true,
+      "matriculas": false
+    },
+    "scrollFrames": null
+  },
+  "content": {
+    "tagline": "[PENDIENTE] Lema del taller",
+    "city": "[PENDIENTE] Localidad",
+    "intro": "[PENDIENTE] Una o dos frases que presenten el taller, con datos reales que el taller haya confirmado.",
+    "phone": "",
+    "whatsapp": "",
+    "email": "",
+    "address": "[PENDIENTE] Dirección",
+    "hours": [
+      "[PENDIENTE] Horario"
+    ],
+    "brands": "",
+    "services": [
+      {
+        "id": "mantenimiento",
+        "name": "[PENDIENTE] Servicio",
+        "description": ""
+      }
+    ],
+    "notice": "Web en preparación: los datos marcados como pendientes aún no son definitivos.",
+    "hero": {
+      "title": "",
+      "subtitle": ""
+    },
+    "about": {
+      "title": "",
+      "points": []
+    }
+  }
+}

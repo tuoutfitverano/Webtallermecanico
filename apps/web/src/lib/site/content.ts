@@ -5,6 +5,10 @@
  * antes de pintarlo: si falta algo, la web usa valores neutros en vez de
  * romperse. Nada de este contenido es secreto: solo se sirve si el taller
  * tiene la web publicada.
+ *
+ * Plantilla: cada taller se describe en un archivo de talleres/ (ver
+ * talleres/README.md) con estos mismos dos bloques, «content» (textos y datos)
+ * y «theme» (aspecto, secciones y funciones que se enseñan).
  */
 import { z } from 'zod';
 
@@ -28,6 +32,16 @@ export const siteContentSchema = z.object({
   brands: text(200).default(''),
   services: z.array(serviceSchema).max(20).default([]),
   notice: text(300).default(''),
+  /** Portada del diseño premium. Vacío = nombre del taller y su lema. */
+  hero: z
+    .object({ title: text(90).default(''), subtitle: text(200).default('') })
+    .default({ title: '', subtitle: '' })
+    .catch({ title: '', subtitle: '' }),
+  /** Presentación del taller (diseño premium). Sin puntos, la sección no aparece. */
+  about: z
+    .object({ title: text(90).default(''), points: z.array(text(240)).max(4).default([]) })
+    .default({ title: '', points: [] })
+    .catch({ title: '', points: [] }),
 });
 
 /** Vídeo de fondo opcional: solo https y alojado donde el taller tenga derecho a usarlo. */
@@ -59,12 +73,58 @@ export const scrollFramesSchema = z.object({
 });
 export type ScrollFrames = z.output<typeof scrollFramesSchema>;
 
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+/** Diseños de la web pública. «clasico» = cristal líquido; «premium» = editorial. */
+export const SITE_DESIGNS = ['clasico', 'premium'] as const;
+export type SiteDesign = (typeof SITE_DESIGNS)[number];
+
+/** Tipografía de los titulares (las dos van incluidas en la web, sin Google Fonts). */
+export const HEADING_FONTS = ['archivo', 'instrument'] as const;
+
+/**
+ * Secciones del diseño premium. «comercial» es la venta de la plataforma a otros
+ * talleres: solo se ve en una web de demostración y la base de datos solo
+ * acepta sus solicitudes en un taller con status = 'demo'.
+ */
+export const SITE_SECTIONS = ['presentacion', 'servicios', 'software', 'ventajas', 'proceso', 'comercial', 'solicitudes', 'contacto'] as const;
+export type SiteSection = (typeof SITE_SECTIONS)[number];
+const SECTION_DEFAULTS: Record<SiteSection, boolean> = {
+  presentacion: true, servicios: true, software: true, ventajas: true, proceso: true, comercial: false, solicitudes: true, contacto: true,
+};
+
+/**
+ * Funciones del software que la web ENSEÑA (capturas y textos). Enseñar no es
+ * activar: lo que depende de un proveedor (matrículas, email) dice si está
+ * activo o pendiente según la configuración real del servidor.
+ */
+export const SOFTWARE_FEATURES = ['ordenes', 'clientes', 'portal', 'avisos', 'solicitudes', 'equipo', 'matriculas'] as const;
+export type SoftwareFeature = (typeof SOFTWARE_FEATURES)[number];
+
+const flags = <K extends string>(keys: readonly K[], defaults: Record<K, boolean>) =>
+  z
+    .object(Object.fromEntries(keys.map(k => [k, z.boolean().default(defaults[k]).catch(defaults[k])])) as Record<K, z.ZodCatch<z.ZodDefault<z.ZodBoolean>>>)
+    .default(defaults as never)
+    .catch(defaults as never);
+
 export const siteThemeSchema = z.object({
-  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#e4572e').catch('#e4572e'),
+  accent: hex.default('#e4572e').catch('#e4572e'),
   heroVideo: videoUrl,
   servicesVideo: videoUrl,
   scrollFrames: scrollFramesSchema.nullable().default(null).catch(null),
+  design: z.enum(SITE_DESIGNS).default('clasico').catch('clasico'),
+  headingFont: z.enum(HEADING_FONTS).default('archivo').catch('archivo'),
+  /** Logotipo (SVG o PNG con fondo transparente). Sin logotipo se escribe el nombre. */
+  logo: assetUrl.nullable().default(null).catch(null),
+  /** Colores del diseño premium; el acento es «accent». */
+  colors: z
+    .object({ background: hex.nullable().default(null).catch(null), surface: hex.nullable().default(null).catch(null), text: hex.nullable().default(null).catch(null) })
+    .default({ background: null, surface: null, text: null })
+    .catch({ background: null, surface: null, text: null }),
+  sections: flags(SITE_SECTIONS, SECTION_DEFAULTS),
+  software: flags(SOFTWARE_FEATURES, { ordenes: true, clientes: true, portal: true, avisos: true, solicitudes: true, equipo: true, matriculas: true }),
 });
+export type SiteTheme = z.output<typeof siteThemeSchema>;
 
 export type SiteService = z.output<typeof serviceSchema>;
 export type SiteContent = z.output<typeof siteContentSchema>;
@@ -80,7 +140,45 @@ export interface PublicSite {
   videos: { hero: string | null; services: string | null };
   /** Secuencia de fotogramas controlada por el scroll (sustituye a los vídeos de portada y servicios). */
   scrollFrames: ScrollFrames | null;
+  design: SiteDesign;
+  headingFont: SiteTheme['headingFont'];
+  logo: string | null;
+  colors: SiteTheme['colors'];
+  sections: Record<SiteSection, boolean>;
+  software: Record<SoftwareFeature, boolean>;
+  /** Sección comercial visible y con formulario: solo en webs de demostración. */
+  salesEnabled: boolean;
   content: SiteContent;
+}
+
+/** Une los datos del taller con su tema y contenido ya validados. */
+export function buildPublicSite(args: {
+  workshopId: string | null;
+  slug: string;
+  name: string;
+  isDemoContent: boolean;
+  theme: unknown;
+  content: unknown;
+}): PublicSite {
+  const content = siteContentSchema.safeParse(args.content ?? {});
+  const theme = siteThemeSchema.parse(typeof args.theme === 'object' && args.theme ? args.theme : {});
+  return {
+    workshopId: args.workshopId,
+    slug: args.slug,
+    name: args.name,
+    isDemoContent: args.isDemoContent,
+    accent: theme.accent,
+    videos: { hero: theme.heroVideo, services: theme.servicesVideo },
+    scrollFrames: theme.scrollFrames,
+    design: theme.design,
+    headingFont: theme.headingFont,
+    logo: theme.logo,
+    colors: theme.colors,
+    sections: theme.sections,
+    software: theme.software,
+    salesEnabled: theme.sections.comercial && args.isDemoContent,
+    content: content.success ? content.data : siteContentSchema.parse({}),
+  };
 }
 
 const rpcResultSchema = z.object({
@@ -98,18 +196,42 @@ export function parsePublicSite(raw: unknown): PublicSite | null {
   const parsed = rpcResultSchema.safeParse(raw);
   if (!parsed.success) return null;
   const { workshop, site } = parsed.data;
-  const content = siteContentSchema.safeParse(site.content ?? {});
-  const theme = siteThemeSchema.parse(typeof site.theme === 'object' && site.theme ? site.theme : {});
-  return {
+  return buildPublicSite({
     workshopId: workshop.id,
     slug: workshop.slug,
     name: workshop.name,
     isDemoContent: site.is_demo_content,
-    accent: theme.accent,
-    videos: { hero: theme.heroVideo, services: theme.servicesVideo },
-    scrollFrames: theme.scrollFrames,
-    content: content.success ? content.data : siteContentSchema.parse({}),
+    theme: site.theme,
+    content: site.content,
+  });
+}
+
+/**
+ * Comprueba un archivo de configuración de taller (talleres/*.json) con más
+ * rigor que la web: la web ignora lo que no entiende, pero aquí cualquier
+ * clave desconocida o valor que la web descartaría es un error que conviene
+ * ver antes de publicar. Devuelve la lista de problemas (vacía = correcto).
+ */
+export function configProblems(raw: unknown, schema: z.ZodType, path = ''): string[] {
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) return parsed.error.issues.map(i => `${path}${i.path.join('.')}: ${i.message}`);
+  const problems: string[] = [];
+  const walk = (a: unknown, b: unknown, at: string) => {
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return void problems.push(`${at.replace(/\.$/, '')}: lista no válida`);
+      a.forEach((v, i) => walk(v, b[i], `${at}${i}.`));
+    } else if (a && typeof a === 'object') {
+      if (!b || typeof b !== 'object' || Array.isArray(b)) return void problems.push(`${at || '(raíz)'}: valor no válido`);
+      for (const [k, v] of Object.entries(a)) {
+        if (!(k in b)) problems.push(`${at}${k}: clave desconocida`);
+        else walk(v, (b as Record<string, unknown>)[k], `${at}${k}.`);
+      }
+    } else if (JSON.stringify(a) !== JSON.stringify(b)) {
+      problems.push(`${at.replace(/\.$/, '')}: valor no válido (la web usaría ${JSON.stringify(b)})`);
+    }
   };
+  walk(raw, parsed.data, path);
+  return problems;
 }
 
 /** Enlace tel: a partir de un teléfono escrito con espacios. */

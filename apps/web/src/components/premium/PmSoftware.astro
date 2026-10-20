@@ -1,0 +1,75 @@
+---
+/**
+ * El software de gestión: composición con capturas reales (escritorio y móvil)
+ * y un recorrido por las pantallas que este taller tiene activadas
+ * (theme.software). Sin JavaScript se ven todas las pantallas seguidas.
+ */
+import { SCREENS } from '../../lib/site/software.ts';
+import type { PublicSite } from '../../lib/site/content.ts';
+
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const screens = SCREENS.filter(s => site.software[s.feature]);
+const C = '/plataforma/capturas';
+const lead = site.salesEnabled
+  ? 'La web no termina en la web. Detrás hay un software de gestión que conecta cada solicitud, cada orden de trabajo y cada aviso con el portal del cliente.'
+  : `${site.name} trabaja con un software de gestión que conecta cada reparación con la web y con el portal del cliente.`;
+---
+<section class="pm-section pm-software" id="software" aria-labelledby="soft-t">
+  <p class="pm-kicker">Software de gestión</p>
+  <h2 id="soft-t" class="pm-h2 pm-h2-xl reveal" data-reveal><span class="pm-line">Un taller.</span> <span class="pm-line">Un sistema más inteligente.</span></h2>
+  <p class="pm-lead pm-measure reveal" data-reveal>{lead}</p>
+
+  <div class="pm-stack" data-pm-stack>
+    <figure class="pm-window pm-window-main" data-parallax="-0.04">
+      <div class="pm-window-bar" aria-hidden="true"><span></span><span></span><span></span><em>Panel del taller · Inicio</em></div>
+      <img src={`${C}/panel-inicio.webp`} width="1600" height="1000" loading="lazy" decoding="async" alt="Inicio del panel del taller con los indicadores del día (datos de demostración)" />
+    </figure>
+    {site.software.ordenes && (
+      <figure class="pm-window pm-window-side" data-parallax="0.06">
+        <div class="pm-window-bar" aria-hidden="true"><span></span><span></span><span></span><em>Órdenes</em></div>
+        <img src={`${C}/ordenes.webp`} width="1600" height="1000" loading="lazy" decoding="async" alt="Lista de órdenes de reparación con su estado (datos de demostración)" />
+      </figure>
+    )}
+    {site.software.portal && (
+      <figure class="pm-phone" data-parallax="0.12">
+        <img src={`${C}/portal.webp`} width="780" height="1688" loading="lazy" decoding="async" alt="Portal del cliente en el móvil: aviso de vehículo listo para recoger (datos de demostración)" />
+      </figure>
+    )}
+  </div>
+  <p class="pm-caption">Capturas reales del software, con datos de demostración.</p>
+
+  {screens.length > 1 && (
+    <div class="pm-tour" data-pm-tour>
+      <div class="pm-tour-head">
+        <h3 class="pm-h3">Recorrido por las pantallas</h3>
+        <p class="pm-tour-count" aria-hidden="true"><span data-pm-tour-n>01</span> / {String(screens.length).padStart(2, '0')}</p>
+      </div>
+      <div class="pm-tour-tabs" role="tablist" aria-label="Pantallas del software" hidden data-pm-tour-tabs>
+        {screens.map((s, i) => (
+          <button type="button" role="tab" id={`pmt-${s.id}`} aria-controls={`pmp-${s.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1} data-pm-tab={s.id}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <div class="pm-tour-panels">
+        {screens.map(s => (
+          <article class:list={['pm-tour-panel', { 'is-phone': s.phone }]} id={`pmp-${s.id}`} role="tabpanel" aria-labelledby={`pmt-${s.id}`} data-pm-panel={s.id}>
+            <div class="pm-tour-copy">
+              <p class="pm-kicker">{s.label}</p>
+              <h4 class="pm-h3">{s.title}</h4>
+              <p>{s.text}</p>
+            </div>
+            <figure class:list={['pm-shot', { 'pm-shot-phone': s.phone }]}>
+              <img src={s.img} width={s.width} height={s.height} loading="lazy" decoding="async" alt={s.alt} />
+            </figure>
+          </article>
+        ))}
+      </div>
+      <div class="pm-tour-nav" hidden data-pm-tour-nav>
+        <button type="button" class="pm-round" data-pm-prev><span aria-hidden="true">←</span><span class="sr-only">Pantalla anterior</span></button>
+        <button type="button" class="pm-round" data-pm-next><span aria-hidden="true">→</span><span class="sr-only">Pantalla siguiente</span></button>
+      </div>
+    </div>
+  )}
+</section>

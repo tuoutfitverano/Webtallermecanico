@@ -57,7 +57,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 /** Campos que se aceptan del formulario; cualquier otro se ignora. */
 const STRING_FIELDS = [
-  'kind', 'name', 'phone', 'email', 'preferredContact', 'topic', 'plate', 'make', 'model',
+  'kind', 'name', 'businessName', 'phone', 'email', 'preferredContact', 'topic', 'plate', 'make', 'model',
   'service', 'preferredDate', 'preferredTime', 'message',
 ] as const;
 
@@ -125,6 +125,12 @@ export async function handleSubmission(input: SubmissionInput, deps: SubmissionD
   const result = validateWebRequest(fields, { services: site.content.services.map(s => s.id), today: deps.today() });
   if (!result.ok) {
     return fail(422, 'validation', 'Revisa los campos marcados.', result.errors);
+  }
+  // Las solicitudes de digitalización solo existen en la web de demostración con
+  // la sección comercial (la base de datos lo vuelve a comprobar).
+  if (result.data.kind === 'digitalizacion' && !site.salesEnabled) {
+    deps.log('request_rejected', { reason: 'sales_disabled' });
+    return fail(422, 'validation', 'Este formulario no está disponible en esta web.');
   }
 
   // 6. Configuración mínima para poder guardar de verdad.

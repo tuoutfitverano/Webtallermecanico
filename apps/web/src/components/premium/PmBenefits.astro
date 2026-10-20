@@ -1,0 +1,44 @@
+---
+/**
+ * Ventajas para el cliente del taller. Cada una sale de una función real del
+ * software que el taller tiene activada; el email solo se menciona si está
+ * configurado de verdad.
+ */
+import type { PublicSite } from '../../lib/site/content.ts';
+import type { FeatureStatus } from '../../lib/site/software.ts';
+
+interface Props { site: PublicSite; status: FeatureStatus }
+const { site, status } = Astro.props;
+const f = site.software;
+const items = [
+  f.portal && { title: 'Tu reparación, en tu móvil', text: 'Consulta en tu portal en qué punto está tu coche, sin tener que llamar para preguntar.' },
+  f.avisos && { title: 'Te avisamos cuando cambia algo', text: status.email ? 'Un aviso en tu portal y por correo cada vez que tu coche cambia de estado.' : 'Un aviso en tu portal cada vez que tu coche cambia de estado.' },
+  f.ordenes && f.portal && { title: 'Información clara', text: 'La diagnosis y el trabajo realizado, explicados, cuando el taller los comparte contigo.' },
+  f.portal && { title: 'El historial de tu coche, a mano', text: 'Cada reparación queda registrada y la puedes volver a consultar cuando quieras.' },
+  f.solicitudes && site.sections.solicitudes && { title: 'Pide cita a cualquier hora', text: 'Envía tu solicitud desde la web. El taller te contacta para confirmarla.' },
+].filter(Boolean) as { title: string; text: string }[];
+---
+{items.length > 0 && (
+  <section class="pm-section pm-benefits" id="ventajas" aria-labelledby="vent-t">
+    <div class="pm-benefits-media" aria-hidden="true">
+      {f.portal && (
+        <figure class="pm-phone pm-phone-static">
+          <img src="/plataforma/capturas/portal-vehiculos.webp" width="780" height="1688" loading="lazy" decoding="async" alt="" />
+        </figure>
+      )}
+    </div>
+    <div class="pm-benefits-copy">
+      <p class="pm-kicker">{site.salesEnabled ? 'Para los clientes del taller' : 'Para ti'}</p>
+      <h2 id="vent-t" class="pm-h2 reveal" data-reveal><span class="pm-line">Tu coche,</span> <span class="pm-line">siempre a la vista.</span></h2>
+      <ol class="pm-benefit-list">
+        {items.map((it, i) => (
+          <li class="pm-benefit reveal" data-reveal>
+            <span class="pm-benefit-n">{String(i + 1).padStart(2, '0')}</span>
+            <div><h3>{it.title}</h3><p>{it.text}</p></div>
+          </li>
+        ))}
+      </ol>
+      {f.portal && <p class="pm-note">El acceso al portal lo da el taller con una invitación personal.</p>}
+    </div>
+  </section>
+)}

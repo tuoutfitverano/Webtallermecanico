@@ -55,7 +55,10 @@ export const POST: APIRoute = async ({ request }) => {
     const params = new URLSearchParams(
       result.body.ok ? { solicitud: 'ok', ref: result.body.reference } : { solicitud: 'error', motivo: result.body.error },
     );
-    return new Response(null, { status: 303, headers: { location: `/?${params}#solicitar`, 'cache-control': 'no-store' } });
+    // La sección comercial tiene su propio formulario y su propio resultado.
+    const sales = (body as Record<string, unknown> | null)?.kind === 'digitalizacion';
+    if (sales) params.set('tipo', 'digitalizacion');
+    return new Response(null, { status: 303, headers: { location: `/?${params}#${sales ? 'digitalizar' : 'solicitar'}`, 'cache-control': 'no-store' } });
   }
   return json(result.body, result.status);
 };

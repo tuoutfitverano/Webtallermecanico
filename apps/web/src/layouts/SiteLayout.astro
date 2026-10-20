@@ -12,20 +12,23 @@ interface Props {
   title: string;
   description?: string;
   noindex?: boolean;
+  /** Diseño premium: aplica también el color de fondo del taller a toda la página. */
+  premium?: boolean;
 }
-const { site, title, description = site.content.intro, noindex = false } = Astro.props;
+const { site, title, description = site.content.intro, noindex = false, premium = false } = Astro.props;
+const rootStyle = [`--accent:${site.accent}`, premium && site.colors.background ? `--bg:${site.colors.background}` : ''].filter(Boolean).join(';');
 // Una web de demostración no debe aparecer en buscadores.
 const robots = noindex || site.isDemoContent ? 'noindex, nofollow' : 'index, follow';
 ---
 <!doctype html>
-<html lang="es" style={`--accent:${site.accent}`}>
+<html lang="es" style={rootStyle}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <meta name="robots" content={robots} />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content={premium && site.colors.background ? site.colors.background : '#000000'} />
     <meta name="color-scheme" content="dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!--

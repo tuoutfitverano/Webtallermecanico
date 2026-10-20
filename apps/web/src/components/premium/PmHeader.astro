@@ -1,0 +1,37 @@
+---
+/** Cabecera del diseño premium: logotipo o nombre, secciones y llamada principal. */
+import type { PublicSite } from '../../lib/site/content.ts';
+
+interface Props {
+  site: PublicSite;
+  showServices: boolean;
+  showSoftware: boolean;
+  showContact: boolean;
+}
+const { site, showServices, showSoftware, showContact } = Astro.props;
+const links = [
+  showServices && { href: '#servicios', label: 'Servicios' },
+  showSoftware && { href: '#software', label: 'Software' },
+  site.sections.proceso && { href: '#proceso', label: 'Proceso' },
+  site.salesEnabled && { href: '#digitalizar', label: 'Para talleres' },
+  showContact && { href: '#contacto', label: 'Contacto' },
+  { href: '/acceso', label: 'Área de clientes', rel: 'nofollow' },
+].filter(Boolean) as { href: string; label: string; rel?: string }[];
+const cta = site.salesEnabled
+  ? { href: '#digitalizar', label: 'Digitalizar mi taller' }
+  : site.sections.solicitudes ? { href: '#solicitar', label: 'Solicitar cita' } : null;
+---
+<header class="pm-header" data-pm-header>
+  <a href="#inicio" class="pm-logo" aria-label={`${site.name}, inicio`}>
+    {site.logo ? <img src={site.logo} alt="" height="28" /> : site.name.toUpperCase()}
+  </a>
+  <nav class="pm-nav" id="pm-nav" aria-label="Secciones">
+    {links.map(l => <a href={l.href} rel={l.rel}>{l.label}</a>)}
+  </nav>
+  <div class="pm-header-side">
+    {cta && <a href={cta.href} class="pm-btn pm-btn-light pm-hide-sm">{cta.label}</a>}
+    <button class="pm-menu" type="button" aria-expanded="false" aria-controls="pm-nav" data-pm-menu>
+      <span class="sr-only">Menú</span><span aria-hidden="true"></span>
+    </button>
+  </div>
+</header>

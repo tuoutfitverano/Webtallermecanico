@@ -42,8 +42,8 @@ function start(stage: HTMLElement) {
   const frameTop = Number(stage.dataset.frameTop ?? 0);
   if (!canvas || !ctx || !dim || !hero || !turnGap || !zoomGap || !src.includes('{n}') || !(count >= 2)) return;
   const second = turnGap.nextElementSibling as HTMLElement | null;
-  // Color de fondo de la web: el fundido final acaba en él (enlaza con la siguiente sección).
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#000';
+  // Color de fondo de la web (el diseño premium puede redefinirlo): el fundido final acaba en él.
+  const bg = getComputedStyle(stage).getPropertyValue('--bg').trim() || '#000';
 
   document.documentElement.classList.add('stage-on');
 

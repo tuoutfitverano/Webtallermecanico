@@ -1,0 +1,18 @@
+---
+/** Proceso: los seis estados reales de una orden y el texto que ve el cliente en su portal. */
+import { REPAIR_STATUSES, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS } from '@talleres/core';
+---
+<section class="pm-section pm-process" id="proceso" aria-labelledby="proc-t">
+  <p class="pm-kicker">Proceso</p>
+  <h2 id="proc-t" class="pm-h2 reveal" data-reveal><span class="pm-line">De la recepción</span> <span class="pm-line">a la entrega.</span></h2>
+  <p class="pm-lead pm-measure">Son los mismos pasos que registra el sistema del taller y que el cliente ve en su portal, con el mismo texto.</p>
+  <ol class="pm-steps" data-pm-progress>
+    {REPAIR_STATUSES.map((s, i) => (
+      <li class="pm-step reveal" data-reveal style={`--d:${i * 0.06}s`}>
+        <span class="pm-step-n">{String(i + 1).padStart(2, '0')}</span>
+        <h3>{REPAIR_STATUS_LABELS[s]}</h3>
+        <p>{REPAIR_STATUS_CUSTOMER_TEXT[s]}</p>
+      </li>
+    ))}
+  </ol>
+</section>

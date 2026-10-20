@@ -1,0 +1,26 @@
+---
+/** Contacto del taller: dirección, teléfono, correo y horario (content). */
+import Icon from '../Icon.astro';
+import type { PublicSite } from '../../lib/site/content.ts';
+import { telHref, whatsappHref } from '../../lib/site/content.ts';
+
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const c = site.content;
+const tel = telHref(c.phone);
+const wa = whatsappHref(c.whatsapp);
+const maps = c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : '';
+---
+<section class="pm-section pm-contact" id="contacto" aria-labelledby="cont-t">
+  <p class="pm-kicker">Contacto</p>
+  <h2 id="cont-t" class="pm-h2 reveal" data-reveal><span class="pm-line">Dónde</span> <span class="pm-line">encontrarnos.</span></h2>
+  <dl class="pm-contact-list">
+    {c.address && (
+      <div><dt>Dirección</dt><dd>{c.address}{maps && <> <a class="pm-link" href={maps} target="_blank" rel="noopener">Cómo llegar <Icon name="arrowUpRight" /></a></>}</dd></div>
+    )}
+    {c.phone && <div><dt>Teléfono</dt><dd>{tel ? <a href={tel}>{c.phone}</a> : c.phone}</dd></div>}
+    {wa && <div><dt>WhatsApp</dt><dd><a href={wa} target="_blank" rel="noopener">{c.whatsapp}</a></dd></div>}
+    {c.email && <div><dt>Correo</dt><dd><a href={`mailto:${c.email}`}>{c.email}</a></dd></div>}
+    {c.hours.length > 0 && <div><dt>Horario</dt><dd>{c.hours.map(h => <span class="pm-block">{h}</span>)}</dd></div>}
+  </dl>
+</section>

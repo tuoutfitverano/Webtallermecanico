@@ -1,6 +1,8 @@
 /**
  * Solicitudes que llegan desde la web pública de un taller:
- * contacto, cita y presupuesto.
+ * contacto, cita y presupuesto. Además, en la web de DEMOSTRACIÓN (sección
+ * comercial), «digitalización»: un propietario de otro taller pide información
+ * sobre la web y el software (la base de datos solo la acepta en un taller demo).
  *
  * Este esquema se usa DOS veces con el mismo código:
  *  · en el navegador, para avisar de errores antes de enviar;
@@ -13,13 +15,14 @@
 import { z } from 'zod';
 import { normalizePlate, PLATE_MAX_LENGTH, PLATE_MIN_LENGTH } from './plates.ts';
 
-export const REQUEST_KINDS = ['cita', 'presupuesto', 'contacto'] as const;
+export const REQUEST_KINDS = ['cita', 'presupuesto', 'contacto', 'digitalizacion'] as const;
 export type RequestKind = (typeof REQUEST_KINDS)[number];
 
 export const REQUEST_KIND_LABELS: Readonly<Record<RequestKind, string>> = {
   cita: 'Solicitud de cita',
   presupuesto: 'Solicitud de presupuesto',
   contacto: 'Contacto',
+  digitalizacion: 'Digitalizar mi taller (comercial)',
 };
 
 /** Estados de una solicitud (igual que el tipo request_status de la base de datos). */
@@ -45,6 +48,16 @@ export const CONTACT_TOPIC_LABELS: Readonly<Record<ContactTopic, string>> = {
   otro: 'Otro motivo',
 };
 
+/** Qué le interesa a un taller que pide digitalizarse (se guarda en «topic»). */
+export const SALES_INTERESTS = ['web_y_software', 'web', 'software', 'informacion'] as const;
+export type SalesInterest = (typeof SALES_INTERESTS)[number];
+export const SALES_INTEREST_LABELS: Readonly<Record<SalesInterest, string>> = {
+  web_y_software: 'Web y software de gestión',
+  web: 'Solo la web',
+  software: 'Solo el software de gestión',
+  informacion: 'Aún no lo sé: quiero información',
+};
+
 export const CONTACT_CHANNELS = ['telefono', 'whatsapp', 'email'] as const;
 export type ContactChannel = (typeof CONTACT_CHANNELS)[number];
 export const CONTACT_CHANNEL_LABELS: Readonly<Record<ContactChannel, string>> = {
@@ -66,6 +79,7 @@ export const OTHER_SERVICE = 'otro';
 
 export const LIMITS = {
   name: { min: 2, max: 120 },
+  businessName: { min: 2, max: 120 },
   phoneDigits: { min: 9, max: 15 },
   email: 254,
   make: 60,
@@ -119,6 +133,7 @@ function buildSchema(rules: RequestRules) {
     .object({
       kind: z.enum(REQUEST_KINDS, { error: 'Tipo de solicitud no válido.' }),
       name: optText(LIMITS.name.max, 'Nombre'),
+      businessName: optText(LIMITS.businessName.max, 'Nombre del taller'),
       phone: optText(30, 'Teléfono'),
       email: optText(LIMITS.email, 'Correo'),
       preferredContact: optText(20, 'Canal'),
@@ -162,6 +177,9 @@ function buildSchema(rules: RequestRules) {
       if (v.kind === 'contacto') {
         if (!oneOf(CONTACT_TOPICS, v.topic)) add('topic', 'Elige el motivo del contacto.');
         if (!v.message || v.message.length < LIMITS.message.min) add('message', `Cuéntanos tu consulta (mínimo ${LIMITS.message.min} caracteres).`);
+      } else if (v.kind === 'digitalizacion') {
+        if (!v.businessName || v.businessName.length < LIMITS.businessName.min) add('businessName', 'Escribe el nombre de tu taller.');
+        if (!oneOf(SALES_INTERESTS, v.topic)) add('topic', 'Elige qué te interesa.');
       } else {
         if (!v.service) add('service', 'Elige el servicio que necesitas.');
         else if (!services.has(v.service)) add('service', 'Elige un servicio de la lista.');
@@ -178,22 +196,26 @@ function buildSchema(rules: RequestRules) {
         else if (v.preferredDate > addDays(today, LIMITS.maxDaysAhead)) add('preferredDate', 'Elige una fecha dentro del próximo año.');
       }
     })
-    .transform(v => ({
+    .transform(v => {
+      const vehicle = v.kind === 'cita' || v.kind === 'presupuesto';
+      return {
       kind: v.kind,
       name: v.name ?? '',
       phone: v.phone,
       email: v.email ? v.email.toLowerCase() : null,
       preferredContact: v.preferredContact as ContactChannel | null,
       // Solo se guarda lo que corresponde a cada tipo de solicitud.
-      topic: v.kind === 'contacto' ? (v.topic as ContactTopic | null) : null,
-      plate: v.kind === 'contacto' || !v.plate ? null : normalizePlate(v.plate),
-      make: v.kind === 'contacto' ? null : v.make,
-      model: v.kind === 'contacto' ? null : v.model,
-      service: v.kind === 'contacto' ? null : v.service,
+      topic: v.kind === 'contacto' || v.kind === 'digitalizacion' ? (v.topic as ContactTopic | SalesInterest | null) : null,
+      businessName: v.kind === 'digitalizacion' ? v.businessName : null,
+      plate: !vehicle || !v.plate ? null : normalizePlate(v.plate),
+      make: vehicle ? v.make : null,
+      model: vehicle ? v.model : null,
+      service: vehicle ? v.service : null,
       preferredDate: v.kind === 'cita' ? v.preferredDate : null,
       preferredTime: v.kind === 'cita' ? (v.preferredTime as TimeSlot | null) : null,
       message: v.message,
-    }));
+      };
+    });
 }
 
 export type WebRequestInput = z.input<ReturnType<typeof buildSchema>>;

@@ -7,7 +7,10 @@ const dir = new URL('../../../../supabase/migrations/', import.meta.url);
 const sql = readdirSync(dir).filter(f => f.endsWith('.sql')).sort().map(f => readFileSync(new URL(f, dir), 'utf8')).join('\n');
 const enumValues = (name: string) => {
   const m = new RegExp(`create type public\\.${name} as enum \\(([^)]*)\\)`).exec(sql);
-  return m ? [...m[1]!.matchAll(/'([^']+)'/g)].map(x => x[1]) : null;
+  if (!m) return null;
+  // Valores añadidos después con «alter type … add value».
+  const added = [...sql.matchAll(new RegExp(`alter type public\\.${name} add value (?:if not exists )?'([^']+)'`, 'g'))].map(x => x[1]);
+  return [...[...m[1]!.matchAll(/'([^']+)'/g)].map(x => x[1]), ...added];
 };
 
 describe('Tipos sincronizados con la base de datos', () => {

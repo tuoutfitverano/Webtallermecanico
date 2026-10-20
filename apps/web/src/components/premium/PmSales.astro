@@ -1,0 +1,84 @@
+---
+/**
+ * Sección comercial (solo en la web de demostración): vender la web y el
+ * software a propietarios de otros talleres. Formulario REAL: la solicitud
+ * («digitalizacion») se guarda en la bandeja del taller demo; la base de datos
+ * la rechaza en cualquier taller que no sea de demostración.
+ * Sin datos de contacto comerciales inventados ni promesas de resultados.
+ */
+import Icon from '../Icon.astro';
+import RequestForm from '../RequestForm.astro';
+import type { PublicSite } from '../../lib/site/content.ts';
+import { capabilityList, type FeatureStatus } from '../../lib/site/software.ts';
+
+interface Props {
+  site: PublicSite;
+  turnstileSiteKey: string | null;
+  result: { ok: boolean; ref?: string } | null;
+  status: FeatureStatus;
+}
+const { site, turnstileSiteKey, result, status } = Astro.props;
+const benefits = [
+  { title: 'Una imagen profesional en internet', text: 'Una web rápida y cuidada, pensada para el móvil, con tus servicios y formularios que de verdad llegan al taller.' },
+  { title: 'Con la identidad de tu taller', text: 'Tu nombre, tus colores, tu logotipo, tus fotos y tus textos. La misma base técnica, un resultado propio.' },
+  { title: 'Herramientas para organizar el trabajo', text: 'Órdenes de reparación, clientes, vehículos y equipo en un panel, con permisos para cada persona.' },
+  { title: 'Una experiencia más clara para tus clientes', text: 'Un portal con el estado de cada reparación y avisos automáticos cuando cambia algo.' },
+  { title: 'Todo en un mismo sitio', text: 'Web, gestión y solicitudes conectadas, con la posibilidad de mantenimiento y mejoras continuas.' },
+];
+const capabilities = capabilityList(site.software, status);
+---
+<section class="pm-sales" id="digitalizar" aria-labelledby="sales-t">
+  <div class="pm-section pm-sales-inner">
+    <p class="pm-kicker">Para propietarios de talleres</p>
+    <h2 id="sales-t" class="pm-h2 pm-h2-xl reveal" data-reveal><span class="pm-line">Tu taller también</span> <span class="pm-line">puede trabajar así.</span></h2>
+    <p class="pm-lead pm-measure reveal" data-reveal>
+      {site.name} es un taller ficticio: esta web es una demostración de lo que hacemos. Creamos la web de tu taller con tu identidad y la conectamos con el software de gestión, adaptado a tu forma de trabajar.
+    </p>
+
+    <div class="pm-sales-grid">
+      <ol class="pm-sales-benefits">
+        {benefits.map((b, i) => (
+          <li class="reveal" data-reveal style={`--d:${i * 0.05}s`}>
+            <span class="pm-benefit-n">{String(i + 1).padStart(2, '0')}</span>
+            <div><h3>{b.title}</h3><p>{b.text}</p></div>
+          </li>
+        ))}
+      </ol>
+
+      <div class="pm-sales-side">
+        <div class="pm-capabilities">
+          <h3 class="pm-kicker">Qué incluye hoy el software</h3>
+          <ul>
+            {capabilities.map(c => (
+              <li class:list={{ 'is-pending': !c.active }}>
+                <span class="pm-cap-dot" aria-hidden="true"></span>
+                <span>{c.label}{c.note && <em> · {c.note}</em>}</span>
+                <span class="sr-only">{c.active ? '(operativo)' : '(pendiente de activar)'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div class="req pm-sales-form" data-sales>
+          {result && (
+            <div class={`alert ${result.ok ? 'alert-ok' : 'alert-bad'}`} role="status">
+              <Icon name={result.ok ? 'check' : 'alert'} />
+              <span>
+                {result.ok
+                  ? <>Solicitud recibida. Referencia <strong>{result.ref}</strong>. Te contactaremos con los datos que nos has dado.</>
+                  : <>No hemos podido enviar tu solicitud y no se ha guardado. Revisa los datos e inténtalo de nuevo.</>}
+              </span>
+            </div>
+          )}
+          <p class="pm-form-title">Solicita una demostración</p>
+          <p class="pm-form-note">Te contactamos para enseñarte la web y el software con calma. Enviar el formulario no te compromete a nada.</p>
+          <RequestForm kind="digitalizacion" services={[]} turnstileSiteKey={turnstileSiteKey} standalone />
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import '../../scripts/request-forms.ts';
+</script>

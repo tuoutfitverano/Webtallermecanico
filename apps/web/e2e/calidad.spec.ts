@@ -86,9 +86,9 @@ async function audit(page: Page, paths: string[], isMobile: boolean) {
 }
 
 test('web pública: accesibilidad, consola, enlaces y móvil', async ({ page, isMobile }) => {
-  await audit(page, ['/', '/premium', '/privacidad', '/aviso-legal', '/cookies', '/acceso', '/registro', '/recuperar', '/privacidad-cuenta', '/condiciones'], isMobile);
-  // Enlaces internos de las dos portadas (actual y premium): ninguno roto.
-  for (const home of ['/', '/premium']) {
+  await audit(page, ['/', '/clasico', '/privacidad', '/aviso-legal', '/cookies', '/acceso', '/registro', '/recuperar', '/privacidad-cuenta', '/condiciones'], isMobile);
+  // Enlaces internos de las dos portadas (premium y clásica): ninguno roto.
+  for (const home of ['/', '/clasico']) {
     await page.goto(home);
     const hrefs = await page.locator('a[href^="/"]').evaluateAll(as => [...new Set(as.map(a => (a as HTMLAnchorElement).getAttribute('href')!.split('#')[0]!))]);
     for (const href of hrefs.filter(Boolean)) {

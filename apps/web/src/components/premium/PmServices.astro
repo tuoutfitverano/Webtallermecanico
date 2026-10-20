@@ -1,0 +1,26 @@
+---
+/** Servicios del taller (content.services), con enlace a pedir cita de cada uno. */
+import Icon from '../Icon.astro';
+import type { PublicSite } from '../../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const c = site.content;
+const canAsk = site.sections.solicitudes;
+---
+<section class="pm-section pm-services" id="servicios" aria-labelledby="serv-t">
+  <p class="pm-kicker">Servicios</p>
+  <h2 id="serv-t" class="pm-h2 reveal" data-reveal><span class="pm-line">El trabajo,</span> <span class="pm-line">bien hecho.</span></h2>
+  {c.brands && <p class="pm-note">Trabajamos con {c.brands.toLowerCase()}.</p>}
+  <ol class="pm-service-list">
+    {c.services.map((s, i) => (
+      <li class="pm-service reveal" data-reveal>
+        <span class="pm-service-n">{String(i + 1).padStart(2, '0')}</span>
+        <div class="pm-service-body">
+          <h3>{s.name}</h3>
+          {s.description && <p>{s.description}</p>}
+        </div>
+        {canAsk && <a class="pm-link" href="#solicitar" data-service={s.id} aria-label={`Pedir cita: ${s.name}`}>Pedir cita <Icon name="arrowUpRight" /></a>}
+      </li>
+    ))}
+  </ol>
+</section>

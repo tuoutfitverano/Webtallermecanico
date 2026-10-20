@@ -1,20 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { DEMO_SITE } from './demo.ts';
+import { DEMO_CONFIG, DEMO_SITE } from './demo.ts';
 import { parsePublicSite, siteContentSchema, siteThemeSchema } from './content.ts';
 
 describe('web de demostración', () => {
-  it('la demo local y los datos de la base de datos (seed.sql) coinciden', () => {
+  it('la demo local, seed.sql y talleres/autovalue.json coinciden', () => {
     const seed = readFileSync(fileURLToPath(new URL('../../../../../supabase/seed.sql', import.meta.url)), 'utf8');
-    const match = seed.match(/insert into public\.workshop_sites[\s\S]*?'(\{"accent"[^']*\})',\s*'([\s\S]*?)'\s*\);/);
-    expect(match, 'no encuentro el contenido del taller demo en seed.sql').toBeTruthy();
-    const content = siteContentSchema.parse(JSON.parse(match![2]!.replace(/''/g, "'")));
-    expect(content).toEqual(DEMO_SITE.content);
-    const theme = siteThemeSchema.parse(JSON.parse(match![1]!));
-    expect(theme.accent).toBe(DEMO_SITE.accent);
-    expect({ hero: theme.heroVideo, services: theme.servicesVideo }).toEqual(DEMO_SITE.videos);
-    expect(theme.scrollFrames).toEqual(DEMO_SITE.scrollFrames);
+    const theme = seed.match(/\$tema\$([\s\S]*?)\$tema\$/)?.[1];
+    const content = seed.match(/\$contenido\$([\s\S]*?)\$contenido\$/)?.[1];
+    expect(theme && content, 'no encuentro el tema y el contenido del taller demo en seed.sql').toBeTruthy();
+    expect(JSON.parse(theme!)).toEqual(DEMO_CONFIG.theme);
+    expect(JSON.parse(content!)).toEqual(DEMO_CONFIG.content);
+    expect(seed).toContain(`'${DEMO_CONFIG.slug}', '${DEMO_CONFIG.name}', '${DEMO_CONFIG.status}'`);
+    expect(DEMO_SITE.content).toEqual(siteContentSchema.parse(DEMO_CONFIG.content));
+    expect(DEMO_SITE.scrollFrames).toEqual(siteThemeSchema.parse(DEMO_CONFIG.theme).scrollFrames);
   });
 
   it('el contenido de un taller se valida y lo que falta tiene valores neutros', () => {

@@ -50,13 +50,15 @@ async function adminRows(path: string) {
 
 // ======================================================================
 test.describe('Navegación', () => {
-  test('la web pública lleva al área de clientes', async ({ page, isMobile }) => {
-    await page.goto('/');
-    if (isMobile) await page.getByRole('button', { name: 'Abrir menú' }).click();
-    await page.getByRole('navigation', { name: 'Principal' }).getByRole('link', { name: 'Área de clientes' }).click();
-    await expect(page).toHaveURL(/\/acceso$/);
-    await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
-  });
+  for (const [path, navName, menuName] of [['/', 'Secciones', 'Menú'], ['/clasico', 'Principal', 'Abrir menú']] as const) {
+    test(`la web pública (${path}) lleva al área de clientes`, async ({ page, isMobile }) => {
+      await page.goto(path);
+      if (isMobile) await page.getByRole('button', { name: menuName, exact: true }).click();
+      await page.getByRole('navigation', { name: navName }).getByRole('link', { name: 'Área de clientes' }).click();
+      await expect(page).toHaveURL(/\/acceso$/);
+      await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
+    });
+  }
 
   test('escritorio: la gestora ve todas las secciones; el mecánico, solo las suyas', async ({ page, isMobile }) => {
     test.skip(isMobile, 'Escritorio');

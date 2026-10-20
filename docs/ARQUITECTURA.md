@@ -126,6 +126,13 @@ Una única aplicación Astro decide qué taller mostrar según el **dominio** de
 
 Para probar en local se usa `demo.localhost`, que siempre apunta a tu propio ordenador. Sin Supabase configurado, `npm run dev` muestra una demo local (`src/lib/site/demo.ts`) cuyos formularios responden "no disponible".
 
+### Plantilla: un diseño compartido, un archivo por taller
+
+- Cada taller se describe en `talleres/<taller>.json`: identidad, textos, servicios, contacto, colores, tipografía, logotipo, secciones visibles y funciones del software que se enseñan. Ese archivo se comprueba con `npm test` y se carga en `workshop_sites` con el SQL de `npm run taller:sql`. La web nunca lee el archivo en producción.
+- `theme.design` elige el diseño: `premium` (secciones en `components/premium/`) o `clasico` (el anterior). Los componentes son los mismos para todos; lo que no se configura usa valores neutros.
+- La sección comercial (`theme.sections.comercial`) es para la demo AutoValue. Su formulario guarda solicitudes `digitalizacion`, que la base de datos solo acepta en talleres con `status = 'demo'`.
+- Guía y estado de las funciones: `docs/PLANTILLA_TALLERES.md`.
+
 ### Solicitudes desde la web (contacto, cita, presupuesto)
 
 ```

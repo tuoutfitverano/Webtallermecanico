@@ -1,0 +1,107 @@
+---
+/**
+ * Diseño «premium» de la web de un taller (plantilla). Las secciones son
+ * compartidas por todos los talleres; qué se ve y con qué textos sale de la
+ * configuración del taller (theme.sections, content, theme.software).
+ *
+ *  · Portada, presentación y servicios sobre el coche que gira (si el taller
+ *    tiene fotogramas) o sobre un fondo propio del diseño.
+ *  · Software: capturas reales y recorrido por las pantallas.
+ *  · Sección comercial «Tu taller también puede trabajar así»: solo en la web
+ *    de demostración (site.salesEnabled), con su formulario real.
+ */
+import '@fontsource-variable/archivo/standard.css';
+import '../../styles/premium.css';
+import DemoNotice from '../DemoNotice.astro';
+import ScrollStage from '../ScrollStage.astro';
+import FadingVideo from '../FadingVideo.astro';
+import RequestForms from '../RequestForms.astro';
+import PmHeader from './PmHeader.astro';
+import PmHero from './PmHero.astro';
+import PmAbout from './PmAbout.astro';
+import PmServices from './PmServices.astro';
+import PmSoftware from './PmSoftware.astro';
+import PmBenefits from './PmBenefits.astro';
+import PmProcess from './PmProcess.astro';
+import PmSales from './PmSales.astro';
+import PmContact from './PmContact.astro';
+import PmFooter from './PmFooter.astro';
+import type { PublicSite } from '../../lib/site/content.ts';
+import type { FeatureStatus } from '../../lib/site/software.ts';
+
+interface Props {
+  site: PublicSite;
+  turnstileSiteKey: string | null;
+  /** Resultado de un envío sin JavaScript: formularios del taller o de digitalización. */
+  noJsResult: { ok: boolean; ref?: string } | null;
+  salesResult: { ok: boolean; ref?: string } | null;
+  status: FeatureStatus;
+}
+const { site, turnstileSiteKey, noJsResult, salesResult, status } = Astro.props;
+const s = site.sections;
+const c = site.content;
+const showAbout = s.presentacion && c.about.points.length > 0;
+const showServices = s.servicios && c.services.length > 0;
+const showSoftware = s.software && Object.values(site.software).some(Boolean);
+const showContact = s.contacto && Boolean(c.address || c.phone || c.email || c.hours.length);
+const sales = site.salesEnabled;
+
+// Colores del taller (si no los define, los del diseño).
+const vars = [
+  site.colors.background && `--pm-bg:${site.colors.background};--bg:${site.colors.background}`,
+  site.colors.surface && `--pm-graphite:${site.colors.surface}`,
+  site.colors.text && `--pm-fg:${site.colors.text}`,
+].filter(Boolean).join(';');
+
+// En la demo, el formulario del taller se presenta como lo que es: una prueba.
+const demoForms = site.isDemoContent
+  ? {
+      kicker: 'Formularios del taller',
+      title: `Pide cita en ${site.name}`,
+      lead: `Así piden cita o presupuesto los clientes de un taller. ${site.name} es un taller de demostración: la solicitud se guarda de verdad en su bandeja, pero no se reserva ninguna reparación.`,
+    }
+  : { kicker: 'Cita, presupuesto o consulta', title: 'Cuéntanos qué necesitas', lead: undefined };
+---
+<div class="pm" style={vars || undefined} data-font={site.headingFont}>
+  <DemoNotice site={site} />
+  <script is:inline>document.documentElement.classList.add('pm-js');</script>
+  <PmHeader site={site} showServices={showServices} showSoftware={showSoftware} showContact={showContact} />
+
+  <main id="inicio">
+    {site.scrollFrames ? (
+      <ScrollStage frames={site.scrollFrames}>
+        <PmHero slot="first" site={site} />
+        <div slot="second" class="pm-over">
+          {showAbout && <PmAbout site={site} />}
+          {showServices && <PmServices site={site} />}
+        </div>
+      </ScrollStage>
+    ) : (
+      <>
+        <div class="pm-hero-plain">
+          {site.videos.hero && <FadingVideo src={site.videos.hero} class="pm-hero-video" />}
+          <PmHero site={site} />
+        </div>
+        {showAbout && <PmAbout site={site} />}
+        {showServices && <PmServices site={site} />}
+      </>
+    )}
+
+    {showSoftware && <PmSoftware site={site} />}
+    {s.ventajas && showSoftware && <PmBenefits site={site} status={status} />}
+    {s.proceso && <PmProcess />}
+    {sales && <PmSales site={site} turnstileSiteKey={turnstileSiteKey} result={salesResult} status={status} />}
+    {s.solicitudes && (
+      <div class="pm-forms">
+        <RequestForms site={site} turnstileSiteKey={turnstileSiteKey} noJsResult={noJsResult} kicker={demoForms.kicker} title={demoForms.title} lead={demoForms.lead} />
+      </div>
+    )}
+    {showContact && <PmContact site={site} />}
+  </main>
+
+  <PmFooter site={site} />
+</div>
+
+<script>
+  import '../../scripts/premium.ts';
+</script>

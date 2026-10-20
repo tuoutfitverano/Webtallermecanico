@@ -1,6 +1,7 @@
 ---
 /**
- * Un formulario de solicitud: cita, presupuesto o contacto.
+ * Un formulario de solicitud: cita, presupuesto o contacto. En la web de
+ * demostración, también «digitalizar mi taller» (sección comercial, sin pestaña).
  * Funciona con JavaScript (envío asíncrono con estados) y, como reserva,
  * sin él (envío clásico al mismo endpoint).
  */
@@ -11,6 +12,8 @@ import {
   CONTACT_TOPICS,
   LIMITS,
   OTHER_SERVICE,
+  SALES_INTEREST_LABELS,
+  SALES_INTERESTS,
   TIME_SLOT_LABELS,
   TIME_SLOTS,
   type RequestKind,
@@ -23,22 +26,26 @@ interface Props {
   services: SiteService[];
   turnstileSiteKey: string | null;
   hidden?: boolean;
+  /** Formulario suelto, fuera de las pestañas (el de digitalización). */
+  standalone?: boolean;
 }
-const { kind, services, turnstileSiteKey, hidden = false } = Astro.props;
+const { kind, services, turnstileSiteKey, hidden = false, standalone = false } = Astro.props;
 const id = (field: string) => `${kind}-${field}`;
 const err = (field: string) => `${kind}-err-${field}`;
 const isContact = kind === 'contacto';
+const isSales = kind === 'digitalizacion';
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
 const maxDate = (() => {
   const d = new Date(`${today}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + LIMITS.maxDaysAhead);
   return d.toISOString().slice(0, 10);
 })();
-const submitLabel = { cita: 'Enviar solicitud de cita', presupuesto: 'Pedir presupuesto', contacto: 'Enviar mensaje' }[kind];
-const messageLabel = { cita: 'Descripción del problema', presupuesto: 'Describe qué le pasa al vehículo', contacto: 'Mensaje' }[kind];
-const messageRequired = kind !== 'cita';
+const submitLabel = { cita: 'Enviar solicitud de cita', presupuesto: 'Pedir presupuesto', contacto: 'Enviar mensaje', digitalizacion: 'Quiero digitalizar mi taller' }[kind];
+const messageLabel = { cita: 'Descripción del problema', presupuesto: 'Describe qué le pasa al vehículo', contacto: 'Mensaje', digitalizacion: '¿Qué te gustaría mejorar en tu taller?' }[kind];
+const messagePlaceholder = isContact ? '¿En qué podemos ayudarte?' : isSales ? 'Ej.: quiero una web nueva y dejar de llevar las órdenes en papel…' : 'Ej.: hace ruido al frenar, se enciende un testigo…';
+const messageRequired = kind === 'presupuesto' || kind === 'contacto';
 ---
-<div class="req-panel" id={`solicitar-${kind}`} role="tabpanel" aria-labelledby={`tab-${kind}`} hidden={hidden}>
+<div class="req-panel" id={`solicitar-${kind}`} role={standalone ? undefined : 'tabpanel'} aria-labelledby={standalone ? undefined : `tab-${kind}`} hidden={hidden}>
   <form
     class="req-form"
     method="post"
@@ -65,6 +72,14 @@ const messageRequired = kind !== 'cita';
         <p class="field-error" id={err('name')} hidden></p>
       </div>
 
+      {isSales && (
+        <div class="field span-2" data-field="businessName">
+          <label for={id('businessName')}><span>Nombre de tu taller</span> <abbr title="obligatorio">*</abbr></label>
+          <input class="input" id={id('businessName')} name="businessName" required maxlength={LIMITS.businessName.max} autocomplete="organization" aria-describedby={err('businessName')} />
+          <p class="field-error" id={err('businessName')} hidden></p>
+        </div>
+      )}
+
       <fieldset class="field span-2 contact-group" data-field="contact" aria-describedby={err('contact')}>
         <legend>Cómo te contactamos <span class="muted">(teléfono o correo)</span> <abbr title="obligatorio">*</abbr></legend>
         <div class="form-grid">
@@ -90,7 +105,15 @@ const messageRequired = kind !== 'cita';
         <p class="field-error" id={err('contact')} hidden></p>
       </fieldset>
 
-      {isContact ? (
+      {isSales ? (
+        <div class="field span-2" data-field="topic">
+          <label for={id('topic')}><span>¿Qué te interesa?</span> <abbr title="obligatorio">*</abbr></label>
+          <select class="select" id={id('topic')} name="topic" required aria-describedby={err('topic')}>
+            {SALES_INTERESTS.map(t => <option value={t}>{SALES_INTEREST_LABELS[t]}</option>)}
+          </select>
+          <p class="field-error" id={err('topic')} hidden></p>
+        </div>
+      ) : isContact ? (
         <div class="field span-2" data-field="topic">
           <label for={id('topic')}><span>Motivo del contacto</span> <abbr title="obligatorio">*</abbr></label>
           <select class="select" id={id('topic')} name="topic" required aria-describedby={err('topic')}>
@@ -148,7 +171,7 @@ const messageRequired = kind !== 'cita';
 
       <div class="field span-2" data-field="message">
         <label for={id('message')}><span>{messageLabel}</span> {messageRequired ? <abbr title="obligatorio">*</abbr> : <span class="muted">(opcional)</span>}</label>
-        <textarea class="textarea" id={id('message')} name="message" maxlength={LIMITS.message.max} required={messageRequired} placeholder={isContact ? '¿En qué podemos ayudarte?' : 'Ej.: hace ruido al frenar, se enciende un testigo…'} aria-describedby={err('message')}></textarea>
+        <textarea class="textarea" id={id('message')} name="message" maxlength={LIMITS.message.max} required={messageRequired} placeholder={messagePlaceholder} aria-describedby={err('message')}></textarea>
         <p class="field-error" id={err('message')} hidden></p>
       </div>
 

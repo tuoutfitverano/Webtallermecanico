@@ -1,0 +1,42 @@
+---
+/**
+ * Diseño «clásico» (cristal líquido) de la web del taller. Es el diseño por
+ * defecto de un taller sin theme.design; el taller demo lo puede comparar en /clasico.
+ */
+import DemoNotice from './DemoNotice.astro';
+import SiteHeader from './SiteHeader.astro';
+import Hero from './Hero.astro';
+import Services from './Services.astro';
+import ScrollStage from './ScrollStage.astro';
+import HowItWorks from './HowItWorks.astro';
+import RequestForms from './RequestForms.astro';
+import ContactInfo from './ContactInfo.astro';
+import SiteFooter from './SiteFooter.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+
+interface Props {
+  site: PublicSite;
+  turnstileSiteKey: string | null;
+  noJsResult: { ok: boolean; ref?: string } | null;
+}
+const { site, turnstileSiteKey, noJsResult } = Astro.props;
+---
+<DemoNotice site={site} />
+<SiteHeader site={site} />
+<main>
+  {site.scrollFrames ? (
+    <ScrollStage frames={site.scrollFrames}>
+      <Hero slot="first" site={site} staged />
+      <Services slot="second" site={site} staged />
+    </ScrollStage>
+  ) : (
+    <>
+      <Hero site={site} />
+      <Services site={site} />
+    </>
+  )}
+  <HowItWorks />
+  <RequestForms site={site} turnstileSiteKey={turnstileSiteKey} noJsResult={noJsResult} />
+  <ContactInfo site={site} />
+</main>
+<SiteFooter site={site} />

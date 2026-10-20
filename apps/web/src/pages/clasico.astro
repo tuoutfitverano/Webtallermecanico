@@ -1,0 +1,29 @@
+---
+/**
+ * Diseño anterior (clásico) de la web de DEMOSTRACIÓN, para compararlo con el
+ * premium. Solo existe en webs marcadas como demostración; un taller real ve 404.
+ */
+import SiteLayout from '../layouts/SiteLayout.astro';
+import ClassicHome from '../components/ClassicHome.astro';
+import { siteForHost, turnstileSiteKey } from '../lib/server/config.ts';
+
+export const prerender = false;
+
+let site;
+try {
+  site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host);
+} catch {
+  return new Response('La web no está disponible en este momento. Inténtalo de nuevo en unos minutos.', {
+    status: 503,
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '60' },
+  });
+}
+if (!site?.isDemoContent) {
+  return new Response('Esta página no existe.', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+}
+Astro.response.headers.set('cache-control', 'no-store');
+const title = `${site.name} · Diseño clásico (comparación)`;
+---
+<SiteLayout site={site} title={title} noindex>
+  <ClassicHome site={site} turnstileSiteKey={turnstileSiteKey()} noJsResult={null} />
+</SiteLayout>

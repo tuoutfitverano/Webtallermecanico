@@ -20,7 +20,8 @@
     "mcp:playwright": "node scripts/playwright-mcp.mjs",
     "test:e2e": "bash scripts/test-e2e.sh",
     "lint": "eslint .",
-    "test:bundle": "node scripts/check-client-bundle.mjs"
+    "test:bundle": "node scripts/check-client-bundle.mjs",
+    "taller:sql": "node scripts/taller/sql.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

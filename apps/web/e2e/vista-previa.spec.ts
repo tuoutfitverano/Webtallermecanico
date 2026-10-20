@@ -157,7 +157,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     });
   }
 
-  // ---- Dos solicitudes desde la web pública (por el formulario real)
+  // ---- Dos solicitudes de cita desde la web pública (por el formulario real)
   for (const [name, phone] of [['Ana Torres', '656 789 012'], ['Pedro Gómez', '667 890 123']] as const) {
     await page.setExtraHTTPHeaders({ 'cf-connecting-ip': `198.51.100.${Math.floor(Math.random() * 200) + 1}` });
     await page.goto(`/?visita=${encodeURIComponent(name)}#solicitar`);
@@ -171,6 +171,17 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     await form.getByRole('button', { name: 'Enviar solicitud de cita' }).click();
     await expect(form.getByRole('heading', { name: /recibida/ })).toBeVisible();
   }
+  // ---- Una solicitud de «digitalizar mi taller» (sección comercial de la demo)
+  await page.setExtraHTTPHeaders({ 'cf-connecting-ip': `198.51.100.${Math.floor(Math.random() * 200) + 1}` });
+  await page.goto('/?visita=comercial#digitalizar');
+  const sales = page.locator('#solicitar-digitalizacion');
+  await sales.getByRole('textbox', { name: 'Nombre *', exact: true }).fill('Rosa Martín', { timeout: 15_000 });
+  await sales.getByLabel('Nombre de tu taller').fill('Talleres Martín (ejemplo)');
+  await sales.getByLabel('Correo electrónico').fill('rosa.martin@ejemplo.test');
+  await sales.getByLabel('¿Qué te gustaría mejorar en tu taller?').fill('Llevo las órdenes en papel y quiero una web nueva.');
+  await sales.getByRole('checkbox').check();
+  await sales.getByRole('button', { name: 'Quiero digitalizar mi taller' }).click();
+  await expect(sales.getByRole('heading', { name: 'Solicitud recibida' })).toBeVisible();
   await page.setExtraHTTPHeaders({});
 
   // ---- Recorrido de pantallas

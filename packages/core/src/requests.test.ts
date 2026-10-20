@@ -16,10 +16,34 @@ describe('validateWebRequest', () => {
     expect(r).toEqual({
       ok: true,
       data: {
-        kind: 'cita', name: 'Ana Pérez', phone: '600 123 456', email: null, preferredContact: null, topic: null,
+        kind: 'cita', name: 'Ana Pérez', phone: '600 123 456', email: null, preferredContact: null, topic: null, businessName: null,
         plate: '1950BXF', make: null, model: null, service: 'frenos', preferredDate: '2026-10-20', preferredTime: 'manana', message: null,
       },
     });
+  });
+
+  it('acepta una solicitud de digitalización (sección comercial) sin datos de vehículo', () => {
+    const r = validateWebRequest(
+      { ...base, kind: 'digitalizacion', businessName: '  Talleres Ana ', topic: 'web_y_software', plate: '1950 bxf', service: 'frenos', make: 'Seat' },
+      rules,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data).toMatchObject({ kind: 'digitalizacion', businessName: 'Talleres Ana', topic: 'web_y_software', plate: null, service: null, make: null, message: null });
+  });
+
+  it('una solicitud de digitalización exige el nombre del taller y un interés de la lista', () => {
+    const r = validateWebRequest({ ...base, kind: 'digitalizacion', topic: 'frenos' }, rules);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.businessName).toMatch(/nombre de tu taller/);
+      expect(r.errors.topic).toMatch(/te interesa/);
+      expect(r.errors.service).toBeUndefined();
+    }
+  });
+
+  it('el nombre del taller solo se guarda en las solicitudes de digitalización', () => {
+    const r = validateWebRequest({ ...base, kind: 'contacto', topic: 'otro', message: 'Consulta de prueba.', businessName: 'Taller' }, rules);
+    expect(r.ok && r.data.businessName).toBe(null);
   });
 
   it('exige teléfono o correo', () => {

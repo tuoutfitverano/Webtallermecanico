@@ -1,0 +1,38 @@
+---
+/** Pie del diseño premium. */
+import type { PublicSite } from '../../lib/site/content.ts';
+import { telHref } from '../../lib/site/content.ts';
+interface Props { site: PublicSite }
+const { site } = Astro.props;
+const c = site.content;
+const tel = telHref(c.phone);
+---
+<footer class="pm-footer">
+  <p class="pm-footer-mark" aria-hidden="true">{site.name.toUpperCase()}</p>
+  <div class="pm-footer-grid">
+    <div>
+      <p class="pm-kicker">Taller</p>
+      <p>{site.name}{site.isDemoContent && ' (demostración)'}</p>
+      {c.address && <p>{c.address}</p>}
+    </div>
+    {(c.phone || c.email) && (
+      <div>
+        <p class="pm-kicker">Contacto</p>
+        {c.phone && (tel ? <p><a href={tel}>{c.phone}</a></p> : <p>{c.phone}</p>)}
+        {c.email && <p><a href={`mailto:${c.email}`}>{c.email}</a></p>}
+      </div>
+    )}
+    {c.hours.length > 0 && (
+      <div>
+        <p class="pm-kicker">Horario</p>
+        {c.hours.map(h => <p>{h}</p>)}
+      </div>
+    )}
+    <div>
+      <p class="pm-kicker">Más</p>
+      <p><a href="/acceso" rel="nofollow">Área de clientes</a></p>
+      {site.salesEnabled && <p><a href="#digitalizar">Para propietarios de talleres</a></p>}
+      <p><a href="/aviso-legal">Aviso legal</a> · <a href="/privacidad">Privacidad</a> · <a href="/cookies">Cookies</a></p>
+    </div>
+  </div>
+</footer>

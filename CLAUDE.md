@@ -12,13 +12,14 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Consulta por matrícula (proveedor, costes, activación): `docs/CONSULTA_MATRICULAS.md`
 - Notificaciones (portal, email, reintentos, consentimiento): `docs/NOTIFICACIONES.md`
 - Integración de pantallas (inventario y flujos verificados): `docs/INTEGRACION.md`
+- Plantilla de webs de taller (configuración por taller, AutoValue): `docs/PLANTILLA_TALLERES.md`, `talleres/`, `docs/AUDITORIA_PLANTILLA.md`
 - Auditoría, despliegue y lanzamiento: `docs/AUDITORIA_FASE8.md`, `docs/DESPLIEGUE.md`, `docs/CHECKLIST_LANZAMIENTO.md`, `docs/DATOS_PERSONALES.md`
 
 ## Estructura
 
 ```
 apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego panel y portal)
-  src/pages/              index (web del taller), premium (diseño alternativo para comparar; styles/premium.css + scripts/premium.ts), privacidad, aviso-legal, api/solicitudes.ts
+  src/pages/              index (web del taller: diseño según theme.design), clasico (diseño anterior, solo demo), privacidad, aviso-legal, api/solicitudes.ts
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
@@ -27,9 +28,10 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
   src/middleware.ts       Cabeceras de seguridad en todo (CSP frame-ancestors, nosniff, HSTS…); área privada: APP_URL y anti-caché
-  src/components/         Secciones de la web y formularios (RequestForm.astro)
+  src/components/         Secciones de la web y formularios (RequestForm.astro); ClassicHome (diseño clásico)
+  src/components/premium/ Diseño premium por secciones (PremiumHome + Pm*.astro), styles/premium.css, scripts/premium.ts
   src/scripts/            JavaScript del navegador (request-forms.ts)
-  src/lib/site/           Contenido del taller, resolución por dominio, demo local
+  src/lib/site/           Contenido del taller (content.ts), archivo de taller (workshop-config.ts), software (software.ts), dominio, demo local
   src/lib/requests/       Endpoint de solicitudes: handler (lógica pura), store, antispam
   src/lib/server/         Configuración del servidor (lee astro:env), sesión (auth.ts, auth-page.ts) — solo servidor
   src/lib/auth/           Redirección segura (?next=), mensajes de error, validación de acceso
@@ -46,6 +48,8 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
   e2e/                    Pruebas de navegador (Playwright Test)
 packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes, clientes y órdenes (workshop.ts)
+talleres/                 Un .json por taller (identidad, textos, tema, secciones). autovalue.json = demo; plantilla.json = taller nuevo
+apps/web/public/plataforma/capturas/  Capturas REALES del software (compartidas por todos los talleres)
 supabase/migrations/      Esquema + permisos (RLS). Nunca edites una migración ya aplicada: crea otra.
 supabase/tests/           Pruebas SQL de permisos por rol (con el esquema auth REAL de Supabase Auth)
 supabase/templates/       Plantillas de correo de Supabase Auth (confirmación, recuperación)
@@ -67,6 +71,7 @@ npm run build        # compilación para Cloudflare + comprobación de que el na
 npm run test:db      # migraciones + permisos RLS en PostgreSQL local
 npm run test:e2e     # navegador → web → Supabase Auth real + PostgREST → PostgreSQL con RLS
 npm run test:mcp     # comprueba el servidor Playwright MCP
+npm run taller:sql -- talleres/x.json   # comprueba el archivo de un taller y escribe su SQL (no lo ejecuta)
 ```
 
 Vista previa navegable para el propietario (panel y portal con datos de demostración, sin servidor): `VISTA_PREVIA_DIR=<carpeta> bash scripts/test-e2e.sh e2e/vista-previa.spec.ts --project escritorio` y después `scripts/vista-previa/build.py` (instrucciones en ese archivo). **Tras CADA petición del propietario, vuelve a publicar la vista previa completa (web + panel + portal) en el mismo artifact; nunca le mandes capturas en su lugar.**
@@ -99,6 +104,15 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Coche que gira con el scroll: `theme.scrollFrames` (`src` con `{n}`, `count`, `poster`, `focusX/focusY` = punto del zoom final; `backdrop` + `frameTop` = fondo opcional, p. ej. el garaje, con los fotogramas transparentes encima). `ScrollStage.astro` + `scripts/scroll-stage.ts` dibujan fotogramas en un canvas: portada → vuelta completa → servicios → zoom hasta la ventanilla tintada → «Cómo trabajamos». Sin JavaScript, con «reducir movimiento» o ahorro de datos: solo la imagen fija y sin huecos. Fotogramas del taller demo (AutoValue) en `public/demo/autovalue/` (vídeo aportado por el propietario; lleva la marca de agua de KlingAI). Se regeneran con `scripts/demo-autovalue/` (`render-garage.mjs` dibuja el garaje de `garage.html`; `frames.py` recorta el coche, añade sombra y reflejo y compone la portada).
 - React solo cuando una pantalla lo necesite de verdad (todavía no se usa).
 - Variables de entorno: `apps/web/.env` en local (plantilla en `.env.example`); en producción, secretos de Cloudflare.
+
+## Plantilla de webs de taller
+
+- Lo propio de cada taller va en `talleres/<taller>.json` (→ `workshop_sites.content/theme` con `npm run taller:sql`); los componentes son compartidos. Nunca copies componentes por taller: añade una opción al esquema (`content.ts`) con valor por defecto que no cambie a los talleres existentes.
+- `talleres/autovalue.json` es la fuente de AutoValue: `demo.ts` lo lee y `seed.sql` lleva una copia (lo comprueba `demo.test.ts`). Si cambias uno, regenera el otro.
+- `configProblems` es más estricto que la web: una clave desconocida o un valor que la web descartaría hace fallar `npm test`.
+- Sección comercial («Quiero digitalizar mi taller», tipo `digitalizacion`): solo con `sections.comercial` + `isDemoContent`; la base de datos solo la acepta si `workshops.status = 'demo'`. Sin datos comerciales inventados ni promesas de resultados.
+- El software se enseña con capturas REALES (`public/plataforma/capturas`, recorrido en `lib/site/software.ts`). Matrícula y email muestran su estado real (`vehicleLookupAvailable()`, `emailAvailable()`); no hay agenda de citas y no se dice que la haya.
+- Las fases 1–8 son etapas internas: no se presentan como módulos en la web.
 
 ## Acceso, cuentas y equipos (Fase 3)
 

@@ -1,19 +1,13 @@
 ---
 /**
  * Web pública del taller. Se genera en cada visita según el dominio, para que
- * una sola aplicación sirva a todos los talleres.
+ * una sola aplicación sirva a todos los talleres. El diseño (clásico o
+ * premium) y sus secciones salen de la configuración del taller.
  */
 import SiteLayout from '../layouts/SiteLayout.astro';
-import DemoNotice from '../components/DemoNotice.astro';
-import SiteHeader from '../components/SiteHeader.astro';
-import Hero from '../components/Hero.astro';
-import Services from '../components/Services.astro';
-import ScrollStage from '../components/ScrollStage.astro';
-import HowItWorks from '../components/HowItWorks.astro';
-import RequestForms from '../components/RequestForms.astro';
-import ContactInfo from '../components/ContactInfo.astro';
-import SiteFooter from '../components/SiteFooter.astro';
-import { siteForHost, turnstileSiteKey } from '../lib/server/config.ts';
+import ClassicHome from '../components/ClassicHome.astro';
+import PremiumHome from '../components/premium/PremiumHome.astro';
+import { emailAvailable, siteForHost, turnstileSiteKey, vehicleLookupAvailable } from '../lib/server/config.ts';
 
 export const prerender = false;
 
@@ -30,32 +24,29 @@ if (!site) {
   return new Response('Esta web no existe o no está publicada.', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 }
 
+// Resultado de un envío sin JavaScript (el formulario vuelve aquí).
 const q = Astro.url.searchParams;
-const noJsResult = q.get('solicitud') === 'ok'
+const result = q.get('solicitud') === 'ok'
   ? { ok: true, ref: (q.get('ref') ?? '').replace(/[^A-Z0-9]/g, '').slice(0, 8) }
   : q.get('solicitud') === 'error' ? { ok: false } : null;
+const isSales = q.get('tipo') === 'digitalizacion';
 
 Astro.response.headers.set('cache-control', 'no-store');
-const title = [site.name, site.content.tagline || 'Taller mecánico', site.content.city].filter(Boolean).join(' · ');
+const premium = site.design === 'premium';
+const title = premium && site.content.hero.title
+  ? `${site.name} · ${site.content.hero.title}`
+  : [site.name, site.content.tagline || 'Taller mecánico', site.content.city].filter(Boolean).join(' · ');
 ---
-<SiteLayout site={site} title={title}>
-  <DemoNotice site={site} />
-  <SiteHeader site={site} />
-  <main>
-    {site.scrollFrames ? (
-      <ScrollStage frames={site.scrollFrames}>
-        <Hero slot="first" site={site} staged />
-        <Services slot="second" site={site} staged />
-      </ScrollStage>
-    ) : (
-      <>
-        <Hero site={site} />
-        <Services site={site} />
-      </>
-    )}
-    <HowItWorks />
-    <RequestForms site={site} turnstileSiteKey={turnstileSiteKey()} noJsResult={noJsResult} />
-    <ContactInfo site={site} />
-  </main>
-  <SiteFooter site={site} />
+<SiteLayout site={site} title={title} premium={premium}>
+  {premium ? (
+    <PremiumHome
+      site={site}
+      turnstileSiteKey={turnstileSiteKey()}
+      noJsResult={isSales ? null : result}
+      salesResult={isSales ? result : null}
+      status={{ plateLookup: vehicleLookupAvailable(), email: emailAvailable() }}
+    />
+  ) : (
+    <ClassicHome site={site} turnstileSiteKey={turnstileSiteKey()} noJsResult={result} />
+  )}
 </SiteLayout>

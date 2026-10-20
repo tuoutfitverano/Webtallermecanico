@@ -107,3 +107,13 @@ Pendiente: envío automático del enlace de invitación por correo (hoy se copia
 ## Fuera de alcance (por ahora)
 
 Contabilidad, facturación fiscal (VeriFactu/TicketBAI), inventario de recambios y nóminas.
+
+## ✅ Plantilla de webs y demo comercial (AutoValue)
+
+- Auditoría del proyecto antes de cambiar nada (`docs/AUDITORIA_PLANTILLA.md`).
+- Un archivo por taller (`talleres/*.json`): identidad, textos, colores, tipografía, logotipo, secciones y funciones que se enseñan. Comprobación estricta en `npm test` y SQL generado con `npm run taller:sql`.
+- Diseño premium por secciones reutilizables: portada cinematográfica con el coche que gira, presentación, servicios, software (capturas reales y recorrido por 8 pantallas), ventajas para el cliente, proceso real, formularios y contacto. El diseño anterior sigue disponible (`theme.design = clasico`; en la demo, `/clasico`).
+- Sección comercial «Tu taller también puede trabajar así» con formulario real (`digitalizacion`), aceptado solo en talleres de demostración (lo impone la base de datos). Las solicitudes llegan a la bandeja del taller demo.
+- Pruebas: SQL (`13_plantilla_digitalizacion`), unitarias de la configuración y del formulario, e2e de la plantilla (incluye un segundo taller con configuración mínima).
+- Guía: `docs/PLANTILLA_TALLERES.md`.
+

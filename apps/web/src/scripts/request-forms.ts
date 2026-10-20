@@ -21,7 +21,7 @@ declare global {
 }
 
 const TIMEOUT_MS = 15_000;
-const FIELD_ORDER = ['name', 'contact', 'phone', 'email', 'preferredContact', 'topic', 'service', 'plate', 'make', 'model', 'preferredDate', 'preferredTime', 'message', 'privacyAccepted'];
+const FIELD_ORDER = ['name', 'businessName', 'contact', 'phone', 'email', 'preferredContact', 'topic', 'service', 'plate', 'make', 'model', 'preferredDate', 'preferredTime', 'message', 'privacyAccepted'];
 
 function setupTabs(root: HTMLElement) {
   const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tab]'));
@@ -132,11 +132,15 @@ function showSuccess(form: HTMLFormElement, res: Extract<ServerResponse, { ok: t
   const success = panel.querySelector<HTMLElement>('[data-success]')!;
   const kind = form.dataset.kind;
   success.querySelector('[data-success-title]')!.textContent =
-    kind === 'cita' ? 'Solicitud de cita recibida' : kind === 'presupuesto' ? 'Solicitud de presupuesto recibida' : 'Mensaje recibido';
+    kind === 'cita' ? 'Solicitud de cita recibida'
+      : kind === 'presupuesto' ? 'Solicitud de presupuesto recibida'
+        : kind === 'digitalizacion' ? 'Solicitud recibida' : 'Mensaje recibido';
   success.querySelector('[data-success-text]')!.textContent =
     kind === 'cita'
       ? 'El taller revisará tu solicitud y te contactará para confirmar la cita. Hasta entonces no está reservada.'
-      : 'El taller ha recibido tu solicitud y te contestará lo antes posible.';
+      : kind === 'digitalizacion'
+        ? 'Te contactaremos con los datos que nos has dado para enseñarte la demostración. No has contratado nada.'
+        : 'El taller ha recibido tu solicitud y te contestará lo antes posible.';
   success.querySelector('[data-success-ref]')!.textContent = res.reference || requestReference(res.id);
   form.hidden = true;
   success.hidden = false;
@@ -228,9 +232,10 @@ function setupForm(form: HTMLFormElement) {
   });
 }
 
+// Formularios del taller (con pestañas) y, en la web de demostración, el de digitalización.
 const root = document.querySelector<HTMLElement>('[data-req]');
 if (root) {
   root.classList.add('js');
   setupTabs(root);
-  root.querySelectorAll<HTMLFormElement>('[data-req-form]').forEach(setupForm);
 }
+document.querySelectorAll<HTMLFormElement>('[data-req-form]').forEach(setupForm);

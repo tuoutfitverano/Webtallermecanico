@@ -405,13 +405,13 @@ test.describe('Web pública', () => {
     await page.goto('/');
     await expect(page.locator('html')).toHaveClass(/stage-on/);
     await expect(page.locator('.stage')).toHaveClass(/is-live/);
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu coche en buenas manos.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('La mecánica evoluciona.');
     const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));
     expect(await dim()).toBeGreaterThan(0.5); // portada: coche oscurecido detrás del texto
     // En mitad de la vuelta el coche se ve limpio.
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-turn')!; scrollTo(0, g.getBoundingClientRect().top + scrollY); });
     await expect.poll(dim).toBeLessThan(0.2);
-    // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza «Cómo trabajamos».
+    // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza el software.
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
     await expect.poll(dim).toBeGreaterThan(0.95);
     expect(new Set(frames).size).toBeGreaterThan(20);
@@ -425,6 +425,13 @@ test.describe('Web pública', () => {
     await expect(page.locator('html')).not.toHaveClass(/stage-on/);
     await expect(page.locator('.stage-poster')).toBeVisible();
     await expect(page.locator('.stage-gap-turn')).toBeHidden();
-    await expect(page.getByRole('heading', { name: 'Tu coche, de principio a fin' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /De la recepción/ })).toBeVisible();
+  });
+
+  test('el diseño anterior sigue disponible en /clasico (solo en la demo) con el mismo coche', async ({ page }) => {
+    await page.goto('/clasico');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu coche en buenas manos.');
+    await expect(page.locator('.stage')).toBeAttached();
+    await expect(page.getByRole('heading', { name: 'Tu coche, de principio a fin' })).toBeAttached();
   });
 });

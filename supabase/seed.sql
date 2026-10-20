@@ -5,12 +5,53 @@
 insert into public.workshops (id, slug, name, status)
 values ('d0000000-0000-0000-0000-000000000001', 'taller-demo', 'AutoValue', 'demo');
 
--- Mismo contenido que apps/web/src/lib/site/demo.ts (la demo local sin base de datos).
+-- Web del taller demo: copia de talleres/autovalue.json (una prueba comprueba que coinciden;
+-- para regenerarla: npm run taller:sql -- talleres/autovalue.json).
 insert into public.workshop_sites (workshop_id, published, is_demo_content, theme, content)
 values (
   'd0000000-0000-0000-0000-000000000001', true, true,
-  '{"accent": "#8A9A7B", "scrollFrames": {"src": "/demo/autovalue/giro/{n}.webp", "count": 73, "poster": "/demo/autovalue/portada.webp", "focusX": 0.365, "focusY": 0.41, "backdrop": "/demo/autovalue/garaje.webp", "frameTop": 0.359375}}',
-  '{
+  $tema${
+  "design": "premium",
+  "accent": "#8A9A7B",
+  "headingFont": "archivo",
+  "logo": null,
+  "colors": {
+    "background": "#000000",
+    "surface": "#121614",
+    "text": "#EFE8DA"
+  },
+  "sections": {
+    "presentacion": true,
+    "servicios": true,
+    "software": true,
+    "ventajas": true,
+    "proceso": true,
+    "comercial": true,
+    "solicitudes": true,
+    "contacto": true
+  },
+  "software": {
+    "ordenes": true,
+    "clientes": true,
+    "portal": true,
+    "avisos": true,
+    "solicitudes": true,
+    "equipo": true,
+    "matriculas": true
+  },
+  "scrollFrames": {
+    "src": "/demo/autovalue/giro/{n}.webp",
+    "count": 73,
+    "poster": "/demo/autovalue/portada.webp",
+    "focusX": 0.365,
+    "focusY": 0.41,
+    "backdrop": "/demo/autovalue/garaje.webp",
+    "frameTop": 0.359375,
+    "srcHd": null,
+    "backdropHd": null
+  }
+}$tema$,
+  $contenido${
   "tagline": "Mecánica y electrónica del automóvil",
   "city": "El Casar",
   "intro": "Taller multimarca de demostración. Pide cita o presupuesto desde la web y te contestaremos para confirmarlo.",
@@ -60,8 +101,20 @@ values (
       "description": "Ruidos, testigos encendidos y fallos de arranque."
     }
   ],
-  "notice": "Web de demostración: el teléfono, el correo, el horario y los servicios son de ejemplo."
-}'
+  "notice": "Web de demostración: AutoValue es un taller ficticio. El teléfono, el correo, el horario y los servicios son de ejemplo.",
+  "hero": {
+    "title": "La mecánica evoluciona. Tu taller también.",
+    "subtitle": "Precisión en cada reparación. Tecnología en cada proceso."
+  },
+  "about": {
+    "title": "Primero entender. Después reparar.",
+    "points": [
+      "Revisamos el vehículo y te explicamos qué necesita antes de empezar.",
+      "Cada trabajo queda registrado en el sistema del taller, paso a paso.",
+      "Te avisamos en tu portal cuando el coche está listo para recoger."
+    ]
+  }
+}$contenido$
 );
 
 -- *.localhost apunta siempre a tu propio ordenador: sirve para probar en local.
