@@ -15,6 +15,7 @@ const rows = [
   { name: 'sb-…-auth-token (y partes .0, .1…)', where: 'Solo en el área privada (acceso, panel y portal)', what: 'Mantiene la sesión iniciada. Sin ella no se puede entrar.', when: 'Mientras dura la sesión (la renueva Supabase Auth)', who: 'Propia (Supabase Auth)' },
   { name: 'sb-…-auth-token-code-verifier', where: 'Solo en el área privada', what: 'Protege el inicio de sesión y la recuperación de contraseña por enlace.', when: 'Unos minutos, hasta completar el proceso', who: 'Propia (Supabase Auth)' },
   { name: 'panel_taller', where: 'Solo en el panel del taller', what: 'Recuerda qué taller tenías abierto si trabajas en varios.', when: '1 año', who: 'Propia' },
+  { name: 'color_panel', where: 'Solo en el panel y el portal', what: 'Recuerda el color que elegiste para el panel o el portal (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
 ];
 ---
 <SiteLayout site={site} title={`Cookies · ${site.name}`} noindex>

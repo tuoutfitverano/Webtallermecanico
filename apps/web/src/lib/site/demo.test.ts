@@ -51,7 +51,7 @@ describe('vídeos de fondo', () => {
 describe('coche que gira con el scroll', () => {
   const base = { src: '/demo/x/{n}.webp', count: 10, poster: '/demo/x/p.webp' };
   it('acepta rutas de la propia web y https, con el punto del zoom', () => {
-    expect(siteThemeSchema.parse({ scrollFrames: { ...base, focusX: 0.3, focusY: 0.4 } }).scrollFrames).toEqual({ ...base, focusX: 0.3, focusY: 0.4, backdrop: null, frameTop: 0, srcHd: null, backdropHd: null });
+    expect(siteThemeSchema.parse({ scrollFrames: { ...base, focusX: 0.3, focusY: 0.4 } }).scrollFrames).toEqual({ ...base, focusX: 0.3, focusY: 0.4, backdrop: null, frameTop: 0, srcHd: null, backdropHd: null, turn: 1, turnGap: 1.3, zoomGap: 1.7 });
     expect(siteThemeSchema.parse({ scrollFrames: { ...base, backdrop: '/demo/x/garaje.webp', frameTop: 0.36 } }).scrollFrames?.backdrop).toBe('/demo/x/garaje.webp');
     expect(siteThemeSchema.parse({ scrollFrames: { ...base, src: 'https://cdn.ejemplo.es/{n}.webp' } }).scrollFrames?.focusX).toBe(0.5);
   });

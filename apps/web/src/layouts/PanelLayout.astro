@@ -13,6 +13,8 @@ import '@fontsource/barlow/latin-500.css';
 import '@fontsource/barlow/latin-600.css';
 import '../styles/site.css';
 import '../styles/panel.css';
+import ColorPicker from '../components/panel/ColorPicker.astro';
+import { PANEL_COLOR_COOKIE, panelColor } from '../lib/panel/colors.ts';
 import Icon from '../components/Icon.astro';
 import type { Panel } from '../lib/server/panel.ts';
 import { ROLE_LABELS } from '../lib/auth/validate.ts';
@@ -42,10 +44,12 @@ const tabs = nav.slice(0, 4);
 const more = nav.slice(4);
 const moreOn = more.some(n => n.id === section);
 const w = panel.workshop;
+// Color de las tarjetas elegido en este dispositivo (verde si no hay elección).
+const color = panelColor(Astro.cookies.get(PANEL_COLOR_COOKIE)?.value);
 ---
 <!doctype html>
 <!-- Sin animación entre páginas: en una herramienta de trabajo el cambio debe ser inmediato. -->
-<html lang="es" transition:animate="none">
+<html lang="es" transition:animate="none" data-color={color}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -54,6 +58,19 @@ const w = panel.workshop;
     <meta name="theme-color" content="#000000" />
     <meta name="color-scheme" content="dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Vista previa sin servidor: el color elegido se guarda también en localStorage. -->
+    <script is:inline>
+      (() => {
+        const apply = () => {
+          try {
+            const c = localStorage.getItem('color_panel');
+            if (c && /^[a-z]{3,12}$/.test(c) && !document.cookie.includes('color_panel=')) document.documentElement.dataset.color = c;
+          } catch { /* sin almacenamiento */ }
+        };
+        apply();
+        document.addEventListener('astro:after-swap', apply);
+      })();
+    </script>
     <ClientRouter fallback="none" />
   </head>
   <body class="pnl-body">
@@ -96,10 +113,13 @@ const w = panel.workshop;
           ) : <span class="pnl-workshop-name">Panel</span>}
           {w && <span class="pnl-role">{ROLE_LABELS[w.role]}</span>}
         </div>
+        <div class="pnl-top-side">
+        <ColorPicker current={color} />
         <form method="post" action="/salir" class="pnl-top-user" data-astro-reload>
           <span class="pnl-user" title={panel.user.email}>{panel.user.email}</span>
           <button class="btn btn-sm" type="submit" aria-label="Salir (cerrar sesión)" title="Cerrar sesión"><Icon name="logout" /><span class="pnl-hide-sm">Salir</span></button>
         </form>
+        </div>
       </header>
 
       <main id="contenido" class="pnl-content" tabindex="-1">

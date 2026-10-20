@@ -70,6 +70,15 @@ export const scrollFramesSchema = z.object({
   /** Versiones 4K opcionales (mismos encuadres) para pantallas de más de 2000 px reales. */
   srcHd: assetUrl.refine(v => v.includes('{n}')).nullable().default(null),
   backdropHd: assetUrl.nullable().default(null),
+  /**
+   * Ritmo: parte de la secuencia que se reproduce (1 = vuelta completa, 0.5 = media
+   * vuelta; el zoom va al punto focusX/focusY de ese último fotograma) y espacio
+   * propio de cada transición, en alturas de pantalla (cuanto menor, más se funde
+   * con las secciones que pasan por encima).
+   */
+  turn: z.number().min(0.1).max(1).default(1),
+  turnGap: z.number().min(0).max(2).default(1.3),
+  zoomGap: z.number().min(0.6).max(2.5).default(1.7),
 });
 export type ScrollFrames = z.output<typeof scrollFramesSchema>;
 

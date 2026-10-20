@@ -41,12 +41,15 @@
       "src": "/demo/autovalue/giro/{n}.webp",
       "count": 73,
       "poster": "/demo/autovalue/portada.webp",
-      "focusX": 0.365,
-      "focusY": 0.41,
+      "focusX": 0.575,
+      "focusY": 0.405,
       "backdrop": "/demo/autovalue/garaje.webp",
       "frameTop": 0.359375,
       "srcHd": "/demo/autovalue/giro-4k/{n}.webp",
-      "backdropHd": "/demo/autovalue/garaje-4k.webp"
+      "backdropHd": "/demo/autovalue/garaje-4k.webp",
+      "turn": 0.5,
+      "turnGap": 0.35,
+      "zoomGap": 0.85
     }
   },
   "content": {

@@ -3,6 +3,7 @@
  * Nada se guarda ni se finge guardar: cada acción explica que es una vista previa.
  */
 import '../../apps/web/src/scripts/panel.ts';
+import '../../apps/web/src/scripts/panel-color.ts';
 
 function toast(text: string) {
   let box = document.getElementById('vp-toast');

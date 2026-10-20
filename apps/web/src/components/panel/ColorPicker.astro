@@ -1,0 +1,32 @@
+---
+/**
+ * Elegir el color del panel o del portal (verde o un tono pastel). Funciona sin
+ * JavaScript (formulario → /api/preferencias); con JavaScript cambia al
+ * instante sin recargar. Solo afecta a este dispositivo.
+ */
+import Icon from '../Icon.astro';
+import { PANEL_COLORS, type PanelColor } from '../../lib/panel/colors.ts';
+
+interface Props { current: PanelColor }
+const { current } = Astro.props;
+const next = `${Astro.url.pathname}${Astro.url.search}`;
+---
+<details class="color-pick" data-color-pick>
+  <summary class="btn btn-sm" title="Color del panel"><Icon name="palette" /><span class="pnl-hide-sm">Color</span><span class="sr-only"> del panel</span></summary>
+  <form method="post" action="/api/preferencias" class="color-pick-menu" data-astro-reload>
+    <input type="hidden" name="next" value={next} />
+    <p class="color-pick-title" id="color-pick-t">Color de las tarjetas</p>
+    <div class="color-pick-grid" role="group" aria-labelledby="color-pick-t">
+      {PANEL_COLORS.map(c => (
+        <button type="submit" name="color" value={c.id} class="color-pick-option" aria-pressed={c.id === current ? 'true' : 'false'}>
+          <span class="color-pick-swatch" style={`background:${c.swatch}`} aria-hidden="true"></span>{c.label}
+        </button>
+      ))}
+    </div>
+    <p class="color-pick-note">Se guarda en este dispositivo.</p>
+  </form>
+</details>
+
+<script>
+  import '../../scripts/panel-color.ts';
+</script>

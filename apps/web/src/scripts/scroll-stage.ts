@@ -5,7 +5,10 @@
  *  · Solo se activa con JavaScript, sin «reducir movimiento» y sin ahorro de
  *    datos. Si no, se queda la imagen fija (nada depende de esto).
  *  · Los fotogramas se cargan en orden; mientras falta alguno se dibuja el
- *    cargado más cercano.
+ *    cargado más cercano. Solo se descargan los que se usan (data-turn).
+ *  · Las transiciones se funden con las secciones: el giro empieza en cuanto se
+ *    baja y acaba con la sección siguiente ya entrando; el zoom empieza mientras
+ *    salen los servicios. Arranque y parada suaves, sin «número aparte».
  */
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -40,6 +43,9 @@ function start(stage: HTMLElement) {
   const fx = Number(stage.dataset.focusX ?? 0.5);
   const fy = Number(stage.dataset.focusY ?? 0.5);
   const frameTop = Number(stage.dataset.frameTop ?? 0);
+  // Parte de la vuelta que se reproduce (1 = completa) y último fotograma usado.
+  const turnPart = Math.min(1, Math.max(0.1, Number(stage.dataset.turn ?? 1) || 1));
+  const lastFrame = Math.max(1, Math.round(turnPart * (count - 1)));
   if (!canvas || !ctx || !dim || !hero || !turnGap || !zoomGap || !src.includes('{n}') || !(count >= 2)) return;
   const second = turnGap.nextElementSibling as HTMLElement | null;
   // Color de fondo de la web (el diseño premium puede redefinirlo): el fundido final acaba en él.
@@ -64,7 +70,7 @@ function start(stage: HTMLElement) {
   const url = (i: number) => src.replace('{n}', String(i).padStart(3, '0'));
   let next = 0;
   const loadNext = () => {
-    if (next >= count) return;
+    if (next > lastFrame) return;
     const i = next++;
     const img = new Image();
     img.decoding = 'async';
@@ -75,7 +81,7 @@ function start(stage: HTMLElement) {
   for (let k = 0; k < 4; k++) loadNext();
 
   // ---- Cristal de la ventanilla: colores medios de su mitad de arriba y de abajo
-  // (del último fotograma). Al acercarse, la foto se sustituye por este cristal
+  // (del fotograma en el que acaba el giro). Al acercarse, la foto se sustituye por este cristal
   // dibujado, que no se pixela a ningún tamaño.
   let glass: [string, string] | null = null;
   const sampleGlass = (img: HTMLImageElement) => {
@@ -128,21 +134,26 @@ function start(stage: HTMLElement) {
     const zoomTop = top(zoomGap!);
     const zoomEnd = zoomTop + zoomGap!.offsetHeight - vh;
 
-    // 1 → 2: vuelta completa
-    const r0 = stageTop + heroH * 0.35;
-    const r1 = secondTop - vh * 0.35;
-    const turn = clamp((y - r0) / Math.max(1, r1 - r0));
-    // 2 → 3: zoom hasta la ventanilla y fundido a negro
-    const z0 = zoomTop - vh * 0.6;
+    // 1 → 2: giro. Empieza en cuanto se baja y dura al menos 0,8 pantallas,
+    // aunque la sección siguiente ya esté entrando (así no queda como un número aparte).
+    const r0 = stageTop + heroH * 0.2;
+    const r1 = Math.max(secondTop - vh * 0.35, r0 + vh * 0.8);
+    const turn = easeInOut(clamp((y - r0) / Math.max(1, r1 - r0)));
+    // 2 → 3: zoom hasta la ventanilla y fundido al fondo; empieza mientras salen los servicios.
+    const z0 = zoomTop - vh * 0.9;
     const zoom = clamp((y - z0) / Math.max(1, zoomEnd - z0));
 
-    // Oscurecido: texto legible sobre el coche; coche limpio mientras gira.
+    // Oscurecido continuo: el coche se aclara al empezar a bajar y se vuelve a
+    // oscurecer, sin saltos, cuando el texto de la siguiente sección llega al centro.
     let shade: number;
-    if (zoom > 0) shade = zoom < 0.25 ? lerp(0.72, 0.1, zoom / 0.25) : zoom > 0.8 ? lerp(0.1, 1, (zoom - 0.8) / 0.2) : 0.1;
-    else if (y < secondTop - vh) shade = lerp(0.62, 0.05, clamp((y - stageTop) / Math.max(1, heroH * 0.5)));
-    else shade = lerp(0.05, 0.72, clamp((y - (secondTop - vh)) / (vh * 0.65)));
+    if (zoom > 0) shade = zoom < 0.4 ? lerp(0.72, 0.12, zoom / 0.4) : zoom > 0.65 ? lerp(0.12, 1, (zoom - 0.65) / 0.35) : 0.12;
+    else {
+      const down = lerp(0.62, 0.12, clamp((y - stageTop) / Math.max(1, heroH * 0.45)));
+      const up = lerp(0.12, 0.72, clamp((y - (secondTop - vh * 0.8)) / (vh * 0.55)));
+      shade = Math.max(down, up);
+    }
 
-    const index = Math.round(turn * (count - 1));
+    const index = Math.round(turn * lastFrame);
     const img = nearest(index);
     // El fotograma dibujado forma parte de la clave: al terminar de cargarse, se redibuja.
     const key = `${img ? frames.indexOf(img) : -1}|${backdrop ? 1 : 0}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;

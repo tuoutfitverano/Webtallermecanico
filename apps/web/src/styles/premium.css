@@ -294,6 +294,9 @@ html.anim .pm .reveal.is-in, html.anim-done .pm .reveal { transform: none; }
 
 /* ---------- Software ---------- */
 .pm-software { padding-top: clamp(120px, 14vw, 200px); }
+/* Tras el zoom a la ventanilla, el software entra mientras el cristal se oscurece
+   (solo cuando el coche se anima; sin animación no hay huecos que solapar). */
+html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding-top: 96px; }
 .pm-software::before {
   content: ''; position: absolute; inset: 0 -50vw; z-index: -1;
   background: radial-gradient(60% 50% at 70% 60%, color-mix(in srgb, var(--pm-accent) 14%, transparent), transparent 70%);

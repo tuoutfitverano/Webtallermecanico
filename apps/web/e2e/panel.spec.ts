@@ -399,7 +399,7 @@ test.describe('Panel · móvil y usuarios sin taller', () => {
 
 // ======================================================================
 test.describe('Web pública', () => {
-  test('el coche gira con el scroll y se acerca a la ventanilla antes de la tercera sección', async ({ page }) => {
+  test('el coche gira media vuelta con el scroll y se acerca a la ventanilla antes del software', async ({ page }) => {
     const frames: string[] = [];
     page.on('request', r => { if (r.url().includes('/demo/autovalue/giro/')) frames.push(r.url()); });
     await page.goto('/');
@@ -408,13 +408,15 @@ test.describe('Web pública', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('La mecánica evoluciona.');
     const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));
     expect(await dim()).toBeGreaterThan(0.5); // portada: coche oscurecido detrás del texto
-    // En mitad de la vuelta el coche se ve limpio.
-    await page.evaluate(() => { const g = document.querySelector('.stage-gap-turn')!; scrollTo(0, g.getBoundingClientRect().top + scrollY); });
+    // A mitad del giro (media vuelta, ya fundida con la portada) el coche se ve limpio.
+    await page.evaluate(() => scrollTo(0, innerHeight * 0.5));
     await expect.poll(dim).toBeLessThan(0.2);
     // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza el software.
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
     await expect.poll(dim).toBeGreaterThan(0.95);
+    // Media vuelta: solo se descargan los fotogramas 000–036.
     expect(new Set(frames).size).toBeGreaterThan(20);
+    expect(Math.max(...frames.map(f => Number(/giro\/(\d+)\.webp/.exec(f)![1])))).toBe(36);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

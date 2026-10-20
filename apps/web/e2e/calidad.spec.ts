@@ -6,6 +6,7 @@
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { PANEL_COLORS } from '../src/lib/panel/colors.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const ANON = process.env.E2E_ANON_KEY ?? '';
@@ -109,6 +110,65 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
     '/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/ordenes/nueva', '/panel/vehiculos', '/panel/vehiculos/nuevo',
     '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
   ], isMobile);
+});
+
+test('panel en cada color pastel: contraste y accesibilidad', async ({ page, context, isMobile }) => {
+  test.skip(isMobile, 'El contraste se comprueba en escritorio');
+  test.setTimeout(240_000);
+  const f = await fixtures();
+  await login(page, 'propietaria@e2e.test', '/panel');
+  for (const c of PANEL_COLORS.filter(x => x.id !== 'verde')) {
+    await context.addCookies([{ name: 'color_panel', value: c.id, url: page.url() }]);
+    await audit(page, ['/panel', `/panel/ordenes/${f.order}`, `/panel/clientes/${f.customer}`, '/panel/solicitudes', '/panel/avisos'], false);
+    await expect(page.locator('html')).toHaveAttribute('data-color', c.id);
+    // El propio selector, abierto, también cumple.
+    await page.locator('[data-color-pick] > summary').click();
+    const axe = await new AxeBuilder({ page }).include('[data-color-pick]').withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => `${c.id}: ${v.id}`)).toEqual([]);
+  }
+});
+
+test('portal en cada color pastel: contraste y accesibilidad', async ({ page, context, isMobile }) => {
+  test.skip(isMobile, 'El contraste se comprueba en escritorio');
+  test.setTimeout(240_000);
+  const f = await fixtures();
+  await login(page, f.email, '/portal');
+  for (const c of PANEL_COLORS.filter(x => x.id !== 'verde')) {
+    await context.addCookies([{ name: 'color_panel', value: c.id, url: page.url() }]);
+    await audit(page, ['/portal', `/portal/reparaciones/${f.order}`, '/portal/vehiculos', '/portal/datos'], false);
+  }
+});
+
+test('color del panel: se aplica al momento, se recuerda y un valor inventado se ignora', async ({ page, context }) => {
+  await login(page, 'propietaria@e2e.test', '/panel');
+  await expect(page.locator('html')).toHaveAttribute('data-color', 'verde');
+  await page.getByRole('button', { name: 'Color del panel' }).or(page.locator('[data-color-pick] > summary')).first().click();
+  await page.getByRole('button', { name: 'Lavanda' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-color', 'lavanda');
+  // El menú se cierra al elegir; la opción queda marcada como la actual.
+  await expect(page.locator('.color-pick-option[value="lavanda"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-color', 'lavanda');
+  // La tarjeta cambia de verdad de color y su texto pasa a oscuro.
+  const card = page.locator('.kpi').first();
+  expect(await card.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(227, 220, 244)');
+  expect(await card.evaluate(el => getComputedStyle(el).color)).toBe('rgb(28, 30, 29)');
+  // Un valor manipulado en la cookie no rompe nada: vuelve al verde.
+  await context.addCookies([{ name: 'color_panel', value: '"><script>', url: page.url() }]);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-color', 'verde');
+});
+
+test.describe('color del panel sin JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+  test('el formulario guarda el color y vuelve a la misma página', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test', '/panel');
+    await page.goto('/panel/ordenes');
+    await page.locator('[data-color-pick] > summary').click();
+    await page.getByRole('button', { name: 'Melocotón' }).click();
+    await expect(page).toHaveURL(/\/panel\/ordenes$/);
+    await expect(page.locator('html')).toHaveAttribute('data-color', 'melocoton');
+  });
 });
 
 test('portal del cliente: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
