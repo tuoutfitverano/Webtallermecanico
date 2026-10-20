@@ -229,6 +229,8 @@ html.anim .pm .reveal.is-in, html.anim-done .pm .reveal { transform: none; }
   white-space: nowrap;
   margin: 0 -.04em;
   user-select: none;
+  /* Decorativo: los clics pasan a los botones que quedan debajo o encima. */
+  pointer-events: none;
 }
 .pm-scroll {
   justify-self: start;

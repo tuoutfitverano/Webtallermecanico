@@ -409,7 +409,8 @@ test.describe('Web pública', () => {
     const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));
     expect(await dim()).toBeGreaterThan(0.5); // portada: coche oscurecido detrás del texto
     // A mitad del giro (media vuelta, ya fundida con la portada) el coche se ve limpio.
-    await page.evaluate(() => scrollTo(0, innerHeight * 0.5));
+    // La portada puede ser más alta que la pantalla: se baja la mitad de la portada.
+    await page.evaluate(() => { const h = document.querySelector<HTMLElement>('.stage-content > section')!; scrollTo(0, h.getBoundingClientRect().top + scrollY + h.offsetHeight * 0.5); });
     await expect.poll(dim).toBeLessThan(0.2);
     // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza el software.
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
