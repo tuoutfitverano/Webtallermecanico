@@ -14,7 +14,7 @@ function apply(color: string) {
 
 function remember(color: string) {
   const secure = location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${PANEL_COLOR_COOKIE}=${color}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+  try { document.cookie = `${PANEL_COLOR_COOKIE}=${color}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`; } catch { /* sin cookies: vale con localStorage */ }
   try { localStorage.setItem(PANEL_COLOR_COOKIE, color); } catch { /* sin almacenamiento: vale con la cookie */ }
 }
 
@@ -35,3 +35,8 @@ document.addEventListener('keydown', e => {
   open.removeAttribute('open');
   open.querySelector('summary')?.focus();
 });
+
+// El menú marca el color que se ve (puede venir de localStorage, no del servidor).
+const sync = () => { const c = document.documentElement.dataset.color; if (isPanelColor(c)) apply(c); };
+sync();
+document.addEventListener('astro:page-load', sync);

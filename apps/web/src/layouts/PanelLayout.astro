@@ -14,7 +14,7 @@ import '@fontsource/barlow/latin-600.css';
 import '../styles/site.css';
 import '../styles/panel.css';
 import ColorPicker from '../components/panel/ColorPicker.astro';
-import { PANEL_COLOR_COOKIE, panelColor } from '../lib/panel/colors.ts';
+import { PANEL_COLOR_COOKIE, PANEL_COLORS, panelColor } from '../lib/panel/colors.ts';
 import Icon from '../components/Icon.astro';
 import type { Panel } from '../lib/server/panel.ts';
 import { ROLE_LABELS } from '../lib/auth/validate.ts';
@@ -58,18 +58,17 @@ const color = panelColor(Astro.cookies.get(PANEL_COLOR_COOKIE)?.value);
     <meta name="theme-color" content="#000000" />
     <meta name="color-scheme" content="dark" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <!-- Vista previa sin servidor: el color elegido se guarda también en localStorage. -->
-    <script is:inline>
-      (() => {
-        const apply = () => {
-          try {
-            const c = localStorage.getItem('color_panel');
-            if (c && /^[a-z]{3,12}$/.test(c) && !document.cookie.includes('color_panel=')) document.documentElement.dataset.color = c;
-          } catch { /* sin almacenamiento */ }
-        };
-        apply();
-        document.addEventListener('astro:after-swap', apply);
-      })();
+    <!-- Color elegido: también en localStorage (vista previa sin servidor o sin cookies). -->
+    <script define:vars={{ ids: PANEL_COLORS.map(c => c.id) }}>
+      // La cookie manda (es lo que ha pintado el servidor); sin ella, localStorage.
+      // Solo se aceptan colores de la lista: uno desconocido deja el verde.
+      const read = f => { try { return f(); } catch { return null; } };
+      const apply = () => {
+        const c = read(() => /(?:^|;\s*)color_panel=([a-z]+)/.exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem('color_panel'));
+        if (c && ids.includes(c)) document.documentElement.dataset.color = c;
+      };
+      apply();
+      document.addEventListener('astro:after-swap', apply);
     </script>
     <ClientRouter fallback="none" />
   </head>
