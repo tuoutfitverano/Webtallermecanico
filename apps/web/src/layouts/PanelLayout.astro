@@ -16,6 +16,8 @@ import '../styles/panel.css';
 import ColorPicker from '../components/panel/ColorPicker.astro';
 import ThemeScript from '../components/ThemeScript.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
+import CookieBanner from '../components/CookieBanner.astro';
+import { CONSENT_COOKIE, consentFrom } from '../lib/consent.ts';
 import { DEFAULT_THEME, THEME_BAR, THEME_COOKIE, themeFor } from '../lib/theme.ts';
 import { PANEL_COLOR_COOKIE, PANEL_COLORS, panelColor } from '../lib/panel/colors.ts';
 import Icon from '../components/Icon.astro';
@@ -51,10 +53,11 @@ const w = panel.workshop;
 const color = panelColor(Astro.cookies.get(PANEL_COLOR_COOKIE)?.value);
 // Modo claro u oscuro de este dispositivo (en el panel, claro si no se ha elegido).
 const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.panel);
+const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
 ---
 <!doctype html>
 <!-- Sin animación entre páginas: en una herramienta de trabajo el cambio debe ser inmediato. -->
-<html lang="es" transition:animate="none" data-color={color} data-theme={theme}>
+<html lang="es" transition:animate="none" data-color={color} data-theme={theme} data-cookies={consent ?? undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -151,6 +154,8 @@ const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.pan
         </details>
       </nav>
     )}
+
+    <CookieBanner consent={consent} />
 
     <script>
       import '../scripts/panel.ts';

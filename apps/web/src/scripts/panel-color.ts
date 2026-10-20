@@ -1,9 +1,14 @@
 /**
  * Color del panel/portal: aplica la elección al instante (sin recargar) y la
- * recuerda en este dispositivo (cookie para el servidor y localStorage para la
- * vista previa sin servidor). Sin JavaScript, el formulario hace lo mismo.
+ * recuerda en este dispositivo si se han aceptado las cookies de preferencias
+ * (cookie para el servidor y localStorage para la vista previa sin servidor).
+ * Sin JavaScript, el formulario hace lo mismo.
  */
 import { isPanelColor, PANEL_COLOR_COOKIE } from '../lib/panel/colors.ts';
+import { rememberPreference } from './consent.ts';
+
+/** Elegido en esta visita: se vuelve a aplicar en cada cambio de página. */
+let chosen: string | null = null;
 
 function apply(color: string) {
   document.documentElement.dataset.color = color;
@@ -12,18 +17,14 @@ function apply(color: string) {
   }
 }
 
-function remember(color: string) {
-  const secure = location.protocol === 'https:' ? '; Secure' : '';
-  try { document.cookie = `${PANEL_COLOR_COOKIE}=${color}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`; } catch { /* sin cookies: vale con localStorage */ }
-  try { localStorage.setItem(PANEL_COLOR_COOKIE, color); } catch { /* sin almacenamiento: vale con la cookie */ }
-}
 
 document.addEventListener('click', e => {
   const btn = (e.target as Element).closest<HTMLButtonElement>('.color-pick-option');
   if (!btn || !isPanelColor(btn.value)) return;
   e.preventDefault();
   apply(btn.value);
-  remember(btn.value);
+  chosen = btn.value;
+  rememberPreference(PANEL_COLOR_COOKIE, btn.value);
   btn.closest('details')?.removeAttribute('open');
 });
 
@@ -39,4 +40,5 @@ document.addEventListener('keydown', e => {
 // El menú marca el color que se ve (puede venir de localStorage, no del servidor).
 const sync = () => { const c = document.documentElement.dataset.color; if (isPanelColor(c)) apply(c); };
 sync();
+document.addEventListener('astro:after-swap', () => { if (chosen) document.documentElement.dataset.color = chosen; });
 document.addEventListener('astro:page-load', sync);

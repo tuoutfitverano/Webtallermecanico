@@ -4,6 +4,7 @@
  */
 import { existsSync } from 'node:fs';
 import { chromium, defineConfig, devices } from '@playwright/test';
+import { ACCEPTED_COOKIES } from './e2e/consent.ts';
 
 // En la nube de Claude Code no se pueden descargar navegadores: si el de esta
 // versión no está, se usa el Chromium preinstalado.
@@ -24,6 +25,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
     locale: 'es-ES',
     timezoneId: 'Europe/Madrid',
+    // Aviso de cookies ya respondido (e2e/consent.ts); las pruebas del aviso empiezan sin él.
+    storageState: ACCEPTED_COOKIES,
     launchOptions: { executablePath },
   },
   projects: [

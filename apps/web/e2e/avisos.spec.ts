@@ -8,6 +8,7 @@
  */
 import { createHmac } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { acceptCookies } from './consent.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const REST = `${PROXY}/rest/v1`;
@@ -88,7 +89,7 @@ async function changeStatus(page: Page, orderId: string, label: string, message 
 const notificationsOf = async (token: string, orderId: string) =>
   rows(await api(`/notifications?order_id=eq.${orderId}&select=channel,event,status,error_code,attempts,provider_message_id,manual_retries&order=created_at`, token));
 async function newPage(browser: Browser) {
-  return (await browser.newContext({ locale: 'es-ES', timezoneId: 'Europe/Madrid' })).newPage();
+  return (await acceptCookies(await browser.newContext({ locale: 'es-ES', timezoneId: 'Europe/Madrid' }))).newPage();
 }
 
 test.describe.configure({ mode: 'serial' });

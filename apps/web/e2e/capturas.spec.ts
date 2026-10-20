@@ -4,6 +4,7 @@
  * La consulta por matrícula usa el proveedor SIMULADO de las pruebas.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { acceptCookies } from './consent.ts';
 
 const DIR = process.env.CAPTURAS_DIR ?? '';
 const PROXY = process.env.E2E_PROXY_URL ?? '';
@@ -51,7 +52,7 @@ test('capturas de las fases 5 y 6', async ({ page, browser, isMobile }) => {
   await post('/rpc/accept_customer_invitation', await token(email), { p_token: inv!.token });
 
   // Fase 5 · portal del cliente
-  const client = await (await browser.newContext({ ...(isMobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1280, height: 860 } }), locale: 'es-ES', timezoneId: 'Europe/Madrid' })).newPage();
+  const client = await (await acceptCookies(await browser.newContext({ ...(isMobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1280, height: 860 } }), locale: 'es-ES', timezoneId: 'Europe/Madrid' }))).newPage();
   await login(client, email, '/portal');
   await client.screenshot({ path: `${DIR}/f5-portal-inicio-${sfx}.png`, fullPage: true });
   await client.goto(`/portal/reparaciones/${o!.id}`);
@@ -104,7 +105,7 @@ test('capturas de la fase 7', async ({ page, browser, isMobile }) => {
     await page.goto('/panel/avisos?estado=todos&canal=email');
     await page.screenshot({ path: `${DIR}/f7-panel-avisos-${sfx}.png`, fullPage: true });
   }
-  const client = await (await browser.newContext({ ...(isMobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1280, height: 860 } }), locale: 'es-ES', timezoneId: 'Europe/Madrid' })).newPage();
+  const client = await (await acceptCookies(await browser.newContext({ ...(isMobile ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1280, height: 860 } }), locale: 'es-ES', timezoneId: 'Europe/Madrid' }))).newPage();
   await login(client, email, '/portal/avisos');
   await client.screenshot({ path: `${DIR}/f7-portal-avisos-${sfx}.png`, fullPage: true });
   if (!isMobile) {

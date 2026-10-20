@@ -1,0 +1,31 @@
+---
+/**
+ * Aviso de cookies (lib/consent.ts): aparece hasta que la persona acepta o
+ * rechaza las cookies de preferencias. «Rechazar» y «Aceptar» tienen el mismo
+ * peso. Sin JavaScript es un formulario (→ /api/preferencias, vuelve a la misma
+ * página); con JavaScript se responde sin recargar. La elección se puede cambiar
+ * en /cookies.
+ */
+import type { Consent } from '../lib/consent.ts';
+
+interface Props { consent: Consent | null }
+const { consent } = Astro.props;
+const next = `${Astro.url.pathname}${Astro.url.search}`;
+---
+{!consent && (
+  <section class="cookie-bar" data-cookie-bar aria-labelledby="cookie-bar-t">
+    <div class="cookie-bar-text">
+      <h2 id="cookie-bar-t" class="cookie-bar-title">Cookies</h2>
+      <p>Usamos cookies técnicas, necesarias para que la web y el área privada funcionen. Si aceptas, también recordaremos en este dispositivo tus preferencias: el modo claro u oscuro y el color del panel. No usamos cookies de publicidad ni de analítica. <a href="/cookies">Más información</a></p>
+    </div>
+    <form method="post" action="/api/preferencias" class="cookie-bar-actions" data-astro-reload>
+      <input type="hidden" name="next" value={next} />
+      <button type="submit" name="cookies" value="rechazadas" class="btn btn-sm">Rechazar</button>
+      <button type="submit" name="cookies" value="aceptadas" class="btn btn-sm">Aceptar</button>
+    </form>
+  </section>
+)}
+
+<script>
+  import '../scripts/consent.ts';
+</script>

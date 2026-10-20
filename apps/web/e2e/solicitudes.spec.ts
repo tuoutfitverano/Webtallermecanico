@@ -3,6 +3,7 @@
  * (PostgreSQL + RLS a través de la API REST, igual que en Supabase).
  */
 import { expect, test, type Page } from '@playwright/test';
+import { acceptCookies } from './consent.ts';
 
 const REST = process.env.E2E_REST_URL ?? '';
 const PROXY = process.env.E2E_PROXY_URL ?? '';
@@ -262,7 +263,7 @@ test.describe('Bandeja de solicitudes en el panel (Fase 8)', () => {
     await form.getByRole('button', { name: 'Pedir presupuesto' }).click();
     await expect(form.getByRole('heading', { name: 'Solicitud de presupuesto recibida' })).toBeVisible();
 
-    const owner = await (await browser.newContext()).newPage();
+    const owner = await (await acceptCookies(await browser.newContext())).newPage();
     await login(owner, 'propietaria@e2e.test', '/panel');
     await expect(owner.locator('.kpi', { hasText: 'Solicitudes web sin atender' })).toBeVisible();
     await owner.goto('/panel/solicitudes');
@@ -276,7 +277,7 @@ test.describe('Bandeja de solicitudes en el panel (Fase 8)', () => {
     await owner.context().close();
 
     // Un mecánico no ve las solicitudes (ni en la página ni por la API).
-    const mech = await (await browser.newContext()).newPage();
+    const mech = await (await acceptCookies(await browser.newContext())).newPage();
     await login(mech, 'mecanico@e2e.test', '/panel');
     await mech.goto('/panel/solicitudes');
     await expect(mech.getByText('Solo el propietario o un administrador ven las solicitudes de la web.')).toBeVisible();

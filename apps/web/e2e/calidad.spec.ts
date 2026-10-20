@@ -7,6 +7,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { PANEL_COLORS } from '../src/lib/panel/colors.ts';
+import { acceptCookies } from './consent.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const ANON = process.env.E2E_ANON_KEY ?? '';
@@ -145,7 +146,7 @@ test('modo claro y oscuro: accesibilidad de la web, el acceso, el panel y el por
     await context.addCookies([{ name: 'tema', value: tema, url: page.url() }]);
     await audit(page, ['/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/vehiculos/nuevo', '/panel/avisos', '/cuenta'], false);
   }
-  await context.clearCookies();
+  await context.clearCookies(); await acceptCookies(context);
   await login(page, f.email, '/portal');
   for (const tema of ['claro', 'oscuro']) {
     await context.addCookies([{ name: 'tema', value: tema, url: page.url() }]);
@@ -171,7 +172,7 @@ test('modo claro y oscuro: cambia al momento, se recuerda y cada zona tiene el s
   await page.reload();
   await expect(html).toHaveAttribute('data-theme', 'oscuro');
   // Panel del taller: claro si no se ha elegido; la elección se mantiene al navegar por el panel.
-  const forget = async () => { await page.evaluate(() => localStorage.clear()); await context.clearCookies(); };
+  const forget = async () => { await page.evaluate(() => localStorage.clear()); await context.clearCookies(); await acceptCookies(context); };
   await forget();
   await login(page, 'propietaria@e2e.test', '/panel');
   await expect(html).toHaveAttribute('data-theme', 'claro');
@@ -180,10 +181,86 @@ test('modo claro y oscuro: cambia al momento, se recuerda y cada zona tiene el s
   await page.getByRole('link', { name: 'Órdenes' }).first().click();
   await page.waitForURL(/\/panel\/ordenes$/);
   await expect(html).toHaveAttribute('data-theme', 'oscuro');
-  // Portal del cliente: oscuro si no se ha elegido.
+  // Portal del cliente y acceso: también claro si no se ha elegido.
   await forget();
   await login(page, f.email, '/portal');
-  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  await expect(html).toHaveAttribute('data-theme', 'claro');
+  await page.goto('/cuenta');
+  await expect(html).toHaveAttribute('data-theme', 'claro');
+});
+
+test.describe('aviso de cookies', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+  const cookie = async (context: import('@playwright/test').BrowserContext, name: string) => (await context.cookies()).find(c => c.name === name)?.value;
+
+  test('aparece hasta responder; aceptar guarda las preferencias y rechazar las borra', async ({ page, context, isMobile }) => {
+    await page.goto('/');
+    const html = page.locator('html');
+    const bar = page.getByRole('region', { name: 'Cookies' });
+    await expect(bar).toBeVisible();
+    // «Rechazar» y «Aceptar» con el mismo peso (mismo estilo y tamaño).
+    const reject = bar.getByRole('button', { name: 'Rechazar' }), accept = bar.getByRole('button', { name: 'Aceptar' });
+    expect(await reject.getAttribute('class')).toBe(await accept.getAttribute('class'));
+    const [rb, ab] = [await reject.boundingBox(), await accept.boundingBox()];
+    expect(Math.abs(rb!.height - ab!.height)).toBeLessThan(1);
+    if (!isMobile) {
+      const axe = await new AxeBuilder({ page }).include('[data-cookie-bar]').withTags(['wcag2a', 'wcag2aa']).analyze();
+      expect(axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id)).toEqual([]);
+    }
+    // Sin responder, el modo cambia al momento pero no se guarda.
+    await page.getByRole('button', { name: 'Modo claro' }).first().click();
+    await expect(html).toHaveAttribute('data-theme', 'claro');
+    expect(await cookie(context, 'tema')).toBeUndefined();
+    await page.reload();
+    await expect(html).toHaveAttribute('data-theme', 'oscuro');
+    // Aceptar: el aviso se va y lo elegido se guarda (también lo elegido antes de aceptar).
+    await page.getByRole('button', { name: 'Modo claro' }).first().click();
+    await accept.click();
+    await expect(bar).toBeHidden();
+    expect(await cookie(context, 'consentimiento')).toBe('aceptadas');
+    expect(await cookie(context, 'tema')).toBe('claro');
+    await page.reload();
+    await expect(html).toHaveAttribute('data-theme', 'claro');
+    await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
+    // Cambiar de idea en /cookies: rechazar borra lo guardado.
+    await page.goto('/cookies');
+    const choice = page.locator('.consent-choice');
+    await expect(choice).toContainText('Aceptadas');
+    await choice.getByRole('button', { name: 'Rechazar' }).click();
+    await expect(choice).toContainText('Rechazadas');
+    expect(await cookie(context, 'consentimiento')).toBe('rechazadas');
+    expect(await cookie(context, 'tema')).toBeUndefined();
+    expect(await page.evaluate(() => localStorage.getItem('tema'))).toBeNull();
+    await page.reload();
+    await expect(html).toHaveAttribute('data-theme', 'oscuro');
+    await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
+  });
+
+  test('si se rechazan, el modo elegido en el panel se mantiene al cambiar de página', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test', '/panel');
+    const html = page.locator('html');
+    await page.getByRole('region', { name: 'Cookies' }).getByRole('button', { name: 'Rechazar' }).click();
+    await page.getByRole('button', { name: 'Modo oscuro' }).click();
+    await expect(html).toHaveAttribute('data-theme', 'oscuro');
+    await page.getByRole('link', { name: 'Órdenes' }).first().click();
+    await page.waitForURL(/\/panel\/ordenes$/);
+    await expect(html).toHaveAttribute('data-theme', 'oscuro');
+    await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
+  });
+});
+
+test.describe('aviso de cookies sin JavaScript', () => {
+  test.use({ javaScriptEnabled: false, storageState: { cookies: [], origins: [] } });
+  test('el formulario guarda la respuesta y vuelve a la misma página', async ({ page }) => {
+    await page.goto('/cookies');
+    await page.getByRole('region', { name: 'Cookies' }).getByRole('button', { name: 'Aceptar' }).click();
+    await expect(page).toHaveURL(/\/cookies$/);
+    await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
+    await expect(page.locator('.consent-choice')).toContainText('Aceptadas');
+    // Con las cookies aceptadas, el modo elegido sin JavaScript se recuerda.
+    await page.getByRole('button', { name: 'Modo claro' }).first().click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'claro');
+  });
 });
 
 test.describe('modo claro y oscuro sin JavaScript', () => {
@@ -229,13 +306,13 @@ test('todos los tamaños (móvil, tablet y PC, en vertical y horizontal): nada s
     }
   };
   for (const tema of ['oscuro', 'claro']) {
-    const ctx = await browser.newContext({ baseURL: `http://${HOST}` });
+    const ctx = await acceptCookies(await browser.newContext({ baseURL: `http://${HOST}` }));
     await ctx.addCookies([{ name: 'tema', value: tema, url: `http://${HOST}` }]);
     const page = await ctx.newPage();
     await check(page, ['/', '/acceso']);
     await login(page, 'propietaria@e2e.test', '/panel');
     await check(page, ['/panel', `/panel/ordenes/${f.order}`]);
-    await ctx.clearCookies();
+    await ctx.clearCookies(); await acceptCookies(ctx);
     await ctx.addCookies([{ name: 'tema', value: tema, url: `http://${HOST}` }]);
     await login(page, f.email, '/portal');
     await check(page, ['/portal']);
@@ -312,7 +389,7 @@ test('teclado: el primer Tab lleva a «Saltar al contenido» en panel y portal',
   await login(page, 'propietaria@e2e.test', '/panel');
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toHaveText('Saltar al contenido');
-  await page.context().clearCookies();
+  await page.context().clearCookies(); await acceptCookies(page.context());
   await login(page, f.email, '/portal');
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toHaveText('Saltar al contenido');

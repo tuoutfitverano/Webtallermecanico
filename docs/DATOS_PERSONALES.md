@@ -15,7 +15,7 @@ Documento técnico para preparar la política de privacidad y el registro de act
 | **Consultas de matrícula** (si se activan): matrícula y datos devueltos | Rellenar la ficha del vehículo | Personal del taller | **Openapi** (recibe la matrícula) |
 | **Avisos**: título, texto, correo destinatario y estado de envío | Informar al cliente | Gestores (registro) y el cliente (sus avisos del portal) | **Resend** (si se activa; recibe correo, asunto y texto) |
 | **Preferencias y consentimientos**: avisos por email, comerciales e historial de cambios | Respetar lo que quiere el cliente y poder demostrar el consentimiento | Personal; el registro, solo gestores | Supabase |
-| Cookies | Ver `/cookies` | — | — |
+| Cookies | Ver `/cookies`: técnicas (sesión, seguridad, taller abierto, respuesta al aviso) y de preferencias (modo claro u oscuro, color del panel), estas solo si se aceptan en el aviso | — | Navegador de la persona |
 
 **Registros técnicos** (`console`): solo códigos de evento y recuentos. Nunca correos, nombres, matrículas, contenidos ni claves. Se comprueba en las pruebas unitarias de matrículas y avisos.
 
@@ -62,4 +62,4 @@ Antes de responder, compruebe la identidad de quien lo pide. Hay plazo de un mes
   - avisos operativos: ejecución del servicio;
   - comerciales: consentimiento (LSSI art. 21);
   - consulta por matrícula: interés legítimo o ejecución, a validar.
-- **Cookies:** confirmar que las de la tabla son técnicas y están exentas de consentimiento, y qué almacena Turnstile.
+- **Cookies:** hay aviso con «Aceptar» y «Rechazar» del mismo peso (`CookieBanner.astro`); las de preferencias solo se guardan si se aceptan y al rechazar se borran; la elección se cambia en `/cookies` y se vuelve a preguntar al año. Falta que el asesor valide los textos del aviso y de `/cookies`, que las técnicas están exentas y qué almacena Turnstile.

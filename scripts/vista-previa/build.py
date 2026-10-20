@@ -9,7 +9,9 @@ estáticas navegables (vista previa sin servidor ni base de datos).
   · Enlaces internos: a la página capturada correspondiente; si no se capturó,
     el enlace avisa de que no está incluido (data-vp-off).
   · Scripts de desarrollo fuera; se añade assets/preview.js (comportamiento
-    del panel + avisos de «vista previa»: nada se guarda ni se finge guardar).
+    del panel + avisos de «vista previa»: nada se guarda ni se finge guardar)
+    y, en la cabecera, state-inline.js (el modo, el color y la respuesta a las
+    cookies pasan de una página a otra aunque el navegador no deje guardar).
 """
 import base64, hashlib, json, os, re, shutil, sys
 
@@ -17,6 +19,10 @@ SRC, OUT, PREVIEW_JS = sys.argv[1], sys.argv[2], sys.argv[3]
 ROOT = '/home/user/Webtallermecanico'
 os.makedirs(f'{OUT}/assets', exist_ok=True)
 shutil.copy(PREVIEW_JS, f'{OUT}/assets/preview.js')
+
+# Elección de la persona (modo, color, cookies) llevada de página en página: ver state.ts.
+COLORS = re.findall(r"id: '([a-z]+)'", open(f'{ROOT}/apps/web/src/lib/panel/colors.ts', encoding='utf-8').read())
+STATE_INLINE = open(f'{ROOT}/scripts/vista-previa/state-inline.js', encoding='utf-8').read().replace('__COLORS__', json.dumps(COLORS))
 
 ROLES = {'taller': ('t', '/panel'), 'trabajador': ('w', '/panel'), 'cliente': ('c', '/portal')}
 PUBLIC = {'': 'index.html', 'acceso': 'acceso.html', 'registro': 'registro.html', 'recuperar': 'recuperar.html',
@@ -91,6 +97,7 @@ for role, (prefix, home) in ROLES.items():
         html = re.sub(r'(<form[^>]*action="/salir"[^>]*)>', r'\1 data-vp-logout>', html)
         html = html.replace('<main id="contenido" class="pnl-content" tabindex="-1">',
                             '<main id="contenido" class="pnl-content" tabindex="-1"><p class="vp-bar" role="note" style="margin:0 0 18px;padding:10px 14px;border:1px solid rgb(252 211 77 / .45);border-radius:12px;background:rgb(252 211 77 / .08);color:var(--alert-warn,#fde68a);font-size:.875rem;line-height:1.45"><strong>Vista previa</strong> con datos de demostración: los cambios no se guardan; el email y la consulta de matrículas son simulados. <a href="index.html" style="color:inherit">Ver la web pública</a></p>', 1)
+        html = html.replace('</head>', f'<script>{STATE_INLINE}</script></head>', 1)
         html = html.replace('</body>', '<script type="module" src="assets/preview.js"></script></body>', 1)
         assert 'href="/' not in html and '/@vite' not in html, (role, path)
         open(f'{OUT}/{files[path]}', 'w', encoding='utf-8').write(html)

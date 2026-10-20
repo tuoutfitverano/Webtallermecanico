@@ -4,6 +4,7 @@
  * Navegador → web → Supabase Auth real + PostgREST → PostgreSQL con RLS.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { acceptCookies } from './consent.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const REST = `${PROXY}/rest/v1`;
@@ -70,7 +71,7 @@ test.describe('Navegación', () => {
     await side.getByRole('link', { name: 'Taller', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Taller', exact: true })).toBeVisible();
 
-    await page.context().clearCookies();
+    await page.context().clearCookies(); await acceptCookies(page.context());
     await login(page, 'mecanico@e2e.test');
     for (const name of ['Avisos', 'Solicitudes web', 'Taller']) {
       await expect(page.locator('.pnl-side').getByRole('link', { name, exact: true })).toHaveCount(0);
@@ -97,7 +98,7 @@ test.describe('Navegación', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
 
-    await page.context().clearCookies();
+    await page.context().clearCookies(); await acceptCookies(page.context());
     await login(page, 'mecanico@e2e.test');
     await page.locator('.pnl-tabs').getByText('Más', { exact: true }).click();
     await expect(page.locator('.pnl-tabs').getByRole('link', { name: 'Mi cuenta' })).toBeVisible();
@@ -205,7 +206,7 @@ test.describe('Clientes: historial de comunicaciones', () => {
     await page.getByText(/^Historial de cambios de comunicaciones/).click();
     await expect(page.locator('.timeline').last()).toContainText('Avisos de reparaciones por email: desactivado · por el taller');
 
-    await page.context().clearCookies();
+    await page.context().clearCookies(); await acceptCookies(page.context());
     await login(page, 'mecanico@e2e.test', url.replace(/^https?:\/\/[^/]+/, ''));
     await expect(page.getByText(/^Historial de cambios de comunicaciones/)).toHaveCount(0);
   });

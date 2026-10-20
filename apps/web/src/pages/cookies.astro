@@ -8,15 +8,19 @@ import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import BackLink from '../components/BackLink.astro';
 import { siteForHost } from '../lib/server/config.ts';
+import { CONSENT_COOKIE, consentFrom } from '../lib/consent.ts';
 export const prerender = false;
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
 if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
+const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
+const next = Astro.url.pathname;
 const rows = [
-  { name: 'sb-…-auth-token (y partes .0, .1…)', where: 'Solo en el área privada (acceso, panel y portal)', what: 'Mantiene la sesión iniciada. Sin ella no se puede entrar.', when: 'Mientras dura la sesión (la renueva Supabase Auth)', who: 'Propia (Supabase Auth)' },
-  { name: 'sb-…-auth-token-code-verifier', where: 'Solo en el área privada', what: 'Protege el inicio de sesión y la recuperación de contraseña por enlace.', when: 'Unos minutos, hasta completar el proceso', who: 'Propia (Supabase Auth)' },
-  { name: 'panel_taller', where: 'Solo en el panel del taller', what: 'Recuerda qué taller tenías abierto si trabajas en varios.', when: '1 año', who: 'Propia' },
-  { name: 'tema', where: 'En la web y en el área privada, solo si eliges un modo', what: 'Recuerda si elegiste el modo claro o el oscuro (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
-  { name: 'color_panel', where: 'Solo en el panel y el portal', what: 'Recuerda el color que elegiste para el panel o el portal (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
+  { name: 'sb-…-auth-token (y partes .0, .1…)', type: 'Técnica', where: 'Solo en el área privada (acceso, panel y portal)', what: 'Mantiene la sesión iniciada. Sin ella no se puede entrar.', when: 'Mientras dura la sesión (la renueva Supabase Auth)', who: 'Propia (Supabase Auth)' },
+  { name: 'sb-…-auth-token-code-verifier', type: 'Técnica', where: 'Solo en el área privada', what: 'Protege el inicio de sesión y la recuperación de contraseña por enlace.', when: 'Unos minutos, hasta completar el proceso', who: 'Propia (Supabase Auth)' },
+  { name: 'panel_taller', type: 'Técnica', where: 'Solo en el panel del taller', what: 'Recuerda qué taller tienes abierto si trabajas en varios (sin ella, cada página volvería al primero).', when: '1 año', who: 'Propia' },
+  { name: 'consentimiento', type: 'Técnica', where: 'En la web y en el área privada', what: 'Recuerda si aceptaste o rechazaste las cookies de preferencias, para no volver a preguntar.', when: '1 año', who: 'Propia' },
+  { name: 'tema', type: 'Preferencias (solo si aceptas)', where: 'En la web y en el área privada', what: 'Recuerda si elegiste el modo claro o el oscuro (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
+  { name: 'color_panel', type: 'Preferencias (solo si aceptas)', where: 'Solo en el panel y el portal', what: 'Recuerda el color que elegiste para el panel o el portal (también en el almacenamiento del navegador, con el mismo nombre).', when: '1 año', who: 'Propia' },
 ];
 ---
 <SiteLayout site={site} title={`Cookies · ${site.name}`} noindex>
@@ -29,11 +33,24 @@ const rows = [
       <div class="alert alert-warn" role="note">
         <span><strong>Texto pendiente de revisión legal.</strong> Debajo está la lista técnica de lo que guarda la aplicación. El titular de la web debe validarla con su asesor antes de publicar la web.</span>
       </div>
-      <p>Esta web no usa cookies de publicidad ni de analítica. Solo se guardan estas: las del área privada, necesarias para entrar, y las de tus preferencias (modo claro u oscuro y color), solo si las eliges tú:</p>
+      <p>Esta web no usa cookies de publicidad ni de analítica. Hay dos tipos:</p>
+      <ul>
+        <li><strong>Técnicas:</strong> necesarias para que la web y el área privada funcionen (sesión, seguridad, taller abierto y tu respuesta a este aviso). Se usan siempre.</li>
+        <li><strong>Preferencias:</strong> recuerdan en este dispositivo el modo claro u oscuro y el color del panel. Solo se guardan si las aceptas; si las rechazas, puedes cambiar el modo y el color igual, pero no se recordarán al volver.</li>
+      </ul>
+      <section class="consent-choice" aria-labelledby="consent-t">
+        <h2 id="consent-t" class="consent-choice-title">Tu elección</h2>
+        <p>Cookies de preferencias: <strong data-consent-state>{consent === 'aceptadas' ? 'Aceptadas' : consent === 'rechazadas' ? 'Rechazadas' : 'Sin responder'}</strong>. Puedes cambiarlo cuando quieras.</p>
+        <form method="post" action="/api/preferencias" class="cookie-bar-actions">
+          <input type="hidden" name="next" value={next} />
+          <button type="submit" name="cookies" value="rechazadas" class="btn btn-sm">Rechazar</button>
+          <button type="submit" name="cookies" value="aceptadas" class="btn btn-sm">Aceptar</button>
+        </form>
+      </section>
       <div class="table-scroll">
         <table class="legal-table">
-          <thead><tr><th scope="col">Nombre</th><th scope="col">Dónde</th><th scope="col">Para qué</th><th scope="col">Duración</th><th scope="col">De quién</th></tr></thead>
-          <tbody>{rows.map(r => <tr><td><code>{r.name}</code></td><td>{r.where}</td><td>{r.what}</td><td>{r.when}</td><td>{r.who}</td></tr>)}</tbody>
+          <thead><tr><th scope="col">Nombre</th><th scope="col">Tipo</th><th scope="col">Dónde</th><th scope="col">Para qué</th><th scope="col">Duración</th><th scope="col">De quién</th></tr></thead>
+          <tbody>{rows.map(r => <tr><td><code>{r.name}</code></td><td>{r.type}</td><td>{r.where}</td><td>{r.what}</td><td>{r.when}</td><td>{r.who}</td></tr>)}</tbody>
         </table>
       </div>
       <p>Los formularios públicos usan Cloudflare Turnstile para frenar el spam. Antes de publicar hay que confirmar en la documentación de Cloudflare qué almacena en el navegador y reflejarlo aquí.</p>

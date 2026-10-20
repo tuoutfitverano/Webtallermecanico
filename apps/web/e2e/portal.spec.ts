@@ -10,6 +10,7 @@
  * la seguridad la pone la base de datos, no la interfaz.
  */
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { acceptCookies } from './consent.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const REST = `${PROXY}/rest/v1`;
@@ -116,7 +117,7 @@ async function setupCustomer(opts: { link?: boolean; name?: string } = {}) {
 }
 
 async function newPage(browser: Browser) {
-  const context = await browser.newContext({ locale: 'es-ES', timezoneId: 'Europe/Madrid' });
+  const context = await acceptCookies(await browser.newContext({ locale: 'es-ES', timezoneId: 'Europe/Madrid' }));
   return context.newPage();
 }
 
