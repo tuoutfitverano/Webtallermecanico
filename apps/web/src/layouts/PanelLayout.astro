@@ -60,11 +60,11 @@ const color = panelColor(Astro.cookies.get(PANEL_COLOR_COOKIE)?.value);
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <!-- Color elegido: también en localStorage (vista previa sin servidor o sin cookies). -->
     <script define:vars={{ ids: PANEL_COLORS.map(c => c.id) }}>
-      // La cookie manda (es lo que ha pintado el servidor); sin ella, localStorage.
-      // Solo se aceptan colores de la lista: uno desconocido deja el verde.
+      // Si hay cookie, manda ella (es lo que ha pintado el servidor), sea válida o no;
+      // sin cookie, localStorage. Solo se aceptan colores de la lista: si no, verde.
       const read = f => { try { return f(); } catch { return null; } };
       const apply = () => {
-        const c = read(() => /(?:^|;\s*)color_panel=([a-z]+)/.exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem('color_panel'));
+        const c = read(() => /(?:^|;\s*)color_panel=([^;]*)/.exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem('color_panel'));
         if (c && ids.includes(c)) document.documentElement.dataset.color = c;
       };
       apply();
