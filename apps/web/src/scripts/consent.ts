@@ -37,6 +37,18 @@ function decide(consent: Consent) {
   dispatchEvent(new CustomEvent('cookies', { detail: consent }));
 }
 
+// Hueco al final de la página del alto real del aviso (más el margen y, en el panel, las pestañas).
+function reserveSpace() {
+  const bar = document.querySelector<HTMLElement>('[data-cookie-bar]');
+  if (!bar || bar.hidden || root.dataset.cookies) return;
+  const fit = () => document.body.style.setProperty('--cookie-space', `${Math.ceil(innerHeight - bar.getBoundingClientRect().top) + 16}px`);
+  fit();
+  new ResizeObserver(fit).observe(bar);
+  addEventListener('resize', fit);
+}
+reserveSpace();
+document.addEventListener('astro:page-load', reserveSpace);
+
 document.addEventListener('click', e => {
   const btn = (e.target as Element).closest<HTMLButtonElement>('button[name="cookies"]');
   const consent = consentFrom(btn?.value);

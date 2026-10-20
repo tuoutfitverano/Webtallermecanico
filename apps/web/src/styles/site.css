@@ -96,6 +96,10 @@
 :root[data-theme='claro'] { --cookie-bg: #FFFDF8; }
 /* Ya respondido (también en la vista previa sin servidor): no se ve. */
 html[data-cookies] .cookie-bar { display: none; }
+/* Mientras se ve, la página deja ese hueco abajo: nada queda tapado debajo del aviso
+   (--cookie-space lo ajusta consent.ts a la altura real del aviso). */
+html:not([data-cookies]) body:has(> [data-cookie-bar]) { padding-bottom: var(--cookie-space, 260px); }
+@media (min-width: 720px) { html:not([data-cookies]) body:has(> [data-cookie-bar]) { padding-bottom: var(--cookie-space, 150px); } }
 .cookie-bar-text { flex: 1 1 320px; min-width: 0; }
 .consent-choice { display: grid; gap: 12px; margin: 24px 0; padding: 18px 20px; border: 1px solid var(--line-2); border-radius: 16px; }
 .consent-choice-title { margin: 0; font-family: var(--font-body); font-style: normal; font-size: 1.0625rem; font-weight: 600; }

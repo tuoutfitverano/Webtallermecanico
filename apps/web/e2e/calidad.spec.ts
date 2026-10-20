@@ -236,6 +236,16 @@ test.describe('aviso de cookies', () => {
     await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
   });
 
+  test('el aviso no tapa nada: en un móvil pequeño se puede pulsar «Entrar» sin responderlo', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto('/acceso');
+    await expect(page.getByRole('region', { name: 'Cookies' })).toBeVisible();
+    await page.getByRole('button', { name: 'Entrar' }).click({ trial: true });
+    await page.goto('/');
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+    await page.getByRole('link', { name: 'Cookies', exact: true }).last().click({ trial: true });
+  });
+
   test('si se rechazan, el modo elegido en el panel se mantiene al cambiar de página', async ({ page }) => {
     await login(page, 'propietaria@e2e.test', '/panel');
     const html = page.locator('html');
