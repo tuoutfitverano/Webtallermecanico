@@ -47,8 +47,8 @@ values (
     "focusY": 0.41,
     "backdrop": "/demo/autovalue/garaje.webp",
     "frameTop": 0.359375,
-    "srcHd": null,
-    "backdropHd": null
+    "srcHd": "/demo/autovalue/giro-4k/{n}.webp",
+    "backdropHd": "/demo/autovalue/garaje-4k.webp"
   }
 }$tema$,
   $contenido${
