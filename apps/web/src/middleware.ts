@@ -16,7 +16,8 @@ import { defineMiddleware } from 'astro:middleware';
 import { appOrigin } from './lib/server/config.ts';
 import { setPrivateHeaders } from './lib/server/auth.ts';
 
-const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado)(\/|$)/;
+// /presupuesto/<código>: enlace público con un código secreto: sin caché y sin enviar la dirección a otros sitios.
+const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado|presupuesto)(\/|$)/;
 
 function setSecurityHeaders(headers: Headers, https: boolean) {
   // Sin restringir scripts (la web usa scripts en línea y Turnstile): solo lo que no rompe nada.

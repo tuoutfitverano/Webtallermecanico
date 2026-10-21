@@ -110,7 +110,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
           <h1 class="pnl-title"><span class="plate" style="font-size:1.5rem;vertical-align:middle">{formatPlate(vehicle.plate)}</span> {vehicle.make} {vehicle.model}</h1>
           <p class="pnl-sub">Registrado el {formatDate(vehicle.created_at)}</p>
         </div>
-        {panel.isManager && <div class="pnl-actions"><a class="btn btn-primary" href={`/panel/ordenes/nueva?vehiculo=${vehicle.id}`}><Icon name="plus" />Nueva orden</a></div>}
+        {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href={`/panel/ordenes/nueva?vehiculo=${vehicle.id}`}><Icon name="plus" />Nueva orden</a></div>}
       </header>
       <Flash kind={flash.kind} text={flash.text} />
       <div class="grid-2">
@@ -142,7 +142,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
           )}
           <section class="card" aria-labelledby="hist">
             <h2 id="hist" class="card-title"><Icon name="history" />Historial de reparaciones</h2>
-            {orders.length === 0 ? <p class="hint">{panel.isManager ? 'Sin reparaciones registradas.' : 'Sin reparaciones asignadas a ti para este vehículo.'}</p> : (
+            {orders.length === 0 ? <p class="hint">{panel.isOffice ? 'Sin reparaciones registradas.' : 'Sin reparaciones asignadas a ti para este vehículo.'}</p> : (
               <ul class="list">{orders.map(o => (
                 <li><a class="row" href={`/panel/ordenes/${o.id}`}>
                   <span class="row-main">

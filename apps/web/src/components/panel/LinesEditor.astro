@@ -1,0 +1,137 @@
+---
+/**
+ * Líneas de una orden, un presupuesto o una factura (mano de obra, piezas…)
+ * con sus importes y el resumen por tipo de IVA.
+ *
+ *  · editable: formulario para añadir y botón para quitar cada línea (POST
+ *    al servidor, sin JavaScript). Las acciones son «linea-anadir» y
+ *    «linea-quitar»; la página decide en qué tabla se guardan.
+ *  · Sin editable (documento enviado o emitido): solo lectura.
+ *  · stored: importes ya fijados por la base de datos (presupuesto enviado,
+ *    factura emitida). Si no, se calculan con las mismas reglas
+ *    (packages/core/src/money.ts).
+ */
+import Icon from '../Icon.astro';
+import { COMMON_TAX_RATES, documentTotals, formatCents, LINE_KIND_LABELS, LINE_KINDS, lineBaseCents, type DocumentTotals } from '@talleres/core';
+import { toMoneyLine, type LineRow } from '../../lib/panel/lines.ts';
+
+interface Props {
+  lines: LineRow[];
+  editable?: boolean;
+  /** Título del bloque (accesible). */
+  title?: string;
+  taxRate?: number;
+  errors?: Record<string, string>;
+  values?: Record<string, string>;
+  stored?: { subtotal_cents: number; tax_cents: number; total_cents: number; taxes: Array<{ rate: number; base_cents: number; tax_cents: number }> } | null;
+  emptyText?: string;
+  /** Precio por hora orientativo del taller (rellena la mano de obra). */
+  labourRateCents?: number | null;
+  /** Rectificativa: se admiten cantidades negativas. */
+  allowNegative?: boolean;
+  id?: string;
+}
+const {
+  lines, editable = false, title = 'Líneas', taxRate = 21, errors = {}, values = {}, stored = null,
+  emptyText = 'Todavía no hay líneas.', labourRateCents = null, allowNegative = false, id = 'lineas',
+} = Astro.props;
+const totals: DocumentTotals = stored
+  ? { subtotalCents: Number(stored.subtotal_cents), taxCents: Number(stored.tax_cents), totalCents: Number(stored.total_cents),
+      taxes: (stored.taxes ?? []).map(t => ({ rate: Number(t.rate), baseCents: Number(t.base_cents), taxCents: Number(t.tax_cents) })) }
+  : documentTotals(lines.map(toMoneyLine));
+const pct = (n: number | string) => `${Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 })} %`;
+const qty = (n: number | string) => Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 });
+const euros = (cents: number | null | undefined) => (cents === null || cents === undefined ? '' : (cents / 100).toFixed(2).replace('.', ','));
+const err = (k: string) => errors[k];
+---
+<section class="card" aria-labelledby={`${id}-t`} id={id}>
+  <h2 id={`${id}-t`} class="card-title"><Icon name="clipboard" />{title}</h2>
+  {lines.length === 0 ? <p class="hint">{emptyText}</p> : (
+    <div class="table-wrap">
+      <table class="data-table lines-table">
+        <thead><tr><th>Concepto</th><th class="num-col">Cant.</th><th class="num-col">Precio</th><th class="num-col">Dto.</th><th class="num-col">IVA</th><th class="num-col">Importe</th>{editable && <th><span class="sr-only">Acciones</span></th>}</tr></thead>
+        <tbody>
+          {lines.map(l => (
+            <tr>
+              <td><span class="muted small">{LINE_KIND_LABELS[l.kind]}{l.part_number && ` · Ref. ${l.part_number}`}</span><br />{l.description}</td>
+              <td class="num-col">{qty(l.quantity)}</td>
+              <td class="num-col">{formatCents(Number(l.unit_price_cents))}</td>
+              <td class="num-col">{Number(l.discount_pct) ? pct(l.discount_pct) : '—'}</td>
+              <td class="num-col">{pct(l.tax_rate)}</td>
+              <td class="num-col">{formatCents(lineBaseCents(toMoneyLine(l)))}</td>
+              {editable && (
+                <td>
+                  <form method="post" data-busy="Quitando…">
+                    <input type="hidden" name="action" value="linea-quitar" />
+                    <input type="hidden" name="line_id" value={l.id} />
+                    <button class="btn btn-sm" type="submit" aria-label={`Quitar «${l.description}»`}><span class="spinner" aria-hidden="true"></span><span data-label>Quitar</span></button>
+                  </form>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  <dl class="totals" aria-label="Totales">
+    {totals.taxes.map(t => (
+      <><dt>Base {pct(t.rate)}</dt><dd>{formatCents(t.baseCents)}</dd><dt>IVA {pct(t.rate)}</dt><dd>{formatCents(t.taxCents)}</dd></>
+    ))}
+    <dt>Base imponible</dt><dd>{formatCents(totals.subtotalCents)}</dd>
+    <dt>Impuestos</dt><dd>{formatCents(totals.taxCents)}</dd>
+    <dt class="totals-total">Total</dt><dd class="totals-total">{formatCents(totals.totalCents)}</dd>
+  </dl>
+
+  {editable && (
+    <form method="post" class="form-stack line-form" data-busy="Añadiendo…" novalidate>
+      <input type="hidden" name="action" value="linea-anadir" />
+      <h3 class="card-title" style="margin:8px 0 0">Añadir línea</h3>
+      <div class="form-row">
+        <div class={`field ${err('kind') ? 'has-error' : ''}`}>
+          <label for={`${id}-kind`}>Tipo</label>
+          <select class="select" id={`${id}-kind`} name="kind">
+            {LINE_KINDS.map(k => <option value={k} selected={(values.kind || 'mano_obra') === k}>{LINE_KIND_LABELS[k]}</option>)}
+          </select>
+        </div>
+        <div class={`field ${err('partNumber') ? 'has-error' : ''}`}>
+          <label for={`${id}-ref`}>Referencia <span class="muted">(opcional)</span></label>
+          <input class="input" id={`${id}-ref`} name="part_number" maxlength="60" value={values.part_number ?? ''} />
+          {err('partNumber') && <p class="field-error">{err('partNumber')}</p>}
+        </div>
+      </div>
+      <div class={`field ${err('description') ? 'has-error' : ''}`}>
+        <label for={`${id}-desc`}>Concepto</label>
+        <input class="input" id={`${id}-desc`} name="description" required maxlength="300" placeholder="Ej.: Sustitución de pastillas delanteras" value={values.description ?? ''} />
+        {err('description') && <p class="field-error">{err('description')}</p>}
+      </div>
+      <div class="line-nums">
+        <div class={`field ${err('quantity') ? 'has-error' : ''}`}>
+          <label for={`${id}-qty`}>Cantidad u horas</label>
+          <input class="input" id={`${id}-qty`} name="quantity" inputmode="decimal" value={values.quantity ?? '1'} />
+          {err('quantity') && <p class="field-error">{err('quantity')}</p>}
+        </div>
+        <div class={`field ${err('unitPriceCents') ? 'has-error' : ''}`}>
+          <label for={`${id}-price`}>Precio unitario (€, sin IVA)</label>
+          <input class="input" id={`${id}-price`} name="unit_price" inputmode="decimal" placeholder={labourRateCents ? euros(labourRateCents) : '0,00'} value={values.unit_price ?? ''} />
+          {err('unitPriceCents') && <p class="field-error">{err('unitPriceCents')}</p>}
+        </div>
+        <div class={`field ${err('discountPct') ? 'has-error' : ''}`}>
+          <label for={`${id}-disc`}>Descuento (%)</label>
+          <input class="input" id={`${id}-disc`} name="discount" inputmode="decimal" value={values.discount ?? '0'} />
+          {err('discountPct') && <p class="field-error">{err('discountPct')}</p>}
+        </div>
+        <div class={`field ${err('taxRate') ? 'has-error' : ''}`}>
+          <label for={`${id}-tax`}>IVA (%)</label>
+          <input class="input" id={`${id}-tax`} name="tax_rate" inputmode="decimal" list={`${id}-taxes`} value={values.tax_rate ?? String(taxRate).replace('.', ',')} />
+          <datalist id={`${id}-taxes`}>{COMMON_TAX_RATES.map(r => <option value={r} />)}</datalist>
+          {err('taxRate') && <p class="field-error">{err('taxRate')}</p>}
+        </div>
+      </div>
+      {labourRateCents && <p class="hint">Precio por hora del taller: {formatCents(labourRateCents)} (sin IVA). Si dejas el precio vacío en mano de obra, se usa ese.</p>}
+      {allowNegative && <p class="hint">Rectificativa: usa una cantidad negativa para restar lo facturado de más.</p>}
+      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Añadir línea</span></button>
+    </form>
+  )}
+</section>

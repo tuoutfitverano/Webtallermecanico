@@ -22,20 +22,26 @@ import { PANEL_COLOR_COOKIE, PANEL_COLORS, panelColor } from '../lib/panel/color
 import Icon from '../components/Icon.astro';
 import type { Portal } from '../lib/server/portal.ts';
 
-export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'avisos' | 'datos';
+export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'presupuestos' | 'facturas' | 'avisos' | 'datos';
 interface Props {
   portal: Portal;
   title: string;
   section?: PortalSection;
 }
 const { portal, title, section } = Astro.props;
-const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'bell' | 'user' }> = [
+const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'bell' | 'user' | 'file' | 'euro' }> = [
   { id: 'inicio', href: '/portal', label: 'Inicio', icon: 'home' },
   { id: 'vehiculos', href: '/portal/vehiculos', label: 'Mis vehículos', icon: 'car' },
   { id: 'reparaciones', href: '/portal/reparaciones', label: 'Reparaciones', icon: 'clipboard' },
   { id: 'avisos', href: '/portal/avisos', label: 'Avisos', icon: 'bell' },
+  { id: 'presupuestos', href: '/portal/presupuestos', label: 'Presupuestos', icon: 'file' },
+  { id: 'facturas', href: '/portal/facturas', label: 'Facturas', icon: 'euro' },
   { id: 'datos', href: '/portal/datos', label: 'Mis datos', icon: 'user' },
 ];
+// Móvil: cuatro pestañas y el resto en «Más» (con «Mi cuenta»).
+const tabs = nav.slice(0, 4);
+const more = nav.slice(4);
+const moreOn = more.some(n => n.id === section);
 const linked = portal.records.length > 0;
 const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_name : portal.records.length > 1 ? `${portal.records.length} talleres` : '';
 // Color de las tarjetas elegido en este dispositivo (grafito si no hay elección).
@@ -115,12 +121,21 @@ const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
 
     {linked && (
       <nav class="pnl-tabs" aria-label="Secciones">
-        {nav.map(n => (
+        {tabs.map(n => (
           <a href={n.href} class:list={['pnl-tab', { 'is-on': n.id === section }]} aria-current={n.id === section ? 'page' : undefined}>
             <Icon name={n.icon} /><span>{n.label}</span>
             {n.id === 'avisos' && portal.unread > 0 && <span class="pnl-badge pnl-badge-tab" aria-label={`${portal.unread} sin leer`}>{portal.unread > 99 ? '99+' : portal.unread}</span>}
           </a>
         ))}
+        <details class="pnl-more">
+          <summary class:list={['pnl-tab', { 'is-on': moreOn }]}><Icon name="menu" /><span>Más</span></summary>
+          <div class="pnl-more-menu">
+            {more.map(n => (
+              <a href={n.href} class:list={{ 'is-on': n.id === section }} aria-current={n.id === section ? 'page' : undefined}><Icon name={n.icon} /><span>{n.label}</span></a>
+            ))}
+            <a href="/cuenta"><Icon name="shield" /><span>Mi cuenta</span></a>
+          </div>
+        </details>
       </nav>
     )}
 

@@ -1,0 +1,120 @@
+---
+/**
+ * Nuevo presupuesto (oficina). Se crea en BORRADOR y se abre su ficha para
+ * añadir las líneas. Desde una orden (?orden=) toma su cliente y su vehículo.
+ * La base de datos comprueba que cliente, vehículo y orden son del mismo
+ * taller y que el vehículo es de ese cliente.
+ */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { formatPlate, orderLabel } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface V { id: string; plate: string; make: string; model: string; customer_id: string | null; customer_name: string | null }
+interface C { id: string; full_name: string; phone: string | null }
+let vehicles: V[] = [];
+let customers: C[] = [];
+type OrderRef = { id: string; number: number; customer_id: string; vehicle_id: string };
+let order = null as OrderRef | null;
+if (panel.workshop && panel.isOffice) {
+  const orderId = Astro.url.searchParams.get('orden') ?? (panel.form ? field(panel.form, 'order_id') : '');
+  const [v, c, o] = await Promise.all([
+    panel.supabase.rpc('search_vehicles', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 300 }),
+    panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 300 }),
+    isUuid(orderId)
+      ? panel.supabase.from('repair_orders').select('id, number, customer_id, vehicle_id').eq('id', orderId).eq('workshop_id', panel.workshop.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  vehicles = (v.data ?? []) as V[];
+  customers = (c.data ?? []) as C[];
+  order = (o.data ?? null) as OrderRef | null;
+}
+const preVehicle = Astro.url.searchParams.get('vehiculo');
+const preCustomer = Astro.url.searchParams.get('cliente');
+const values: Record<string, string> = {
+  vehicle_id: order?.vehicle_id ?? (vehicles.find(v => v.id === preVehicle)?.id ?? ''),
+  customer_id: order?.customer_id ?? (isUuid(preCustomer) ? preCustomer : vehicles.find(v => v.id === preVehicle)?.customer_id ?? ''),
+  title: '', notes: '',
+};
+let error = '';
+
+if (panel.form && panel.workshop && panel.isOffice) {
+  for (const k of Object.keys(values)) values[k] = field(panel.form, k).trim();
+  if (!values.customer_id) values.customer_id = vehicles.find(v => v.id === values.vehicle_id)?.customer_id ?? '';
+  if (!isUuid(values.customer_id)) {
+    error = 'Elige el cliente (o un vehículo que tenga cliente).';
+    Astro.response.status = 422;
+  } else if (values.title.length > 160 || values.notes.length > 2000) {
+    error = 'El título admite 160 caracteres y las notas 2000.';
+    Astro.response.status = 422;
+  } else {
+    const { data, error: e } = await panel.supabase.from('quotes').insert({
+      workshop_id: panel.workshop.id, customer_id: values.customer_id, vehicle_id: isUuid(values.vehicle_id) ? values.vehicle_id : null,
+      order_id: order?.id ?? null, title: values.title || null, notes: values.notes || null,
+    }).select('id').single();
+    if (e || !data) {
+      logAuth('panel_quote_create_error', e?.code);
+      error = e ? dbErrorMessage(e) : 'No se ha creado el presupuesto.';
+      Astro.response.status = 400;
+    } else {
+      return Astro.redirect(`/panel/presupuestos/${data.id}?creado=1`, 303);
+    }
+  }
+}
+---
+<PanelLayout panel={panel} title="Nuevo presupuesto" section="presupuestos">
+  <a class="pnl-back" href="/panel/presupuestos"><Icon name="arrow" />Presupuestos</a>
+  <header class="pnl-head"><div><h1 class="pnl-title">Nuevo presupuesto</h1><p class="pnl-sub">Se crea como borrador: después añades las líneas y lo envías.</p></div></header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Los presupuestos los crea la oficina del taller (propietario, administrador o recepción).</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <form method="post" class="card form-stack" data-busy="Creando…" novalidate>
+      <Flash kind="bad" text={error} />
+      {order && (
+        <>
+          <input type="hidden" name="order_id" value={order.id} />
+          <input type="hidden" name="customer_id" value={order.customer_id} />
+          <input type="hidden" name="vehicle_id" value={order.vehicle_id} />
+          <p>Presupuesto para la orden <a href={`/panel/ordenes/${order.id}`}>{orderLabel(order.number)}</a>: {(() => { const v = vehicles.find(x => x.id === order!.vehicle_id); return v ? `${formatPlate(v.plate)} · ${v.make} ${v.model} · ${v.customer_name ?? ''}` : ''; })()}</p>
+        </>
+      )}
+      {!order && (
+        <div class="form-row">
+          <div class="field">
+            <label for="vehicle_id">Vehículo <span class="muted">(opcional)</span></label>
+            <select class="select" id="vehicle_id" name="vehicle_id">
+              <option value="">Sin vehículo</option>
+              {vehicles.map(v => <option value={v.id} selected={v.id === values.vehicle_id}>{formatPlate(v.plate)} · {v.make} {v.model}{v.customer_name ? ` · ${v.customer_name}` : ' · sin cliente'}</option>)}
+            </select>
+            <p class="hint">Si eliges un vehículo, el cliente es su propietario.</p>
+          </div>
+          <div class="field">
+            <label for="customer_id">Cliente</label>
+            <select class="select" id="customer_id" name="customer_id">
+              <option value="">El del vehículo</option>
+              {customers.map(c => <option value={c.id} selected={c.id === values.customer_id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+      <div class="field">
+        <label for="title">Título <span class="muted">(opcional)</span></label>
+        <input class="input" id="title" name="title" maxlength="160" placeholder="Ej.: Frenos delanteros y revisión" value={values.title} />
+      </div>
+      <div class="field">
+        <label for="notes">Nota para el cliente <span class="muted">(opcional, la verá con el presupuesto)</span></label>
+        <textarea class="textarea" id="notes" name="notes" maxlength="2000" rows="3">{values.notes}</textarea>
+      </div>
+      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear presupuesto</span></button>
+    </form>
+  )}
+</PanelLayout>

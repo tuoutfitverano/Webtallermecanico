@@ -90,8 +90,8 @@ if (panel.workshop && panel.isManager) {
   invitations = (data ?? []) as Invitation[];
 }
 // Un administrador solo invita mecánicos (lo impone también create_workshop_invitation).
-const invitable: readonly MemberRole[] = panel.isOwner ? INVITABLE_ROLES : ['mecanico'];
-const canManage = (role: string) => panel.isOwner ? role !== 'propietario' : panel.isManager && role === 'mecanico';
+const invitable: readonly MemberRole[] = panel.isOwner ? INVITABLE_ROLES : ['recepcionista', 'mecanico'];
+const canManage = (role: string) => panel.isOwner ? role !== 'propietario' : panel.isManager && (role === 'mecanico' || role === 'recepcionista');
 ---
 <PanelLayout panel={panel} title="Equipo" section="equipo">
   <header class="pnl-head">

@@ -26,7 +26,7 @@ interface C { id: string; full_name: string; phone: string | null }
 let vehicles: V[] = [];
 let customers: C[] = [];
 let team: Awaited<ReturnType<typeof loadTeam>> = [];
-if (panel.workshop && panel.isManager) {
+if (panel.workshop && panel.isOffice) {
   const [v, c, t] = await Promise.all([
     panel.supabase.rpc('search_vehicles', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 }),
     panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 }),
@@ -51,7 +51,7 @@ const values: Record<string, string> = {
 let errors: Partial<Record<string, string>> = {};
 let error = '';
 
-if (panel.form && panel.workshop && panel.isManager) {
+if (panel.form && panel.workshop && panel.isOffice) {
   for (const k of Object.keys(values)) values[k] = field(panel.form, k);
   // Si no se elige cliente, se usa el del vehículo.
   if (!values.customer_id) values.customer_id = vehicles.find(v => v.id === values.vehicle_id)?.customer_id ?? '';
@@ -92,8 +92,8 @@ const err = (k: string) => errors[k];
 <PanelLayout panel={panel} title="Nueva orden" section="ordenes">
   <a class="pnl-back" href="/panel/ordenes"><Icon name="arrow" />Órdenes</a>
   <header class="pnl-head"><h1 class="pnl-title">Nueva orden de reparación</h1></header>
-  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isManager ? (
-    <div class="empty"><strong>Solo el propietario o un administrador puede crear órdenes.</strong><a class="btn" href="/panel/ordenes">Ver mis órdenes</a></div>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Solo la oficina del taller (propietario, administrador o recepción) crea órdenes.</strong><a class="btn" href="/panel/ordenes">Ver mis órdenes</a></div>
   ) : vehicles.length === 0 ? (
     <div class="empty">
       <strong>Primero registra un vehículo.</strong>

@@ -33,9 +33,10 @@ export const ROLE_LABELS = {
   propietario: 'Propietario/a',
   administrador: 'Administrador/a',
   mecanico: 'Mecánico/a',
+  recepcionista: 'Recepción',
 } as const;
 export type MemberRole = keyof typeof ROLE_LABELS;
-export const INVITABLE_ROLES: readonly MemberRole[] = ['administrador', 'mecanico'];
+export const INVITABLE_ROLES: readonly MemberRole[] = ['administrador', 'recepcionista', 'mecanico'];
 export function isMemberRole(value: unknown): value is MemberRole {
   return typeof value === 'string' && value in ROLE_LABELS;
 }

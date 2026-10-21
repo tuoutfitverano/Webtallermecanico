@@ -1,0 +1,133 @@
+---
+/**
+ * Presupuesto por enlace seguro (el cliente no necesita cuenta).
+ *
+ *  · El código del enlace (256 bits aleatorios) solo lo comprueba el servidor
+ *    con la clave secreta; la base de datos guarda únicamente su huella.
+ *  · Muestra lo justo: taller, vehículo (marca, modelo y 3 cifras de la
+ *    matrícula), líneas e importes. Nada del cliente.
+ *  · Responder pide el nombre y la confirmación de haber leído el
+ *    presupuesto; el enlace sirve una sola vez y caduca con la validez.
+ *  · Sin caché, sin indexar y sin enviar la dirección a otros sitios
+ *    (middleware: ruta privada).
+ */
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { quoteByToken, respondQuoteByToken, type PublicQuote } from '../../lib/server/config.ts';
+import { documentTotals, formatCents, LINE_KIND_LABELS, quoteLabel } from '@talleres/core';
+import { formatDay } from '../../lib/panel/format.ts';
+
+export const prerender = false;
+const token = (Astro.params.token ?? '').toLowerCase();
+
+let result: { kind: 'ok' | 'bad'; text: string } | null = null;
+let answered: string | null = null;
+let name = '';
+let comment = '';
+if (Astro.request.method === 'POST') {
+  const origin = Astro.request.headers.get('origin');
+  const form = await Astro.request.formData().catch(() => null);
+  if (!form || (origin && origin !== Astro.url.origin)) {
+    return new Response('Envío no permitido.', { status: 403 });
+  }
+  const decision = form.get('decision');
+  name = String(form.get('name') ?? '').trim().slice(0, 120);
+  comment = String(form.get('comment') ?? '').trim().slice(0, 1000);
+  if (decision !== 'aceptar' && decision !== 'rechazar') {
+    result = { kind: 'bad', text: 'Elige si aceptas o rechazas el presupuesto.' };
+  } else if (name.length < 2) {
+    result = { kind: 'bad', text: 'Escribe tu nombre para responder.' };
+  } else if (decision === 'aceptar' && form.get('read') !== 'on') {
+    result = { kind: 'bad', text: 'Para aceptar, confirma que has leído el presupuesto y sus condiciones.' };
+  } else {
+    const r = await respondQuoteByToken(token, decision === 'aceptar', name, comment, Astro.request.headers.get('cf-connecting-ip'));
+    if (r.ok) answered = r.status;
+    else result = { kind: 'bad', text: r.message };
+  }
+  if (result) Astro.response.status = 422;
+}
+
+const quote: PublicQuote | null | 'no_disponible' = answered ? null : await quoteByToken(token);
+if (!answered && (quote === null || quote === 'no_disponible')) Astro.response.status = quote === null ? 404 : 503;
+const q = quote && quote !== 'no_disponible' ? quote : null;
+const totals = q ? { subtotalCents: Number(q.subtotal_cents), taxCents: Number(q.tax_cents), totalCents: Number(q.total_cents),
+  taxes: (q.taxes ?? []).map(t => ({ rate: Number(t.rate), baseCents: Number(t.base_cents), taxCents: Number(t.tax_cents) })) } : documentTotals([]);
+const pct = (n: number) => `${Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 })} %`;
+---
+<AuthLayout title={q ? `Presupuesto ${quoteLabel(q.number, q.version)}` : 'Presupuesto'} back={false} wide>
+  {answered ? (
+    <section class="auth-card liquid-glass-strong" aria-labelledby="t">
+      <p class="label">Presupuesto</p>
+      <h1 id="t" class="auth-title heading">{answered === 'aceptado' ? 'Presupuesto aceptado' : 'Presupuesto rechazado'}</h1>
+      <p class="auth-lead">{answered === 'aceptado'
+        ? 'Gracias. El taller ya tiene tu aceptación y se pondrá con la reparación. Si tienes dudas, llámales.'
+        : 'Gracias por responder. El taller ya sabe que no lo aceptas; si quieres otra propuesta, llámales.'}</p>
+      <p class="hint">Este enlace ya no se puede volver a usar.</p>
+    </section>
+  ) : !q ? (
+    <section class="auth-card liquid-glass-strong" aria-labelledby="t">
+      <p class="label">Presupuesto</p>
+      <h1 id="t" class="auth-title heading">{quote === 'no_disponible' ? 'No disponible ahora' : 'Enlace no válido o caducado'}</h1>
+      <p class="auth-lead">{quote === 'no_disponible'
+        ? 'No podemos mostrar el presupuesto en este momento. Inténtalo más tarde o llama al taller.'
+        : 'El enlace no existe, ya se usó para responder o el presupuesto ha caducado. Pide al taller uno nuevo.'}</p>
+    </section>
+  ) : (
+    <>
+      <section class="auth-card liquid-glass-strong" aria-labelledby="t">
+        <p class="label">{q.workshop_name}</p>
+        <h1 id="t" class="auth-title heading">Presupuesto {quoteLabel(q.number, q.version)}</h1>
+        <p class="auth-lead">
+          {q.title ?? 'Presupuesto de reparación'}
+          {q.vehicle && <> · {q.vehicle}{q.plate_hint && <> (matrícula acabada en {q.plate_hint})</>}</>}
+          <br />Válido hasta el {formatDay(q.valid_until)}.
+        </p>
+        {q.notes && <p class="message">{q.notes}</p>}
+        <div class="table-scroll">
+          <table class="team-table">
+            <thead><tr><th>Concepto</th><th style="text-align:right">Cant.</th><th style="text-align:right">Precio</th><th style="text-align:right">IVA</th><th style="text-align:right">Importe</th></tr></thead>
+            <tbody>
+              {q.lines.map(l => (
+                <tr>
+                  <td><span class="muted">{LINE_KIND_LABELS[l.kind]}</span><br />{l.description}{Number(l.discount_pct) ? <span class="muted"> (−{pct(l.discount_pct)})</span> : null}</td>
+                  <td style="text-align:right">{Number(l.quantity).toLocaleString('es-ES')}</td>
+                  <td style="text-align:right">{formatCents(Number(l.unit_price_cents))}</td>
+                  <td style="text-align:right">{pct(l.tax_rate)}</td>
+                  <td style="text-align:right">{formatCents(Number(l.base_cents))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <dl class="facts" style="margin-top:16px">
+          {totals.taxes.map(t => <><dt>IVA {pct(t.rate)} sobre {formatCents(t.baseCents)}</dt><dd>{formatCents(t.taxCents)}</dd></>)}
+          <dt>Base imponible</dt><dd>{formatCents(totals.subtotalCents)}</dd>
+          <dt><strong>Total (IVA incluido)</strong></dt><dd><strong>{formatCents(totals.totalCents)}</strong></dd>
+        </dl>
+        {q.conditions && <><h2 class="panel-title" style="margin-top:20px">Condiciones</h2><p class="auth-lead" style="white-space:pre-line">{q.conditions}</p></>}
+        {q.workshop_phone && <p class="hint">¿Dudas? Llama al taller: <a href={`tel:${q.workshop_phone.replace(/\s/g, '')}`}>{q.workshop_phone}</a></p>}
+      </section>
+
+      <section class="auth-card liquid-glass-strong" aria-labelledby="r">
+        <h2 id="r" class="panel-title">Tu respuesta</h2>
+        {result && <div class={`alert alert-${result.kind}`} role="alert"><Icon name="alert" /><span>{result.text}</span></div>}
+        <form method="post" class="auth-form" data-busy="Enviando…" novalidate>
+          <div class="field">
+            <label for="name">Tu nombre</label>
+            <input class="input" id="name" name="name" required maxlength="120" autocomplete="name" value={name} />
+          </div>
+          <div class="field">
+            <label for="comment">Comentario para el taller <span class="muted">(opcional)</span></label>
+            <textarea class="textarea" id="comment" name="comment" maxlength="1000" rows="2">{comment}</textarea>
+          </div>
+          <label class="check"><input type="checkbox" name="read" /><span>He leído el presupuesto y sus condiciones.</span></label>
+          <div class="pnl-actions" style="display:flex;flex-wrap:wrap;gap:10px">
+            <button class="btn btn-primary" type="submit" name="decision" value="aceptar">Acepto el presupuesto</button>
+            <button class="btn" type="submit" name="decision" value="rechazar">No lo acepto</button>
+          </div>
+          <p class="hint">Guardamos tu respuesta, tu nombre, la fecha y una copia del presupuesto como constancia para ti y para el taller. No es una firma electrónica.</p>
+        </form>
+      </section>
+    </>
+  )}
+</AuthLayout>

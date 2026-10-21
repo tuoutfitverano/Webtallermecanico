@@ -1,0 +1,320 @@
+---
+/**
+ * Ficha de un presupuesto (oficina).
+ *
+ *  · Borrador: datos, líneas (añadir/quitar), enviar o borrar.
+ *  · Enviar: la base de datos fija importes y condiciones, avisa al cliente
+ *    (portal y, si procede, email/WhatsApp) y devuelve el ENLACE una sola vez
+ *    (solo se guarda su huella). Aquí se enseña para copiarlo o abrir WhatsApp
+ *    con el mensaje preparado; abrir WhatsApp no cuenta como «enviado».
+ *  · Enviado: nuevo enlace, versión nueva, anotar la respuesta dada en el
+ *    taller o anular. Aceptado: evidencia de la aceptación y crear factura.
+ */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import LinesEditor from '../../../components/panel/LinesEditor.astro';
+import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { formatDateTime, formatDay, todayMadrid } from '../../../lib/panel/format.ts';
+import { LINE_SELECT, lineColumns, readLine, type LineRow } from '../../../lib/panel/lines.ts';
+import {
+  formatCents, formatPlate, orderLabel, QUOTE_RESPONSE_SOURCE_LABELS, QUOTE_STATUS_LABELS, quoteLabel, whatsappLink, type QuoteStatus,
+} from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+const id = Astro.params.id ?? '';
+
+interface Quote {
+  id: string; number: number; version: number; status: QuoteStatus; title: string | null; notes: string | null; internal_notes: string | null;
+  valid_until: string | null; conditions: string | null; subtotal_cents: number | null; tax_cents: number | null; total_cents: number | null;
+  taxes: Array<{ rate: number; base_cents: number; tax_cents: number }> | null; sent_at: string | null; responded_at: string | null;
+  response_source: string | null; response_name: string | null; response_comment: string | null; snapshot_hash: string | null;
+  token_expires_at: string | null; created_at: string; order_id: string | null;
+  customers: { id: string; full_name: string; phone: string | null; email: string | null; user_id: string | null } | null;
+  vehicles: { id: string; plate: string; make: string; model: string } | null;
+  repair_orders: { id: string; number: number } | null;
+}
+const SELECT = 'id, number, version, status, title, notes, internal_notes, valid_until, conditions, subtotal_cents, tax_cents, total_cents, taxes, sent_at, responded_at, response_source, response_name, response_comment, snapshot_hash, token_expires_at, created_at, order_id, customers(id, full_name, phone, email, user_id), vehicles(id, plate, make, model), repair_orders(id, number)';
+const ctx = panel;
+async function load() {
+  if (!ctx.workshop || !ctx.isOffice || !isUuid(id)) return null;
+  const { data } = await ctx.supabase.from('quotes').select(SELECT).eq('id', id).eq('workshop_id', ctx.workshop.id).maybeSingle();
+  return (data as unknown as Quote | null) ?? null;
+}
+async function loadLines() {
+  const { data } = await ctx.supabase.from('quote_items').select(LINE_SELECT).eq('quote_id', id).order('position').order('created_at');
+  return (data ?? []) as LineRow[];
+}
+
+let quote = await load();
+let lines: LineRow[] = quote ? await loadLines() : [];
+let settings = { default_tax_rate: 21, labour_rate_cents: null as number | null, quote_validity_days: 30 };
+if (quote && panel.workshop) {
+  const { data } = await panel.supabase.from('workshop_billing_settings').select('default_tax_rate, labour_rate_cents, quote_validity_days').eq('workshop_id', panel.workshop.id).maybeSingle();
+  if (data) settings = { default_tax_rate: Number(data.default_tax_rate), labour_rate_cents: data.labour_rate_cents === null ? null : Number(data.labour_rate_cents), quote_validity_days: data.quote_validity_days };
+}
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creado') === '1' ? 'Presupuesto creado. Añade las líneas y envíalo.' : Astro.url.searchParams.get('version') === '1' ? 'Versión nueva creada como borrador.' : '' };
+let lineErrors: Record<string, string> = {};
+let lineValues: Record<string, string> = {};
+let link: string | null = null;
+let askDelete = false;
+let askCancel = false;
+
+if (panel.form && panel.workshop && quote) {
+  const form = panel.form;
+  const action = field(form, 'action');
+  const fail = (error: { code?: string; message?: string } | null, fallback: string, event: string) => {
+    logAuth(event, error?.code);
+    flash = { kind: 'bad', text: error?.code === '22023' && error.message ? error.message : error ? dbErrorMessage(error) : fallback };
+    Astro.response.status = 400;
+  };
+  if (action === 'linea-anadir' && quote.status === 'borrador') {
+    const r = readLine(form, { taxRate: settings.default_tax_rate, labourRateCents: settings.labour_rate_cents });
+    if (!r.ok) { lineErrors = r.errors; lineValues = r.values; flash = { kind: 'bad', text: 'Revisa la línea.' }; Astro.response.status = 422; }
+    else {
+      const position = lines.reduce((m, l) => Math.max(m, l.position), 0) + 1;
+      const { error } = await panel.supabase.from('quote_items').insert({ workshop_id: panel.workshop.id, quote_id: quote.id, position, ...lineColumns(r.data) });
+      if (error) fail(error, 'No se ha añadido la línea.', 'panel_quote_line_error');
+      else flash = { kind: 'ok', text: 'Línea añadida.' };
+    }
+  } else if (action === 'linea-quitar' && quote.status === 'borrador') {
+    const lineId = field(form, 'line_id');
+    const { error } = isUuid(lineId) ? await panel.supabase.from('quote_items').delete().eq('id', lineId).eq('quote_id', quote.id) : { error: null };
+    if (error) fail(error, 'No se ha quitado la línea.', 'panel_quote_line_error');
+    else flash = { kind: 'ok', text: 'Línea quitada.' };
+  } else if (action === 'datos' && quote.status === 'borrador') {
+    const valid = field(form, 'valid_until');
+    const update = {
+      title: field(form, 'title').trim().slice(0, 160) || null, notes: field(form, 'notes').trim().slice(0, 2000) || null,
+      internal_notes: field(form, 'internal_notes').trim().slice(0, 2000) || null,
+      valid_until: /^\d{4}-\d{2}-\d{2}$/.test(valid) ? valid : null,
+    };
+    if (update.valid_until && update.valid_until < todayMadrid()) { flash = { kind: 'bad', text: 'La validez no puede ser anterior a hoy.' }; Astro.response.status = 422; }
+    else {
+      const { error } = await panel.supabase.from('quotes').update(update).eq('id', quote.id).eq('workshop_id', panel.workshop.id);
+      if (error) fail(error, 'No se han guardado los datos.', 'panel_quote_update_error');
+      else flash = { kind: 'ok', text: 'Datos guardados.' };
+    }
+  } else if (action === 'enviar') {
+    const { data, error } = await panel.supabase.rpc('send_quote', { p_quote_id: quote.id });
+    const row = Array.isArray(data) ? data[0] : null;
+    if (error || !row) fail(error, 'No se ha enviado el presupuesto.', 'panel_quote_send_error');
+    else { link = `${panel.origin}/presupuesto/${row.token}`; flash = { kind: 'ok', text: 'Presupuesto enviado: el cliente lo tiene en su portal (si tiene cuenta). Comparte también el enlace de abajo.' }; }
+  } else if (action === 'nuevo-enlace') {
+    const { data, error } = await panel.supabase.rpc('new_quote_link', { p_quote_id: quote.id });
+    if (error || !data) fail(error, 'No se ha creado el enlace.', 'panel_quote_link_error');
+    else { link = `${panel.origin}/presupuesto/${data}`; flash = { kind: 'ok', text: 'Enlace nuevo creado: el anterior ya no funciona.' }; }
+  } else if (action === 'nueva-version') {
+    const { data, error } = await panel.supabase.rpc('revise_quote', { p_quote_id: quote.id });
+    if (error || !data) fail(error, 'No se ha creado la versión nueva.', 'panel_quote_revise_error');
+    else return Astro.redirect(`/panel/presupuestos/${data}?version=1`, 303);
+  } else if (action === 'pedir-anular') {
+    askCancel = true;
+  } else if (action === 'anular') {
+    const { error } = await panel.supabase.rpc('cancel_quote', { p_quote_id: quote.id });
+    if (error) fail(error, 'No se ha anulado.', 'panel_quote_cancel_error');
+    else flash = { kind: 'ok', text: 'Presupuesto anulado. Su enlace ya no funciona.' };
+  } else if (action === 'respuesta-taller') {
+    const decision = field(form, 'decision');
+    const { error } = await panel.supabase.rpc('record_quote_decision', {
+      p_quote_id: quote.id, p_accept: decision === 'aceptar', p_name: field(form, 'response_name').trim(), p_comment: field(form, 'response_comment').trim() || null,
+    });
+    if (decision !== 'aceptar' && decision !== 'rechazar') { flash = { kind: 'bad', text: 'Indica si lo acepta o lo rechaza.' }; Astro.response.status = 422; }
+    else if (error) fail(error, 'No se ha guardado la respuesta.', 'panel_quote_decision_error');
+    else flash = { kind: 'ok', text: decision === 'aceptar' ? 'Aceptación anotada. Las líneas se han pasado a la orden.' : 'Rechazo anotado.' };
+  } else if (action === 'pedir-borrar') {
+    askDelete = true;
+  } else if (action === 'borrar' && quote.status === 'borrador') {
+    const { data, error } = await panel.supabase.from('quotes').delete().eq('id', quote.id).eq('workshop_id', panel.workshop.id).select('id');
+    if (!error && data?.length) return Astro.redirect('/panel/presupuestos?borrado=1', 303);
+    fail(error, 'No se ha borrado.', 'panel_quote_delete_error');
+  }
+  quote = await load();
+  lines = quote ? await loadLines() : [];
+}
+
+let versions: Array<{ id: string; version: number; status: QuoteStatus }> = [];
+if (quote && panel.workshop) {
+  const { data } = await panel.supabase.from('quotes').select('id, version, status').eq('workshop_id', panel.workshop.id).eq('number', quote.number).order('version');
+  versions = (data ?? []) as typeof versions;
+}
+if (panel.workshop && panel.isOffice && !quote) Astro.response.status = 404;
+
+const editable = quote?.status === 'borrador';
+const stored = quote && quote.status !== 'borrador' && quote.total_cents !== null
+  ? { subtotal_cents: Number(quote.subtotal_cents), tax_cents: Number(quote.tax_cents), total_cents: Number(quote.total_cents), taxes: quote.taxes ?? [] }
+  : null;
+const label = quote ? quoteLabel(quote.number, quote.version) : 'Presupuesto';
+const message = quote && link
+  ? `Hola, ${quote.customers?.full_name ?? ''}. Te enviamos el presupuesto ${label}${quote.vehicles ? ` para tu ${quote.vehicles.make} ${quote.vehicles.model}` : ''}: ${formatCents(Number(quote.total_cents ?? 0))} (IVA incluido). Puedes verlo y aceptarlo o rechazarlo aquí: ${link}`
+  : '';
+const wa = quote && link ? whatsappLink(quote.customers?.phone, message) : null;
+const mail = quote && link && quote.customers?.email
+  ? `mailto:${encodeURIComponent(quote.customers.email)}?subject=${encodeURIComponent(`Presupuesto ${label}`)}&body=${encodeURIComponent(message)}`
+  : null;
+const tone: Record<QuoteStatus, string> = { borrador: '', enviado: 'pill-warn', aceptado: 'pill-ok', rechazado: 'pill-bad', caducado: 'pill-bad', sustituido: '', anulado: '' };
+---
+<PanelLayout panel={panel} title={label} section="presupuestos">
+  <a class="pnl-back" href="/panel/presupuestos"><Icon name="arrow" />Presupuestos</a>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Los presupuestos los gestiona la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : !quote ? (
+    <div class="empty"><strong>Presupuesto no encontrado.</strong><a class="btn" href="/panel/presupuestos">Volver a presupuestos</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{label} <span class={`pill ${tone[quote.status]}`}>{QUOTE_STATUS_LABELS[quote.status]}</span></h1>
+          <p class="pnl-sub">
+            {quote.customers && <a href={`/panel/clientes/${quote.customers.id}`}>{quote.customers.full_name}</a>}
+            {quote.vehicles && <> · <a href={`/panel/vehiculos/${quote.vehicles.id}`}><span class="plate">{formatPlate(quote.vehicles.plate)}</span></a> {quote.vehicles.make} {quote.vehicles.model}</>}
+            {quote.repair_orders && <> · <a href={`/panel/ordenes/${quote.repair_orders.id}`}>{orderLabel(quote.repair_orders.number)}</a></>}
+          </p>
+        </div>
+      </header>
+      <Flash kind={flash.kind} text={flash.text} />
+
+      {link && (
+        <section class="card" aria-labelledby="enlace-t">
+          <h2 id="enlace-t" class="card-title"><Icon name="link" />Enlace para el cliente</h2>
+          <p class="hint">Solo se muestra ahora: guárdalo o envíalo. Caduca con la validez del presupuesto ({formatDay(quote.valid_until)}) y sirve para una sola respuesta. Si lo pierdes, crea uno nuevo.</p>
+          <div class="copy-row" style="margin-top:10px">
+            <label class="sr-only" for="quote-link">Enlace del presupuesto</label>
+            <input class="input" id="quote-link" readonly value={link} data-copy-source />
+            <button class="btn btn-sm" type="button" data-copy="quote-link">Copiar</button>
+          </div>
+          <div class="doc-actions" style="margin-top:12px">
+            {wa ? <a class="btn btn-sm" href={wa} target="_blank" rel="noopener noreferrer"><Icon name="chat" />Abrir WhatsApp con el mensaje</a> : <span class="hint">El cliente no tiene un móvil en su ficha para WhatsApp.</span>}
+            {mail && <a class="btn btn-sm" href={mail}><Icon name="mail" />Escribir un correo</a>}
+          </div>
+          <p class="hint" style="margin-top:8px">Abrir WhatsApp o el correo prepara el mensaje; enviarlo lo haces tú desde tu aplicación. Aquí no queda como «enviado».</p>
+        </section>
+      )}
+
+      {quote.status === 'aceptado' || quote.status === 'rechazado' ? (
+        <section class="card" aria-labelledby="resp-t">
+          <h2 id="resp-t" class="card-title"><Icon name="shield" />Respuesta del cliente</h2>
+          <dl class="facts">
+            <dt>Respuesta</dt><dd><span class={`pill ${tone[quote.status]}`}>{QUOTE_STATUS_LABELS[quote.status]}</span></dd>
+            <dt>Fecha</dt><dd>{formatDateTime(quote.responded_at)}</dd>
+            <dt>Cómo</dt><dd>{QUOTE_RESPONSE_SOURCE_LABELS[quote.response_source ?? ''] ?? '—'}</dd>
+            <dt>Nombre</dt><dd>{quote.response_name ?? '—'}</dd>
+            {quote.response_comment && <><dt>Comentario</dt><dd>{quote.response_comment}</dd></>}
+            {quote.snapshot_hash && <><dt>Huella</dt><dd class="mono small">{quote.snapshot_hash}</dd></>}
+          </dl>
+          <p class="hint" style="margin-top:10px">Se guarda una copia de lo respondido (líneas, importes, condiciones y fecha) con su huella. No es una firma electrónica cualificada.</p>
+          {quote.status === 'aceptado' && (
+            <div class="doc-actions" style="margin-top:12px">
+              <a class="btn btn-primary" href={`/panel/facturas/nueva?presupuesto=${quote.id}`}><Icon name="euro" />Crear factura</a>
+              {quote.repair_orders && <a class="btn" href={`/panel/ordenes/${quote.repair_orders.id}`}>Ver la orden</a>}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      <div class="grid-2" style="margin-top:16px">
+        <div class="stack">
+          <LinesEditor lines={lines} editable={editable} title="Líneas del presupuesto" taxRate={settings.default_tax_rate}
+            errors={lineErrors} values={lineValues} stored={stored} labourRateCents={settings.labour_rate_cents}
+            emptyText="Añade la mano de obra y las piezas que incluye el presupuesto." />
+        </div>
+        <div class="stack">
+          <section class="card" aria-labelledby="datos-t">
+            <h2 id="datos-t" class="card-title"><Icon name="file" />Datos</h2>
+            {editable ? (
+              <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+                <input type="hidden" name="action" value="datos" />
+                <div class="field"><label for="title">Título</label><input class="input" id="title" name="title" maxlength="160" value={quote.title ?? ''} /></div>
+                <div class="field"><label for="valid_until">Válido hasta <span class="muted">(vacío: {settings.quote_validity_days} días desde el envío)</span></label><input class="input" id="valid_until" name="valid_until" type="date" min={todayMadrid()} value={quote.valid_until ?? ''} /></div>
+                <div class="field"><label for="notes">Nota para el cliente</label><textarea class="textarea" id="notes" name="notes" maxlength="2000" rows="3">{quote.notes ?? ''}</textarea></div>
+                <div class="field note-internal"><label for="internal_notes">Notas internas <span class="muted">(el cliente no las ve)</span></label><textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="2000" rows="2">{quote.internal_notes ?? ''}</textarea></div>
+                <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar datos</span></button>
+              </form>
+            ) : (
+              <dl class="facts">
+                <dt>Título</dt><dd>{quote.title ?? '—'}</dd>
+                <dt>Enviado</dt><dd>{formatDateTime(quote.sent_at)}</dd>
+                <dt>Válido hasta</dt><dd>{formatDay(quote.valid_until)}</dd>
+                {quote.notes && <><dt>Nota</dt><dd>{quote.notes}</dd></>}
+                {quote.internal_notes && <><dt>Interna</dt><dd>{quote.internal_notes}</dd></>}
+                {quote.conditions && <><dt>Condiciones</dt><dd>{quote.conditions}</dd></>}
+              </dl>
+            )}
+          </section>
+
+          <section class="card" aria-labelledby="acc-t">
+            <h2 id="acc-t" class="card-title"><Icon name="check" />Acciones</h2>
+            {quote.status === 'borrador' && (
+              <>
+                <form method="post" data-busy="Enviando…">
+                  <input type="hidden" name="action" value="enviar" />
+                  <button class="btn btn-primary" type="submit" disabled={lines.length === 0}><span class="spinner" aria-hidden="true"></span><span data-label>Enviar al cliente</span></button>
+                </form>
+                <p class="hint" style="margin-top:8px">{lines.length === 0 ? 'Añade al menos una línea para poder enviarlo.' : 'Al enviarlo ya no se puede cambiar (para cambios se crea una versión nueva). El cliente lo verá en su portal y recibirás un enlace para compartir.'}</p>
+                <div style="margin-top:16px">
+                  {askDelete ? (
+                    <form method="post" class="confirm" data-busy="Borrando…">
+                      <input type="hidden" name="action" value="borrar" />
+                      <strong>¿Borrar este borrador?</strong>
+                      <div class="pnl-actions"><button class="btn btn-danger" type="submit">Sí, borrar</button><a class="btn" href={`/panel/presupuestos/${quote.id}`}>Cancelar</a></div>
+                    </form>
+                  ) : <form method="post"><input type="hidden" name="action" value="pedir-borrar" /><button class="btn btn-sm btn-danger" type="submit">Borrar borrador…</button></form>}
+                </div>
+              </>
+            )}
+            {quote.status === 'enviado' && (
+              <div class="form-stack">
+                <div class="doc-actions">
+                  <form method="post" data-busy="Creando…"><input type="hidden" name="action" value="nuevo-enlace" /><button class="btn btn-sm" type="submit"><Icon name="link" />Crear enlace nuevo</button></form>
+                  <form method="post" data-busy="Creando…"><input type="hidden" name="action" value="nueva-version" /><button class="btn btn-sm" type="submit">Crear versión nueva</button></form>
+                </div>
+                <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+                  <input type="hidden" name="action" value="respuesta-taller" />
+                  <h3 class="card-title" style="margin:8px 0 0">Respuesta dada en el taller</h3>
+                  <p class="hint">Si el cliente te lo dice en persona o por teléfono, anótalo aquí.</p>
+                  <div class="field"><label for="response_name">Quién responde</label><input class="input" id="response_name" name="response_name" maxlength="120" value={quote.customers?.full_name ?? ''} /></div>
+                  <div class="field"><label for="response_comment">Comentario <span class="muted">(opcional)</span></label><input class="input" id="response_comment" name="response_comment" maxlength="1000" /></div>
+                  <div class="doc-actions">
+                    <button class="btn btn-sm" type="submit" name="decision" value="aceptar">Anotar: acepta</button>
+                    <button class="btn btn-sm btn-danger" type="submit" name="decision" value="rechazar">Anotar: rechaza</button>
+                  </div>
+                </form>
+              </div>
+            )}
+            {(quote.status === 'rechazado' || quote.status === 'caducado') && (
+              <form method="post" data-busy="Creando…"><input type="hidden" name="action" value="nueva-version" /><button class="btn" type="submit">Crear versión nueva</button></form>
+            )}
+            {['borrador', 'enviado', 'rechazado', 'caducado'].includes(quote.status) && quote.status !== 'borrador' && (
+              <div style="margin-top:16px">
+                {askCancel ? (
+                  <form method="post" class="confirm" data-busy="Anulando…">
+                    <input type="hidden" name="action" value="anular" />
+                    <strong>¿Anular {label}?</strong><span class="hint">El enlace dejará de funcionar. Queda registrado.</span>
+                    <div class="pnl-actions"><button class="btn btn-danger" type="submit">Sí, anular</button><a class="btn" href={`/panel/presupuestos/${quote.id}`}>Cancelar</a></div>
+                  </form>
+                ) : <form method="post"><input type="hidden" name="action" value="pedir-anular" /><button class="btn btn-sm btn-danger" type="submit">Anular presupuesto…</button></form>}
+              </div>
+            )}
+            {(quote.status === 'aceptado' || quote.status === 'anulado' || quote.status === 'sustituido') && <p class="hint">Este presupuesto ya no admite cambios.</p>}
+          </section>
+
+          {versions.length > 1 && (
+            <section class="card" aria-labelledby="ver-t">
+              <h2 id="ver-t" class="card-title"><Icon name="history" />Versiones</h2>
+              <ul class="plain-list">
+                {versions.map(v => <li>{v.id === quote!.id ? <strong>{quoteLabel(quote!.number, v.version)}</strong> : <a href={`/panel/presupuestos/${v.id}`}>{quoteLabel(quote!.number, v.version)}</a>} · {QUOTE_STATUS_LABELS[v.status]}</li>)}
+              </ul>
+            </section>
+          )}
+        </div>
+      </div>
+    </>
+  )}
+</PanelLayout>

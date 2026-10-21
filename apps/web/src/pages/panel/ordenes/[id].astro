@@ -60,7 +60,7 @@ if (panel.form && panel.workshop && order) {
   if (action === 'estado') {
     const status = field(panel.form, 'status');
     // Mensaje opcional para el cliente junto al cambio de estado (solo gestores).
-    const message = panel.isManager ? field(panel.form, 'customer_message').trim() : '';
+    const message = panel.isOffice ? field(panel.form, 'customer_message').trim() : '';
     if (!isRepairStatus(status)) flash = { kind: 'bad', text: 'Estado no válido.' };
     else if (message.length > 2000) flash = { kind: 'bad', text: 'El mensaje para el cliente admite como máximo 2000 caracteres.' };
     else update = message ? { status, customer_notes: message } : { status };
@@ -72,11 +72,11 @@ if (panel.form && panel.workshop && order) {
     };
     const parsed = orderUpdateSchema.safeParse({
       status: order.status,
-      assignedTo: panel.isManager ? draft.assigned_to : order.assigned_to,
-      problemDescription: panel.isManager ? draft.problem_description : order.problem_description,
+      assignedTo: panel.isOffice ? draft.assigned_to : order.assigned_to,
+      problemDescription: panel.isOffice ? draft.problem_description : order.problem_description,
       diagnosis: draft.diagnosis, workDone: draft.work_done, internalNotes: draft.internal_notes,
-      customerNotes: panel.isManager ? draft.customer_notes : order.customer_notes,
-      showDetailsToCustomer: panel.isManager ? draft.show_details === '1' : order.show_details_to_customer,
+      customerNotes: panel.isOffice ? draft.customer_notes : order.customer_notes,
+      showDetailsToCustomer: panel.isOffice ? draft.show_details === '1' : order.show_details_to_customer,
     });
     if (!parsed.success) {
       errors = fieldErrors(parsed.error);
@@ -86,7 +86,7 @@ if (panel.form && panel.workshop && order) {
       const d = parsed.data;
       update = { diagnosis: d.diagnosis, work_done: d.workDone, internal_notes: d.internalNotes };
       // Solo gestores: asignación, descripción y lo que ve el cliente (la base de datos lo exige igualmente).
-      if (panel.isManager) {
+      if (panel.isOffice) {
         Object.assign(update, {
           assigned_to: d.assignedTo, problem_description: d.problemDescription,
           customer_notes: d.customerNotes, show_details_to_customer: d.showDetailsToCustomer,
@@ -141,7 +141,7 @@ const describe = (e: Event): string => {
     default: return `Cambió: ${(e.changed_fields ?? []).map(f => FIELD_LABELS[f] ?? f).join(', ')}`;
   }
 };
-const statusOptions = REPAIR_STATUSES.filter(s => panel.isManager || s !== 'entregado' || order?.status === 'entregado');
+const statusOptions = REPAIR_STATUSES.filter(s => panel.isOffice || s !== 'entregado' || order?.status === 'entregado');
 const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to);
 ---
 <PanelLayout panel={panel} title={order ? orderLabel(order.number) : 'Orden'} section="ordenes">
@@ -166,7 +166,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
         <h2 id="estado-t" class="card-title">Estado</h2>
         <form method="post" class="status-picker" data-busy="Guardando…">
           <input type="hidden" name="action" value="estado" />
-          {panel.isManager && (
+          {panel.isOffice && (
             <div class="field" style="flex-basis:100%">
               <label for="customer_message">Mensaje para el cliente con el cambio de estado <span class="muted small">(opcional, lo verá en su portal)</span></label>
               <textarea class="textarea" id="customer_message" name="customer_message" maxlength="2000" rows="2" placeholder="Ej.: Ya tenemos la pieza; empezamos con la reparación."></textarea>
@@ -176,7 +176,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             <button class="btn btn-sm" type="submit" name="status" value={s} aria-pressed={s === order!.status ? 'true' : 'false'} disabled={s === order!.status}>{REPAIR_STATUS_LABELS[s]}</button>
           ))}
         </form>
-        {!panel.isManager && <p class="hint" style="margin-top:10px">Marcar como entregado lo hace el propietario o un administrador.</p>}
+        {!panel.isOffice && <p class="hint" style="margin-top:10px">Marcar como entregado lo hace la oficina del taller (propietario, administrador o recepción).</p>}
       </section>
 
       <div class="grid-2" style="margin-top:16px">
@@ -194,7 +194,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             <div class="form-stack">
               <div class={`field ${errors.problemDescription ? 'has-error' : ''}`}>
                 <label for="problem_description">Descripción del problema</label>
-                {panel.isManager
+                {panel.isOffice
                   ? <textarea class="textarea" id="problem_description" name="problem_description" required maxlength="4000" rows="3">{v.problem_description}</textarea>
                   : <p id="problem_description">{order.problem_description}</p>}
                 {errors.problemDescription && <p class="field-error">{errors.problemDescription}</p>}
@@ -211,7 +211,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
           </section>
           <section class="card" aria-labelledby="portal-t">
             <h2 id="portal-t" class="card-title"><Icon name="chat" />Para el cliente <span class="muted small">(portal)</span></h2>
-            {panel.isManager ? (
+            {panel.isOffice ? (
               <div class="form-stack">
                 <div class={`field ${errors.customerNotes ? 'has-error' : ''}`}>
                   <label for="customer_notes">Mensaje para el cliente</label>
@@ -224,7 +224,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             ) : (
               <>
                 {order.customer_notes ? <p class="message">{order.customer_notes}</p> : <p class="hint">Sin mensaje para el cliente.</p>}
-                <p class="hint" style="margin-top:8px">Lo que ve el cliente lo deciden el propietario o un administrador.</p>
+                <p class="hint" style="margin-top:8px">Lo que ve el cliente lo decide la oficina del taller (propietario, administrador o recepción).</p>
               </>
             )}
           </section>
@@ -235,7 +235,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
           </section>
           <section class="card" aria-labelledby="asig-t">
             <h2 id="asig-t" class="card-title"><Icon name="user" />Mecánico asignado</h2>
-            {panel.isManager ? (
+            {panel.isOffice ? (
               <>
                 <label for="assigned_to" class="sr-only">Mecánico asignado</label>
                 <select class="select" id="assigned_to" name="assigned_to">

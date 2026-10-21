@@ -36,8 +36,10 @@ export interface Panel {
   workshops: PanelWorkshop[];
   /** null si la persona no pertenece a ningún taller. */
   workshop: PanelWorkshop | null;
-  /** Propietario o administrador del taller activo. */
+  /** Propietario o administrador del taller activo (equipo, configuración, rectificativas). */
   isManager: boolean;
+  /** Oficina: propietario, administrador o recepción (órdenes, presupuestos, facturas, cobros). */
+  isOffice: boolean;
   isOwner: boolean;
   isPost: boolean;
   form: FormData | null;
@@ -82,6 +84,7 @@ export async function panelPage(Astro: AstroGlobal): Promise<Panel | Response> {
     workshops,
     workshop,
     isManager: isOwner || workshop?.role === 'administrador',
+    isOffice: isOwner || workshop?.role === 'administrador' || workshop?.role === 'recepcionista',
     isOwner,
     isPost: page.isPost,
     form: page.form,

@@ -145,7 +145,7 @@ if (panel.workshop && isUuid(id)) {
     panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
     panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
     // Solo los gestores pueden leer las invitaciones (RLS); a un mecánico le llega vacío.
-    panel.isManager
+    panel.isOffice
       ? panel.supabase.from('customer_invitations').select('id, email, expires_at, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
         .eq('status', 'pendiente').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -180,7 +180,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
         </div>
         <div class="pnl-actions">
           <a class="btn" href={`/panel/vehiculos/nuevo?cliente=${customer.id}`}><Icon name="car" />Registrar vehículo</a>
-          {panel.isManager && vehicles.length > 0 && <a class="btn btn-primary" href={`/panel/ordenes/nueva?cliente=${customer.id}`}><Icon name="plus" />Nueva orden</a>}
+          {panel.isOffice && vehicles.length > 0 && <a class="btn btn-primary" href={`/panel/ordenes/nueva?cliente=${customer.id}`}><Icon name="plus" />Nueva orden</a>}
         </div>
       </header>
       <Flash kind={flash.kind} text={flash.text} />
@@ -200,7 +200,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
               <>
                 <p><span class="status status-listo">Vinculada</span> El cliente entra con su cuenta y ve sus vehículos y reparaciones de este taller{customer.portal_linked_at ? ` desde el ${formatDate(customer.portal_linked_at)}` : ''}.</p>
                 <p class="hint" style="margin-top:8px">Nunca ve las notas internas, el equipo ni otros clientes. La diagnosis y el trabajo realizado, solo si lo autorizas en cada orden.</p>
-                {panel.isManager && (
+                {panel.isOffice && (
                   <div style="margin-top:12px">
                     {askUnlink ? (
                       <form method="post" class="confirm" data-busy="Retirando…">
@@ -221,7 +221,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
             ) : (
               <>
                 <p><span class="status status-entregado">Sin vincular</span> Este cliente todavía no tiene acceso a su portal.</p>
-                {!panel.isManager ? <p class="hint" style="margin-top:8px">Las invitaciones al portal las envía el propietario o un administrador.</p> : (
+                {!panel.isOffice ? <p class="hint" style="margin-top:8px">Las invitaciones al portal las envía la oficina del taller (propietario, administrador o recepción).</p> : (
                   <>
                     {inviteLink && (
                       <div class="invite-result" style="margin-top:12px">

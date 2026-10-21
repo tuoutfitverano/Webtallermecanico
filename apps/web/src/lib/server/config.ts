@@ -320,3 +320,44 @@ export async function runMaintenance(): Promise<Record<string, number> | null> {
   }
   return (data ?? {}) as Record<string, number>;
 }
+
+// ---------------------------------------------------------------- presupuestos por enlace (público)
+
+export interface PublicQuote {
+  workshop_name: string; workshop_phone: string | null; number: number; version: number; status: string;
+  title: string | null; notes: string | null; valid_until: string; conditions: string | null;
+  vehicle: string | null; plate_hint: string | null;
+  lines: Array<{ kind: 'mano_obra' | 'pieza' | 'otro'; description: string; part_number: string | null; quantity: number; unit_price_cents: number; discount_pct: number; tax_rate: number; base_cents: number }>;
+  subtotal_cents: number; tax_cents: number; total_cents: number; taxes: Array<{ rate: number; base_cents: number; tax_cents: number }>;
+}
+
+/** Presupuesto de un enlace (solo servidor, clave secreta). 'no_disponible' si falta la configuración. */
+export async function quoteByToken(token: string): Promise<PublicQuote | null | 'no_disponible'> {
+  const service = getServiceClient();
+  if (!service) return 'no_disponible';
+  if (!/^[0-9a-f]{64}$/.test(token)) return null;
+  const { data, error } = await service.rpc('quote_by_token', { p_token: token });
+  if (error) {
+    log('quote_link_error', { code: error.code ?? 'desconocido' });
+    return 'no_disponible';
+  }
+  return (data ?? null) as PublicQuote | null;
+}
+
+/** Respuesta del cliente por enlace. Del navegador solo se guarda una huella diaria de la IP. */
+export async function respondQuoteByToken(token: string, accept: boolean, name: string, comment: string, ip: string | null):
+  Promise<{ ok: true; status: string } | { ok: false; message: string }> {
+  const service = getServiceClient();
+  if (!service) return { ok: false, message: 'El servicio no está disponible en este momento. Inténtalo más tarde o llama al taller.' };
+  const hashSecret = env('REQUEST_HASH_SECRET') || (isDev ? 'solo-para-desarrollo' : '');
+  const ipHash = await clientFingerprint(ip, hashSecret, madridToday());
+  const { data, error } = await service.rpc('respond_quote_by_token', {
+    p_token: token, p_accept: accept, p_name: name, p_comment: comment || null, p_ip_hash: ipHash,
+  });
+  if (error) {
+    log('quote_link_response_error', { code: error.code ?? 'desconocido' });
+    // Los mensajes 22023 de la base de datos son para la persona (enlace caducado, falta el nombre…).
+    return { ok: false, message: error.code === '22023' && error.message ? error.message : 'No se ha podido guardar tu respuesta. Inténtalo de nuevo.' };
+  }
+  return { ok: true, status: String(data) };
+}

@@ -40,7 +40,7 @@ if (panel.form && panel.workshop && panel.isManager && action === 'pedir-borrar'
     flash = { kind: 'bad', text: 'No se ha borrado: la solicitud no existe o no tienes permiso.' };
     Astro.response.status = 400;
   } else flash = { kind: 'ok', text: 'Solicitud borrada definitivamente.' };
-} else if (panel.form && panel.workshop && panel.isManager && action === 'estado') {
+} else if (panel.form && panel.workshop && panel.isOffice && action === 'estado') {
   const id = field(panel.form, 'id');
   const status = field(panel.form, 'status') as RequestStatus;
   if (!isUuid(id) || !REQUEST_STATUSES.includes(status)) {
@@ -75,7 +75,7 @@ interface Req {
 }
 let rows: Req[] = [];
 let loadError = false;
-if (panel.workshop && panel.isManager) {
+if (panel.workshop && panel.isOffice) {
   let q = panel.supabase.from('web_requests')
     .select('id, kind, status, name, business_name, phone, email, preferred_contact, plate, vehicle_make, vehicle_model, service, topic, preferred_date, preferred_time, message, created_at, handled_at')
     .eq('workshop_id', panel.workshop.id).order('created_at', { ascending: false }).limit(100);
@@ -92,7 +92,7 @@ if (panel.workshop && panel.isManager) {
       <p class="pnl-sub">Lo que llega desde los formularios de tu web. Una cita solicitada no está confirmada hasta que hables con la persona.</p>
     </div>
   </header>
-  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isManager ? (
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
     <div class="empty"><strong>Solo el propietario o un administrador ven las solicitudes de la web.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
   ) : (
     <>

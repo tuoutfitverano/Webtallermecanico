@@ -1,0 +1,57 @@
+---
+/** Una factura del cliente: datos, líneas, impuestos, lo pagado y lo pendiente (solo lectura). */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import LinesEditor from '../../../components/panel/LinesEditor.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { isUuid } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDay } from '../../../lib/panel/format.ts';
+import { formatCents, INVOICE_KIND_LABELS } from '@talleres/core';
+import type { LineRow } from '../../../lib/panel/lines.ts';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+const id = Astro.params.id ?? '';
+
+interface Party { name?: string; legal_name?: string; tax_id?: string | null; address?: string | null; postal_code?: string | null; city?: string | null; province?: string | null }
+interface Inv {
+  id: string; full_number: string; kind: 'ordinaria' | 'rectificativa'; issue_date: string; due_date: string; issuer: Party; recipient: Party;
+  lines: Array<Omit<LineRow, 'id' | 'position'>>; subtotal_cents: number; tax_cents: number; total_cents: number;
+  taxes: Array<{ rate: number; base_cents: number; tax_cents: number }>; rectifies: string | null; reason: string | null; paid_cents: number;
+}
+let inv: Inv | null = null;
+if (portal.records.length > 0 && isUuid(id)) {
+  const { data, error } = await portal.supabase.rpc('portal_invoice', { p_invoice_id: id });
+  if (error) logAuth('portal_invoice_error', error.code);
+  inv = (data ?? null) as Inv | null;
+}
+if (portal.records.length > 0 && !inv) Astro.response.status = 404;
+const lines: LineRow[] = (inv?.lines ?? []).map((l, i) => ({ ...l, id: String(i), position: i }));
+const address = (p: Party) => [p.address, [p.postal_code, p.city].filter(Boolean).join(' '), p.province].filter(Boolean).join(', ');
+const pending = inv ? Number(inv.total_cents) - Number(inv.paid_cents) : 0;
+---
+<PortalLayout portal={portal} title={inv ? `Factura ${inv.full_number}` : 'Factura'} section="facturas">
+  <a class="pnl-back" href="/portal/facturas"><Icon name="arrow" />Facturas</a>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : !inv ? (
+    <div class="empty"><strong>Factura no encontrada.</strong><a class="btn" href="/portal/facturas">Ver mis facturas</a></div>
+  ) : (
+    <>
+      <header class="pnl-head"><div><h1 class="pnl-title">{INVOICE_KIND_LABELS[inv.kind]} {inv.full_number}</h1><p class="pnl-sub">Fecha {formatDay(inv.issue_date)} · vence {formatDay(inv.due_date)}</p></div></header>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="emisor-t"><h2 id="emisor-t" class="card-title">Emisor</h2><p><strong>{inv.issuer.legal_name ?? inv.issuer.name}</strong><br />NIF {inv.issuer.tax_id}<br />{address(inv.issuer)}</p></section>
+        <section class="card" aria-labelledby="dest-t"><h2 id="dest-t" class="card-title">Cliente</h2><p><strong>{inv.recipient.name}</strong>{inv.recipient.tax_id && <><br />NIF {inv.recipient.tax_id}</>}{address(inv.recipient) && <><br />{address(inv.recipient)}</>}</p></section>
+      </div>
+      {inv.rectifies && <div class="explain" style="margin-top:16px"><strong>Rectifica la factura {inv.rectifies}</strong><p>{inv.reason}</p></div>}
+      <div style="margin-top:16px"><LinesEditor lines={lines} title="Conceptos" stored={{ subtotal_cents: inv.subtotal_cents, tax_cents: inv.tax_cents, total_cents: inv.total_cents, taxes: inv.taxes }} /></div>
+      <section class="card" aria-labelledby="pago-t">
+        <h2 id="pago-t" class="card-title"><Icon name="euro" />Pago</h2>
+        <dl class="facts"><dt>Pagado</dt><dd>{formatCents(Number(inv.paid_cents))}</dd><dt>Pendiente</dt><dd><strong>{formatCents(pending)}</strong></dd></dl>
+        {pending !== 0 && <p class="hint" style="margin-top:8px">El pago se hace en el taller (efectivo, tarjeta o transferencia). Esta plataforma no cobra pagos en línea.</p>}
+      </section>
+    </>
+  )}
+</PortalLayout>

@@ -1,0 +1,50 @@
+---
+/** Mis presupuestos: los enviados por el taller (nunca borradores ni versiones sustituidas). */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDay } from '../../../lib/panel/format.ts';
+import { formatCents, formatPlate, QUOTE_STATUS_LABELS, quoteLabel, type QuoteStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+interface Row { id: string; workshop_name: string; number: number; version: number; status: QuoteStatus; title: string | null; vehicle: string | null; plate: string | null; total_cents: number; valid_until: string; sent_at: string; responded_at: string | null }
+let rows: Row[] = [];
+let error = false;
+if (portal.records.length > 0) {
+  const { data, error: e } = await portal.supabase.rpc('portal_quotes');
+  if (e) { logAuth('portal_quotes_error', e.code); error = true; }
+  rows = (data ?? []) as Row[];
+}
+const tone: Partial<Record<QuoteStatus, string>> = { enviado: 'pill-warn', aceptado: 'pill-ok', rechazado: 'pill-bad', caducado: 'pill-bad' };
+---
+<PortalLayout portal={portal} title="Presupuestos" section="presupuestos">
+  <header class="pnl-head"><div><h1 class="pnl-title">Presupuestos</h1><p class="pnl-sub">Los presupuestos que te ha enviado tu taller. Puedes aceptarlos o rechazarlos aquí.</p></div></header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <>
+      {error && <Flash kind="bad" text="No se han podido cargar tus presupuestos. Recarga la página." />}
+      <section class="card" aria-label="Lista de presupuestos">
+        {rows.length === 0 ? <div class="empty"><strong>No tienes presupuestos.</strong><span>Cuando el taller te envíe uno, aparecerá aquí.</span></div> : (
+          <ul class="list">
+            {rows.map(r => (
+              <li>
+                <a class="row" href={`/portal/presupuestos/${r.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{quoteLabel(r.number, r.version)}</span>{r.title ?? 'Presupuesto'}{r.plate && <span class="plate">{formatPlate(r.plate)}</span>}</span>
+                    <span class="row-meta">{r.workshop_name}{r.vehicle && ` · ${r.vehicle}`} · válido hasta {formatDay(r.valid_until)}</span>
+                  </span>
+                  <span class="row-side"><span class={`pill ${tone[r.status] ?? ''}`}>{QUOTE_STATUS_LABELS[r.status]}</span><span class="money-big">{formatCents(Number(r.total_cents))}</span></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PortalLayout>

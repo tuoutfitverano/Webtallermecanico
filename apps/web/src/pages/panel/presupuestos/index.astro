@@ -1,0 +1,82 @@
+---
+/** Presupuestos del taller: estado, cliente, vehículo, importe y validez. Solo la oficina (y la base de datos lo exige). */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDay, formatDateTime } from '../../../lib/panel/format.ts';
+import { formatCents, formatPlate, QUOTE_STATUS_LABELS, quoteLabel, type QuoteStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const FILTERS = [
+  { id: 'abiertos', label: 'Abiertos', statuses: ['borrador', 'enviado'] },
+  { id: 'pendientes', label: 'Pendientes de respuesta', statuses: ['enviado'] },
+  { id: 'borradores', label: 'Borradores', statuses: ['borrador'] },
+  { id: 'aceptados', label: 'Aceptados', statuses: ['aceptado'] },
+  { id: 'cerrados', label: 'Rechazados, caducados y anulados', statuses: ['rechazado', 'caducado', 'anulado'] },
+  { id: 'todos', label: 'Todos', statuses: ['borrador', 'enviado', 'aceptado', 'rechazado', 'caducado', 'anulado'] },
+] as const;
+const filter = FILTERS.find(f => f.id === Astro.url.searchParams.get('estado')) ?? FILTERS[0];
+
+interface Row {
+  id: string; number: number; version: number; status: QuoteStatus; title: string | null; total_cents: number | null; valid_until: string | null;
+  sent_at: string | null; created_at: string; customers: { id: string; full_name: string } | null; vehicles: { plate: string; make: string; model: string } | null;
+}
+let rows: Row[] = [];
+let loadError = false;
+if (panel.workshop && panel.isOffice) {
+  const { data, error } = await panel.supabase.from('quotes')
+    .select('id, number, version, status, title, total_cents, valid_until, sent_at, created_at, customers(id, full_name), vehicles(plate, make, model)')
+    .eq('workshop_id', panel.workshop.id).in('status', [...filter.statuses]).order('created_at', { ascending: false }).limit(200);
+  if (error) { logAuth('panel_quotes_error', error.code); loadError = true; }
+  rows = (data ?? []) as unknown as Row[];
+}
+const tone: Record<QuoteStatus, string> = { borrador: '', enviado: 'pill-warn', aceptado: 'pill-ok', rechazado: 'pill-bad', caducado: 'pill-bad', sustituido: '', anulado: '' };
+---
+<PanelLayout panel={panel} title="Presupuestos" section="presupuestos">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Presupuestos</h1>
+      <p class="pnl-sub">Prepara, envía y sigue las respuestas de tus clientes.</p>
+    </div>
+    {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/presupuestos/nuevo"><Icon name="plus" />Nuevo presupuesto</a></div>}
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Los presupuestos los gestiona la oficina del taller (propietario, administrador o recepción).</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      {loadError && <Flash kind="bad" text="No se han podido cargar los presupuestos. Recarga la página." />}
+      <nav class="filter-tabs" aria-label="Estado">
+        {FILTERS.map(f => <a href={`/panel/presupuestos?estado=${f.id}`} aria-current={f.id === filter.id ? 'page' : undefined}>{f.label}</a>)}
+      </nav>
+      <section class="card" aria-label="Lista de presupuestos">
+        {rows.length === 0 ? (
+          <div class="empty"><strong>No hay presupuestos con este filtro.</strong><span>Crea uno desde una orden o desde aquí.</span><a class="btn" href="/panel/presupuestos/nuevo">Nuevo presupuesto</a></div>
+        ) : (
+          <ul class="list">
+            {rows.map(r => (
+              <li>
+                <a class="row" href={`/panel/presupuestos/${r.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{quoteLabel(r.number, r.version)}</span>{r.title ?? 'Presupuesto'}{r.vehicles && <span class="plate">{formatPlate(r.vehicles.plate)}</span>}</span>
+                    <span class="row-meta">{r.customers?.full_name ?? '—'}{r.vehicles && ` · ${r.vehicles.make} ${r.vehicles.model}`} · {r.sent_at ? `enviado ${formatDateTime(r.sent_at)}` : `creado ${formatDateTime(r.created_at)}`}{r.valid_until && ` · válido hasta ${formatDay(r.valid_until)}`}</span>
+                  </span>
+                  <span class="row-side">
+                    <span class={`pill ${tone[r.status]}`}>{QUOTE_STATUS_LABELS[r.status]}</span>
+                    {r.total_cents !== null && <span class="money-big">{formatCents(Number(r.total_cents))}</span>}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PanelLayout>

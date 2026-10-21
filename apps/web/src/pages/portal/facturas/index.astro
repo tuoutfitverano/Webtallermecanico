@@ -1,0 +1,51 @@
+---
+/** Mis facturas: las emitidas por el taller y si están pagadas. */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDay } from '../../../lib/panel/format.ts';
+import { formatCents, INVOICE_KIND_LABELS } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+interface Row { id: string; workshop_name: string; full_number: string; kind: 'ordinaria' | 'rectificativa'; issue_date: string; due_date: string; total_cents: number; paid_cents: number; pending_cents: number; vehicle: string | null }
+let rows: Row[] = [];
+let error = false;
+if (portal.records.length > 0) {
+  const { data, error: e } = await portal.supabase.rpc('portal_invoices');
+  if (e) { logAuth('portal_invoices_error', e.code); error = true; }
+  rows = (data ?? []) as Row[];
+}
+const state = (r: Row) => Number(r.pending_cents) === 0 ? { text: 'Pagada', tone: 'pill-ok' }
+  : Number(r.paid_cents) === 0 ? { text: 'Pendiente de pago', tone: 'pill-warn' } : { text: 'Pagada en parte', tone: 'pill-warn' };
+---
+<PortalLayout portal={portal} title="Facturas" section="facturas">
+  <header class="pnl-head"><div><h1 class="pnl-title">Facturas</h1><p class="pnl-sub">Las facturas de tus reparaciones y lo que queda por pagar.</p></div></header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <>
+      {error && <Flash kind="bad" text="No se han podido cargar tus facturas. Recarga la página." />}
+      <section class="card" aria-label="Lista de facturas">
+        {rows.length === 0 ? <div class="empty"><strong>No tienes facturas.</strong></div> : (
+          <ul class="list">
+            {rows.map(r => (
+              <li>
+                <a class="row" href={`/portal/facturas/${r.id}`}>
+                  <span class="row-main">
+                    <span class="row-title"><span class="num">{r.full_number}</span>{INVOICE_KIND_LABELS[r.kind]}</span>
+                    <span class="row-meta">{r.workshop_name}{r.vehicle && ` · ${r.vehicle}`} · {formatDay(r.issue_date)}</span>
+                  </span>
+                  <span class="row-side"><span class={`pill ${state(r).tone}`}>{state(r).text}</span><span class="money-big">{formatCents(Number(r.total_cents))}</span></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PortalLayout>

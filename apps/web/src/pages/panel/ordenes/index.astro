@@ -46,9 +46,9 @@ const filtered = Boolean(q || estado || todas || empleado);
   <header class="pnl-head">
     <div>
       <h1 class="pnl-title">Órdenes de reparación</h1>
-      <p class="pnl-sub">{panel.isManager ? 'Todas las órdenes del taller.' : 'Las órdenes asignadas a ti.'}</p>
+      <p class="pnl-sub">{panel.isOffice ? 'Todas las órdenes del taller.' : 'Las órdenes asignadas a ti.'}</p>
     </div>
-    {panel.isManager && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/ordenes/nueva"><Icon name="plus" />Nueva orden</a></div>}
+    {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/ordenes/nueva"><Icon name="plus" />Nueva orden</a></div>}
   </header>
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
     <>
@@ -66,7 +66,7 @@ const filtered = Boolean(q || estado || todas || empleado);
             <option value="todas" selected={todas}>Todas</option>
           </select>
         </div>
-        {panel.isManager ? (
+        {panel.isOffice ? (
           <div class="field">
             <label for="empleado" class="sr-only">Empleado</label>
             <select class="select" id="empleado" name="empleado">
@@ -81,8 +81,8 @@ const filtered = Boolean(q || estado || todas || empleado);
       <section class="card" aria-label="Lista de órdenes">
         {rows.length === 0 ? (
           <div class="empty">
-            <strong>{filtered ? 'Ninguna orden coincide con los filtros.' : panel.isManager ? 'No hay reparaciones en curso.' : 'No tienes reparaciones asignadas en curso.'}</strong>
-            {filtered ? <a class="btn" href="/panel/ordenes">Quitar filtros</a> : panel.isManager && <a class="btn btn-primary" href="/panel/ordenes/nueva"><Icon name="plus" />Crear una orden</a>}
+            <strong>{filtered ? 'Ninguna orden coincide con los filtros.' : panel.isOffice ? 'No hay reparaciones en curso.' : 'No tienes reparaciones asignadas en curso.'}</strong>
+            {filtered ? <a class="btn" href="/panel/ordenes">Quitar filtros</a> : panel.isOffice && <a class="btn btn-primary" href="/panel/ordenes/nueva"><Icon name="plus" />Crear una orden</a>}
           </div>
         ) : (
           <ul class="list">

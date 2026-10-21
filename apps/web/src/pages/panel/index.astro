@@ -33,7 +33,7 @@ if (panel.workshop) {
     panel.supabase.rpc('search_repair_orders', { p_workshop_id: id, p_query: '', p_limit: 8 }),
     loadTeam(panel),
     // Solo gestores leen las solicitudes (RLS); para un mecánico no se pregunta.
-    panel.isManager
+    panel.isOffice
       ? panel.supabase.from('web_requests').select('id', { count: 'exact', head: true }).eq('workshop_id', id).eq('status', 'nueva')
       : Promise.resolve({ count: null }),
   ]);
@@ -46,7 +46,7 @@ if (panel.workshop) {
   recent = (r.data ?? []) as OrderRow[];
   team = t;
 }
-const mine = !panel.isManager;
+const mine = !panel.isOffice;
 const kpis = summary ? [
   { value: summary.active, label: mine ? 'Tus reparaciones activas' : 'Reparaciones activas', href: '/panel/ordenes' },
   { value: summary.pending_diagnosis, label: 'Pendientes de diagnosis', href: '/panel/ordenes?estado=diagnosis' },
@@ -83,7 +83,7 @@ const kpis = summary ? [
         </section>
       )}
 
-      {panel.isManager && (
+      {panel.isOffice && (
         <section class="card" aria-labelledby="atajos">
           <h2 id="atajos" class="card-title">Accesos rápidos</h2>
           <div class="quick">
@@ -100,7 +100,7 @@ const kpis = summary ? [
         {recent.length === 0 ? (
           <div class="empty">
             <strong>{mine ? 'No tienes trabajos asignados.' : 'Todavía no hay reparaciones registradas.'}</strong>
-            {panel.isManager ? (
+            {panel.isOffice ? (
               <>
                 <span>{summary?.vehicles ? 'Crea la primera orden a partir de un vehículo registrado.' : 'Empieza registrando un cliente y su vehículo; después crea la orden.'}</span>
                 <a class="btn btn-primary" href={summary?.vehicles ? '/panel/ordenes/nueva' : '/panel/clientes/nuevo'}>

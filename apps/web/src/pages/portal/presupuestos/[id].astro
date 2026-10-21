@@ -1,0 +1,97 @@
+---
+/**
+ * Un presupuesto del cliente: líneas, importes y condiciones. Si está
+ * pendiente, lo acepta o lo rechaza aquí (respond_quote_portal comprueba que
+ * es suyo; la respuesta queda con fecha y copia de lo aceptado).
+ */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import LinesEditor from '../../../components/panel/LinesEditor.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { field, isUuid } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDateTime, formatDay } from '../../../lib/panel/format.ts';
+import { formatPlate, QUOTE_RESPONSE_SOURCE_LABELS, QUOTE_STATUS_LABELS, quoteLabel, type QuoteStatus } from '@talleres/core';
+import type { LineRow } from '../../../lib/panel/lines.ts';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+const id = Astro.params.id ?? '';
+
+interface Q {
+  id: string; workshop_name: string; number: number; version: number; status: QuoteStatus; title: string | null; notes: string | null;
+  valid_until: string; conditions: string | null; sent_at: string; responded_at: string | null; response_source: string | null;
+  vehicle: string | null; plate: string | null; order_id: string | null;
+  lines: Array<Omit<LineRow, 'id' | 'position'> & { base_cents: number }>;
+  subtotal_cents: number; tax_cents: number; total_cents: number; taxes: Array<{ rate: number; base_cents: number; tax_cents: number }>;
+}
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+const load = async () => {
+  if (portal.records.length === 0 || !isUuid(id)) return null;
+  const { data, error } = await portal.supabase.rpc('portal_quote', { p_quote_id: id });
+  if (error) logAuth('portal_quote_error', error.code);
+  return (data ?? null) as Q | null;
+};
+let quote = await load();
+
+if (portal.form && quote) {
+  const decision = field(portal.form, 'decision');
+  if ((decision === 'aceptar' && portal.form.get('read') !== 'on')) {
+    flash = { kind: 'bad', text: 'Para aceptar, confirma que has leído el presupuesto y sus condiciones.' };
+    Astro.response.status = 422;
+  } else if (decision === 'aceptar' || decision === 'rechazar') {
+    const { error } = await portal.supabase.rpc('respond_quote_portal', {
+      p_quote_id: quote.id, p_accept: decision === 'aceptar', p_comment: field(portal.form, 'comment').trim().slice(0, 1000) || null,
+    });
+    if (error) {
+      logAuth('portal_quote_response_error', error.code);
+      flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : 'No se ha guardado tu respuesta. Inténtalo de nuevo.' };
+      Astro.response.status = 400;
+    } else flash = { kind: 'ok', text: decision === 'aceptar' ? 'Presupuesto aceptado. El taller ya lo sabe.' : 'Has rechazado el presupuesto. El taller ya lo sabe.' };
+    quote = await load();
+  }
+}
+if (portal.records.length > 0 && !quote) Astro.response.status = 404;
+const lines: LineRow[] = (quote?.lines ?? []).map((l, i) => ({ ...l, id: String(i), position: i }));
+const tone: Partial<Record<QuoteStatus, string>> = { enviado: 'pill-warn', aceptado: 'pill-ok', rechazado: 'pill-bad', caducado: 'pill-bad' };
+---
+<PortalLayout portal={portal} title={quote ? `Presupuesto ${quoteLabel(quote.number, quote.version)}` : 'Presupuesto'} section="presupuestos">
+  <a class="pnl-back" href="/portal/presupuestos"><Icon name="arrow" />Presupuestos</a>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : !quote ? (
+    <div class="empty"><strong>Presupuesto no encontrado.</strong><a class="btn" href="/portal/presupuestos">Ver mis presupuestos</a></div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{quoteLabel(quote.number, quote.version)} <span class={`pill ${tone[quote.status] ?? ''}`}>{QUOTE_STATUS_LABELS[quote.status]}</span></h1>
+          <p class="pnl-sub">{quote.workshop_name}{quote.vehicle && <> · {quote.vehicle}</>}{quote.plate && <> <span class="plate">{formatPlate(quote.plate)}</span></>} · válido hasta {formatDay(quote.valid_until)}</p>
+        </div>
+      </header>
+      <Flash kind={flash.kind} text={flash.text} />
+      {quote.notes && <div class="explain" style="margin-bottom:16px"><strong>Nota del taller</strong><p>{quote.notes}</p></div>}
+      <LinesEditor lines={lines} title={quote.title ?? 'Detalle'} stored={{ subtotal_cents: quote.subtotal_cents, tax_cents: quote.tax_cents, total_cents: quote.total_cents, taxes: quote.taxes }} />
+      {quote.conditions && <section class="card" aria-labelledby="cond-t"><h2 id="cond-t" class="card-title">Condiciones</h2><p style="white-space:pre-line">{quote.conditions}</p></section>}
+      {quote.status === 'enviado' ? (
+        <section class="card" aria-labelledby="resp-t">
+          <h2 id="resp-t" class="card-title"><Icon name="check" />Tu respuesta</h2>
+          <form method="post" class="form-stack" data-busy="Enviando…" novalidate>
+            <div class="field"><label for="comment">Comentario para el taller <span class="muted">(opcional)</span></label><textarea class="textarea" id="comment" name="comment" maxlength="1000" rows="2"></textarea></div>
+            <label class="check"><input type="checkbox" name="read" /><span>He leído el presupuesto y sus condiciones.</span></label>
+            <div class="doc-actions">
+              <button class="btn btn-primary" type="submit" name="decision" value="aceptar">Acepto el presupuesto</button>
+              <button class="btn" type="submit" name="decision" value="rechazar">No lo acepto</button>
+            </div>
+            <p class="hint">Se guarda tu respuesta, la fecha y una copia de este presupuesto como constancia.</p>
+          </form>
+        </section>
+      ) : quote.responded_at ? (
+        <p class="hint">Respondido el {formatDateTime(quote.responded_at)} {QUOTE_RESPONSE_SOURCE_LABELS[quote.response_source ?? ''] ?? ''}.</p>
+      ) : quote.status === 'caducado' ? <p class="hint">Este presupuesto ha caducado. Si te interesa, pide al taller uno nuevo.</p> : null}
+      {quote.order_id && <p style="margin-top:12px"><a href={`/portal/reparaciones/${quote.order_id}`}>Ver la reparación</a></p>}
+    </>
+  )}
+</PortalLayout>
