@@ -5,26 +5,9 @@
  * cookie, manda ella (es lo que ha pintado el servidor); sin cookie, lo de esta
  * visita (sessionStorage) o, con cookies aceptadas, localStorage (vista previa
  * sin servidor). Un valor desconocido no cambia nada.
+ *
+ * El texto está en lib/inline-scripts.ts: la CSP solo ejecuta scripts en línea con huella conocida.
  */
-import { THEMES } from '../lib/theme.ts';
-import { CONSENTS } from '../lib/consent.ts';
+import { THEME_SCRIPT } from '../lib/inline-scripts.ts';
 ---
-<script define:vars={{ themes: THEMES, consents: CONSENTS }}>
-  const root = document.documentElement;
-  const read = f => { try { return f(); } catch { return null; } };
-  const fromCookie = name => read(() => new RegExp('(?:^|;\\s*)' + name + '=([^;]*)').exec(document.cookie)?.[1]);
-  const consent = () => fromCookie('consentimiento') ?? read(() => localStorage.getItem('consentimiento'));
-  // Preferencia: cookie; si no, la de esta visita (sessionStorage); si no y se aceptaron
-  // las cookies, la guardada en el dispositivo (localStorage). Un valor viejo guardado
-  // sin consentimiento no se impone a lo elegido.
-  const preference = name => fromCookie(name) ?? read(() => sessionStorage.getItem(name))
-    ?? (consent() === 'aceptadas' ? read(() => localStorage.getItem(name)) : null);
-  const apply = () => {
-    const t = preference('tema');
-    if (t && themes.includes(t)) root.dataset.theme = t;
-    const c = consent();
-    if (c && consents.includes(c)) root.dataset.cookies = c;
-  };
-  apply();
-  document.addEventListener('astro:after-swap', apply);
-</script>
+<script is:inline set:html={THEME_SCRIPT}></script>

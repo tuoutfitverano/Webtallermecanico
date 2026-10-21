@@ -15,6 +15,9 @@ export default defineConfig({
   devToolbar: { enabled: process.env.E2E !== '1' },
   vite: {
     plugins: [tailwindcss()],
+    // Nada en línea: los scripts propios van como archivos (la CSP solo admite
+    // en línea los de lib/inline-scripts.ts, por su huella).
+    build: { assetsInlineLimit: 0 },
   },
   // Variables de entorno. Todas se leen en el SERVIDOR en tiempo de ejecución
   // (access: 'secret'), así se pueden cambiar en Cloudflare sin recompilar y

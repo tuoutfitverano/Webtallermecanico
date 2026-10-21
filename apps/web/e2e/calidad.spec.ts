@@ -420,11 +420,33 @@ test('cabeceras de seguridad en la web pública y en el área privada', async ()
     const h = r.headers;
     expect(h.get('x-content-type-options'), `${path} nosniff`).toBe('nosniff');
     expect(h.get('content-security-policy') ?? '', `${path} CSP`).toContain("frame-ancestors 'none'");
+    expect(h.get('content-security-policy') ?? '', `${path} CSP scripts`).toMatch(/script-src 'self' https:\/\/challenges\.cloudflare\.com 'sha256-/);
+    expect(h.get('content-security-policy') ?? '', `${path} CSP sin unsafe`).not.toMatch(/unsafe-(inline|eval)/);
     expect(h.get('permissions-policy') ?? '', `${path} permisos`).toContain('camera=()');
     expect(h.get('referrer-policy'), `${path} referrer`).toBeTruthy();
   }
   const priv = await fetch(`${WEB}/acceso`, { headers: { host: HOST } });
   expect(priv.headers.get('cache-control')).toContain('no-store');
+});
+
+test('CSP: los scripts en línea propios funcionan y uno inyectado no se ejecuta', async ({ page, context }) => {
+  const violations: string[] = [];
+  page.on('console', m => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  await context.addCookies([{ name: 'tema', value: 'claro', url: `http://${HOST}` }]);
+  await page.goto('/');
+  // El script del modo (en línea, con huella) ha funcionado y el de la web pública también.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'claro');
+  await expect(page.locator('html')).toHaveClass(/pm-js/);
+  expect(violations, 'ningún script propio bloqueado').toEqual([]);
+  // Un script inyectado (como haría un ataque XSS) queda bloqueado.
+  const ran = await page.evaluate(async () => {
+    const s = document.createElement('script');
+    s.textContent = 'window.__inyectado = true';
+    document.body.append(s);
+    await new Promise(r => setTimeout(r, 100));
+    return (window as unknown as { __inyectado?: boolean }).__inyectado === true;
+  });
+  expect(ran).toBe(false);
 });
 
 test('página 404: responde 404, explica qué pasa, ofrece salidas y cumple accesibilidad en los dos modos', async ({ page, context, isMobile }) => {

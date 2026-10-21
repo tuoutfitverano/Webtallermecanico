@@ -1,4 +1,5 @@
 ---
+import { PREMIUM_JS_SCRIPT } from '../../lib/inline-scripts.ts';
 /**
  * Diseño «premium» de la web de un taller (plantilla). Las secciones son
  * compartidas por todos los talleres; qué se ve y con qué textos sale de la
@@ -64,7 +65,7 @@ const demoForms = site.isDemoContent
 ---
 <div class="pm" style={vars || undefined} data-font={site.headingFont}>
   <DemoNotice site={site} />
-  <script is:inline>document.documentElement.classList.add('pm-js');</script>
+  <script is:inline set:html={PREMIUM_JS_SCRIPT}></script>
   <PmHeader site={site} showServices={showServices} showSoftware={showSoftware} showContact={showContact} />
 
   <main id="inicio">
