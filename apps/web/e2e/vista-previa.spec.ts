@@ -145,6 +145,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { v: 7, c: 5, to: 'en_reparacion', problem: 'Le cuesta arrancar en frío.', diagnosis: 'Batería agotada y bujías desgastadas.', work: '', notes: 'Estamos cambiando la batería; mañana te contamos.', details: true, worker: true },
     { v: 8, c: 5, to: 'diagnosis', problem: 'Testigo de neumáticos encendido.', diagnosis: '', work: '', notes: '', details: false, worker: true },
   ];
+  const orders: Array<Record<string, string>> = [];
   for (const j of jobs) {
     const [o] = await rest('POST', '/repair_orders', owner.tok, {
       workshop_id: DEMO, vehicle_id: vehicles[j.v]!.id, customer_id: customers[j.c]!.id, problem_description: j.problem,
@@ -155,7 +156,72 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
       diagnosis: j.diagnosis || null, work_done: j.work || null, customer_notes: j.notes || null, show_details_to_customer: j.details,
       internal_notes: 'Nota interna de ejemplo: el cliente nunca la ve.',
     });
+    orders.push(o!);
   }
+
+  // ---- Gestión: datos fiscales FICTICIOS, ajustes, líneas, presupuestos, facturas,
+  // planificación, fichajes y recordatorios. Todo es de demostración (base temporal).
+  await rest('PATCH', `/workshops?id=eq.${DEMO}`, owner.tok, {
+    legal_name: 'AutoValue Demo S.L. (ficticio)', tax_id: 'B00000000', address_line: 'Calle de Ejemplo 1 (dirección ficticia)', postal_code: '28000', city: 'Madrid',
+  });
+  await rest('PATCH', `/workshop_billing_settings?workshop_id=eq.${DEMO}`, owner.tok, {
+    labour_rate_cents: 4500, payment_terms_days: 15, invoice_footer: 'Factura de demostración. Datos ficticios.',
+    quote_conditions: 'Presupuesto de demostración. Los precios son de ejemplo.',
+  });
+  const line = (kind: string, description: string, quantity: number, cents: number) => ({ kind, description, quantity, unit_price_cents: cents, tax_rate: 21 });
+  async function addOrderLines(o: number, lines: ReturnType<typeof line>[]) {
+    let position = 0;
+    for (const l of lines) await rest('POST', '/repair_order_items', owner.tok, { workshop_id: DEMO, order_id: orders[o]!.id, position: ++position, ...l });
+  }
+  async function quote(o: number, title: string, lines: ReturnType<typeof line>[]) {
+    const [q] = await rest('POST', '/quotes', owner.tok, { workshop_id: DEMO, customer_id: customers[jobs[o]!.c]!.id, vehicle_id: vehicles[jobs[o]!.v]!.id, order_id: orders[o]!.id, title });
+    let position = 0;
+    for (const l of lines) await rest('POST', '/quote_items', owner.tok, { workshop_id: DEMO, quote_id: q!.id, position: ++position, ...l });
+    await rest('POST', '/rpc/send_quote', owner.tok, { p_quote_id: q!.id });
+    return q!.id!;
+  }
+  async function invoice(o: number, paidCents: number | 'todo') {
+    const id = (await rest('POST', '/rpc/create_invoice_draft', owner.tok, { p_order_id: orders[o]!.id })) as unknown as string;
+    await rest('POST', '/rpc/issue_invoice', owner.tok, { p_invoice_id: id });
+    const [inv] = await rest('GET', `/invoices?id=eq.${id}&select=total_cents`, owner.tok);
+    const amount = paidCents === 'todo' ? Number(inv!.total_cents) : paidCents;
+    if (amount > 0) await rest('POST', '/payments', owner.tok, { workshop_id: DEMO, invoice_id: id, amount_cents: amount, method: 'tarjeta', paid_on: new Date().toISOString().slice(0, 10) });
+  }
+  // Revisión de los 60.000 km (entregada): factura cobrada.
+  await addOrderLines(1, [line('mano_obra', 'Revisión de mantenimiento', 1, 4500), line('pieza', 'Aceite 5W30 (5 l)', 1, 3800), line('pieza', 'Filtro de aceite', 1, 950), line('pieza', 'Filtro de aire', 1, 1450)]);
+  await invoice(1, 'todo');
+  // Frenos del Seat (listo): líneas en la orden.
+  await addOrderLines(0, [line('pieza', 'Discos de freno delanteros (par)', 1, 8900), line('pieza', 'Pastillas delanteras', 1, 4200), line('mano_obra', 'Sustitución de discos y pastillas', 1.5, 4500)]);
+  // EGR del Renault: presupuesto pendiente de respuesta.
+  await quote(2, 'Sustitución de la válvula EGR', [line('pieza', 'Válvula EGR', 1, 18500), line('mano_obra', 'Desmontaje y montaje', 2.5, 4500)]);
+  // Prueba Cliente · Golf (listo): presupuesto aceptado en el taller y factura con un pago a cuenta.
+  const golfQuote = await quote(6, 'Rótula de dirección y revisión anual', [line('pieza', 'Rótula de dirección izquierda', 1, 4600), line('mano_obra', 'Sustitución y alineado', 1.5, 4500), line('mano_obra', 'Revisión anual', 1, 4500)]);
+  await rest('POST', '/rpc/record_quote_decision', owner.tok, { p_quote_id: golfQuote, p_accept: true, p_name: 'Prueba Cliente', p_comment: 'Aceptado por teléfono (demostración).' });
+  await invoice(6, 5000);
+  // Prueba Cliente · Citroën (en reparación): presupuesto pendiente, para aceptarlo desde el portal.
+  await quote(7, 'Batería y bujías', [line('pieza', 'Batería 60 Ah', 1, 9500), line('pieza', 'Bujías (juego de 4)', 1, 3200), line('mano_obra', 'Sustitución', 0.5, 4500)]);
+  // Planificación: prioridades, días, fechas previstas (una ya pasada) y tiempos estimados.
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const plan = [
+    { o: 2, priority: 'alta', scheduled_on: day(1), due_at: `${day(3)}T17:00:00Z`, estimated_minutes: 180 },
+    { o: 3, priority: 'normal', scheduled_on: day(0), due_at: `${day(1)}T17:00:00Z`, estimated_minutes: 90 },
+    { o: 4, priority: 'urgente', scheduled_on: day(0), due_at: `${day(-1)}T17:00:00Z`, estimated_minutes: 360 },
+    { o: 5, priority: 'baja', scheduled_on: day(2), due_at: null, estimated_minutes: 60 },
+    { o: 7, priority: 'normal', scheduled_on: day(0), due_at: `${day(1)}T13:00:00Z`, estimated_minutes: 45 },
+    { o: 8, priority: 'normal', scheduled_on: day(1), due_at: null, estimated_minutes: 30 },
+  ];
+  for (const p of plan) {
+    await rest('PATCH', `/repair_orders?id=eq.${orders[p.o]!.id}`, owner.tok, { priority: p.priority, scheduled_on: p.scheduled_on, due_at: p.due_at, estimated_minutes: p.estimated_minutes, mileage_in: p.o === 7 ? 151200 : null });
+  }
+  // Fichaje real del trabajador en el Citroën (empezar y parar: hora del servidor).
+  await rest('POST', '/rpc/start_work', worker.tok, { p_order_id: orders[7]!.id });
+  await rest('POST', '/rpc/stop_work', worker.tok, { p_order_id: orders[7]!.id });
+  // Ficha del Golf: versión, kilómetros y próxima revisión (la ve la clienta en su portal).
+  await rest('PATCH', `/vehicles?id=eq.${vehicles[6]!.id}`, owner.tok, { version: '2.0 TSI', mileage: 87400, next_service_date: day(10), next_service_km: 90000, next_service_notes: 'Cambio de aceite y filtros (demostración).' });
+  // La clienta pide recordatorios de mantenimiento; el taller activa las reglas y se generan.
+  await rest('POST', '/rpc/set_service_reminders', client.tok, { p_customer_id: customers[5]!.id, p_enabled: true });
+  await rest('PATCH', `/reminder_settings?workshop_id=eq.${DEMO}`, owner.tok, { revision_enabled: true, quote_enabled: true, pickup_enabled: true });
+  await fetch(`${PROXY}/rest/v1/rpc/run_maintenance`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: '{}' });
 
   // ---- Dos solicitudes de cita desde la web pública (por el formulario real)
   for (const [name, phone] of [['Ana Torres', '656 789 012'], ['Pedro Gómez', '667 890 123']] as const) {
@@ -186,11 +252,11 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
 
   // ---- Recorrido de pantallas
   await login(page, 'propietaria@e2e.test', '/panel');
-  const t = await crawl(page, 'taller', ['/panel', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 170);
+  const t = await crawl(page, 'taller', ['/panel', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/panel/planificacion', '/panel/presupuestos', '/panel/facturas', '/panel/recordatorios', '/panel/estadisticas', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 260);
   await login(page, WORKER, '/panel', DEMO_PASSWORD);
   const w = await crawl(page, 'trabajador', ['/panel', '/panel/ordenes', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
   await login(page, CLIENT, '/portal', DEMO_PASSWORD);
-  const c = await crawl(page, 'cliente', ['/portal', '/portal/avisos', '/portal/datos', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 60);
+  const c = await crawl(page, 'cliente', ['/portal', '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 80);
   expect(t).toBeGreaterThan(20);
   expect(w).toBeGreaterThan(5);
   expect(c).toBeGreaterThan(5);

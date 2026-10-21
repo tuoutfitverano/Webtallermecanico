@@ -104,9 +104,22 @@ Pendiente: envío automático del enlace de invitación por correo (hoy se copia
 - Panel de alta de talleres, dominios personalizados (Cloudflare for SaaS), publicación y suspensión.
 - Páginas por servicio para SEO local, datos estructurados `AutoRepair`, sitemap, banner de cookies si se usan cookies no esenciales.
 
+## ✅ Gestión completa del taller (pendiente de tu revisión)
+
+- Rol nuevo **Recepción** (órdenes, clientes, presupuestos, facturas y cobros; no gestiona equipo ni configuración).
+- Vehículo: versión, bastidor (VIN), kilómetros y próxima revisión; historial con kilómetros, trabajos, presupuestos y facturas.
+- Orden: líneas (mano de obra, piezas, otros) con IVA, prioridad, día planificado, fecha prevista (interna), tiempo estimado y **fichaje real** (empezar/parar con la hora del servidor).
+- **Planificación**: tablero por estados y semana, filtros por mecánico y prioridad, retrasos y órdenes sin asignar.
+- **Presupuestos** con versiones, envío, aceptación o rechazo desde el portal o con enlace de un solo uso, constancia de la respuesta y paso de líneas a la orden. Guía: `docs/FACTURACION.md`.
+- **Facturas** (operativas, **no certificadas VERI\*FACTU**): numeración sin huecos por serie y año, datos congelados, registro encadenado, rectificativas, cobros parciales y anulados con motivo, impresión/PDF. Portal: facturas del cliente.
+- **Recordatorios** automáticos (revisión por fecha o km si el cliente lo pide, presupuesto sin respuesta, vehículo sin recoger, trabajo retrasado interno) y avisos con enlace al portal.
+- **Estadísticas** con datos reales por periodo y bloque «Requiere atención» en el inicio.
+- Guía: `docs/GESTION_TALLER.md`. Pruebas: `15_gestion_taller`, `16_facturacion_recordatorios` y `e2e/gestion.spec.ts`.
+- Pendiente: conformidad VERI\*FACTU (certificación propia o proveedor), revisión de una asesoría, agenda de citas, SMS y pagos en línea.
+
 ## Fuera de alcance (por ahora)
 
-Contabilidad, facturación fiscal (VeriFactu/TicketBAI), inventario de recambios y nóminas.
+Contabilidad, facturación fiscal certificada (VERI\*FACTU/TicketBAI), inventario de recambios, agenda de citas, pagos en línea y nóminas.
 
 ## ✅ Plantilla de webs y demo comercial (AutoValue)
 

@@ -110,6 +110,8 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
   await audit(page, [
     '/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/ordenes/nueva', '/panel/vehiculos', '/panel/vehiculos/nuevo',
     '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
+    '/panel/planificacion', '/panel/planificacion?vista=semana', '/panel/presupuestos', '/panel/presupuestos/nuevo',
+    '/panel/facturas', '/panel/facturas/nueva', '/panel/recordatorios', '/panel/estadisticas',
   ], isMobile);
 });
 
@@ -144,7 +146,7 @@ test('modo claro y oscuro: accesibilidad de la web, el acceso, el panel y el por
   await login(page, 'propietaria@e2e.test', '/panel');
   for (const tema of ['claro', 'oscuro']) {
     await context.addCookies([{ name: 'tema', value: tema, url: page.url() }]);
-    await audit(page, ['/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/vehiculos/nuevo', '/panel/avisos', '/cuenta'], false);
+    await audit(page, ['/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/vehiculos/nuevo', '/panel/avisos', '/cuenta', '/panel/planificacion', '/panel/facturas', '/panel/estadisticas'], false);
   }
   await context.clearCookies(); await acceptCookies(context);
   await login(page, f.email, '/portal');
@@ -408,7 +410,7 @@ test.describe('color del panel sin JavaScript', () => {
 test('portal del cliente: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
   const f = await fixtures();
   await login(page, f.email, '/portal');
-  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos'], isMobile);
+  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas'], isMobile);
 });
 
 test('cabeceras de seguridad en la web pública y en el área privada', async () => {

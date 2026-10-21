@@ -59,6 +59,21 @@ Cada taller lo cambia en **Panel → Avisos → Qué se avisa** (solo propietari
   - el taller no está suspendido.
 - **Contenido:** vehículo, número de orden, explicación del estado y el «mensaje para el cliente» si lo hay. Nunca notas internas, diagnosis no autorizada ni datos del personal.
 
+### Avisos de gestión (plantilla `aviso_v1`)
+
+Además de los cambios de estado, la base de datos crea avisos con `private.enqueue_notice(...)` (portal + email y/o WhatsApp según lo que haya elegido el cliente y tenga activo el taller):
+
+| Evento | Cuándo |
+| --- | --- |
+| `presupuesto_enviado` | El taller envía un presupuesto (enlace a `/portal/presupuestos/<id>`) |
+| `recordatorio_presupuesto` | Presupuesto sin respuesta tras los días configurados |
+| `recordatorio_recogida` | Vehículo listo y sin recoger tras los días configurados |
+| `recordatorio_revision` | Próxima revisión cerca (fecha o km), **solo si el cliente lo pidió** en «Mis datos» |
+
+- Cada aviso lleva `link_path` (solo rutas `/portal/…`; lo impone la base de datos) y una clave `dedupe_key` para no repetirse.
+- El email de `aviso_v1` enlaza a esa página del portal («Abrir mi portal»). En WhatsApp viaja en la misma plantilla aprobada (taller, título, detalle).
+- Los recordatorios se configuran en **Panel → Recordatorios** y nacen desactivados. Ver `docs/GESTION_TALLER.md`.
+
 ## 3. Base de datos (`20261023090000_notificaciones.sql`)
 
 | Tabla | Qué guarda | Quién la lee |

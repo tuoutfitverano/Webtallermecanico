@@ -13,6 +13,8 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Notificaciones (portal, email, reintentos, consentimiento): `docs/NOTIFICACIONES.md`
 - Integración de pantallas (inventario y flujos verificados): `docs/INTEGRACION.md`
 - Plantilla de webs de taller (configuración por taller, AutoValue): `docs/PLANTILLA_TALLERES.md`, `talleres/`, `docs/AUDITORIA_PLANTILLA.md`
+- Gestión del taller (roles, planificación, recordatorios, estadísticas): `docs/GESTION_TALLER.md`
+- Presupuestos, facturas y cobros (operativa, NO VERI*FACTU): `docs/FACTURACION.md`
 - Auditoría, despliegue y lanzamiento: `docs/AUDITORIA_FASE8.md`, `docs/DESPLIEGUE.md`, `docs/CHECKLIST_LANZAMIENTO.md`, `docs/DATOS_PERSONALES.md`
 
 ## Estructura
@@ -23,7 +25,9 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
-                          panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web), panel/taller (datos y servicios)
+                          panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web), panel/taller (datos, servicios y ajustes de facturación)
+                          panel/planificacion, panel/presupuestos/, panel/facturas/ (+ [id]/imprimir), panel/recordatorios, panel/estadisticas
+                          presupuesto/[token] (respuesta del cliente sin cuenta); portal/presupuestos/, portal/facturas/
                           api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend; whatsapp = Meta)
                           cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
@@ -48,7 +52,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/styles/app.css      Diseño premium del área privada (acceso, cuenta, panel, portal): Archivo, etiquetas con raya, botones en píldora
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
   e2e/                    Pruebas de navegador (Playwright Test)
-packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes, clientes y órdenes (workshop.ts)
+packages/core/            Reglas compartidas navegador/servidor: matrículas, vehículos, solicitudes, clientes y órdenes (workshop.ts), dinero (money.ts), documentos (documents.ts)
 talleres/                 Un .json por taller (identidad, textos, tema, secciones). autovalue.json = demo; plantilla.json = taller nuevo
 apps/web/public/plataforma/capturas/  Capturas REALES del software (compartidas por todos los talleres)
 supabase/migrations/      Esquema + permisos (RLS). Nunca edites una migración ya aplicada: crea otra.
@@ -126,7 +130,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - **Supabase Auth** con `@supabase/ssr`: sesión en cookies, un cliente NUEVO por petición (`createAuthClient`), usuario validado con `getClaims()`. **Nunca** `getSession()` en el servidor.
 - El área privada usa la **clave publicable + el token del usuario**: RLS decide. No uses la clave secreta para leer o escribir datos de usuarios.
 - Páginas con POST: `authPage(Astro)`; si `isPost && !form` → 403 (origen distinto). Redirecciones solo con `safeNext()`.
-- Roles del taller: `propietario` (owner), `administrador` (manager), `mecanico` (mechanic). Los privilegios **nunca** se leen de `user_metadata` ni del perfil.
+- Roles del taller: `propietario` (owner), `administrador` (manager), `recepcionista` (oficina: órdenes, presupuestos, facturas y cobros; no equipo ni configuración), `mecanico` (mechanic). En SQL: `staff_workshop_ids` (todos), `office_workshop_ids` (propietario, administrador, recepción; `can_manage()` = oficina), `manager_workshop_ids` (propietario y administrador: equipo, ajustes, rectificativas, anular cobros). En la web: `panel.isOffice` / `panel.isManager`. Los privilegios **nunca** se leen de `user_metadata` ni del perfil.
 - Equipo e invitaciones solo mediante funciones (`create_workshop_invitation`, `accept_workshop_invitation`, `set_member_role`, `set_member_active`, `workshop_team`, `my_workshops`). En SQL, compara roles con `IS NOT DISTINCT FROM` (con `=` un rol NULL deja pasar a cualquiera).
 - Alta de talleres: `private.create_workshop(...)` desde el SQL Editor; la API no la ve. Ver `docs/PUESTA_EN_MARCHA.md`.
 - Contraseñas: mínimo 10 con mayúsculas, minúsculas y números (igual en `validate.ts` y `supabase/config.toml`).
@@ -182,6 +186,17 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Mantenimiento periódico en `public.run_maintenance()` (lo llama `/api/notificaciones/procesar`). Derechos RGPD: `private.export_customer_data` y `private.anonymize_customer` (solo SQL Editor). Ver `docs/DATOS_PERSONALES.md`.
 - Los nombres accesibles de botones y enlaces deben contener el texto visible (WCAG 2.5.3).
 - Nada de desplegar, aplicar migraciones en producción ni contratar servicios sin confirmación expresa (`docs/DESPLIEGUE.md`).
+
+## Gestión: presupuestos, facturas, planificación, recordatorios
+
+- Dinero en **céntimos enteros**; cantidades con 2 decimales. Línea = round(q × precio × (100 − dto)/100); IVA por tipo, redondeado una vez por tipo. La misma regla en `packages/core/src/money.ts` y en SQL (`private.line_base_cents`, `private.lines_totals`): si cambias una, cambia la otra (hay prueba de paridad).
+- Presupuestos: borrador editable; enviado = inmutable (cambios → `revise_quote`, versión nueva). Estados solo por funciones (`send_quote`, `record_quote_decision`, `respond_quote_portal`, `respond_quote_by_token`…). Enlace público: 256 bits, solo se guarda la huella, un uso, caduca; `quote_by_token`/`respond_quote_by_token` solo con la clave secreta desde el servidor. La respuesta guarda una copia y su huella: **no** es firma electrónica.
+- Facturas: **operativas, NO certificadas VERI*FACTU**; nunca digas lo contrario. Numeración sin huecos por serie y año (`issue_invoice`), datos congelados al emitir, `invoice_records` encadenado e inmutable. Emitida = no se cambia ni se borra (rectificativa). Cobros: nunca más del total; se anulan con motivo, no se borran. Sin pagos en línea ni datos de tarjeta.
+- Las operaciones de sistema usan la marca `app.quote_op` / `app.invoice_op` dentro de funciones `security definer`, comprobada con `private.quote_system_op()` / `private.invoice_system_op()` (que además exigen que el usuario actual no sea `authenticated` ni `anon`).
+- Fecha prevista de entrega (`due_at`) es interna: nunca al cliente. El fichaje (`start_work`/`stop_work`) usa la hora del servidor.
+- Avisos nuevos con `private.enqueue_notice(...)` (plantilla `aviso_v1`, `link_path` solo `/portal/…`, `dedupe_key`). Recordatorios en `private.generate_reminders()` dentro de `run_maintenance`; los de revisión solo si el cliente lo pidió (`set_service_reminders` desde el portal).
+- Estadísticas solo con datos reales (`workshop_stats`, `security invoker`). Nunca números de ejemplo en producción.
+- Enlaces `wa.me` (`whatsappLink`) solo PREPARAN el mensaje: nunca se registran como enviados.
 
 ## Formularios y solicitudes (Fase 2)
 
