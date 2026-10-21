@@ -71,7 +71,7 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await page.goto('/panel/taller');
     await page.getByLabel(/Razón social/).fill('Talleres Demo E2E SL');
     await page.getByLabel(/NIF \/ CIF/).fill('B12345678');
-    await page.getByLabel(/^Dirección/).fill('Calle de Prueba 1');
+    await page.getByLabel(/^Dirección \(sale/).fill('Calle de Prueba 1');
     await page.getByLabel('Código postal').fill('28001');
     await page.getByLabel('Localidad').fill('Madrid');
     await page.getByRole('button', { name: 'Guardar datos' }).click();

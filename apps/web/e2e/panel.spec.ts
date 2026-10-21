@@ -217,7 +217,7 @@ test.describe('Panel · propietaria', () => {
     await page.getByRole('button', { name: 'Listo para recoger' }).click();
     await expect(page.getByRole('status')).toContainText('Estado actualizado.');
     await page.getByRole('button', { name: 'Entregado' }).click();
-    await expect(page.locator('.facts')).toContainText('Entregada');
+    await expect(page.locator('.facts', { hasText: 'Entregada' })).toBeVisible();
   });
 
   test('borrado con confirmación integrada y protección del historial', async ({ page }) => {
@@ -303,7 +303,7 @@ test.describe('Panel · mecánico', () => {
     await page.goto(other.orderUrl);
     await expect(page.getByText('Orden no encontrada.')).toBeVisible();
     await page.goto('/panel/ordenes/nueva');
-    await expect(page.getByText('Solo el propietario o un administrador puede crear órdenes.')).toBeVisible();
+    await expect(page.getByText('Solo la oficina del taller (propietario, administrador o recepción) crea órdenes.')).toBeVisible();
 
     // Forzando la petición: el servidor y la base de datos lo impiden.
     const forced = await page.evaluate(async url => {

@@ -180,7 +180,7 @@ test('modo claro y oscuro: cambia al momento, se recuerda y cada zona tiene el s
   await expect(html).toHaveAttribute('data-theme', 'claro');
   await page.getByRole('button', { name: 'Modo oscuro' }).click();
   await expect(html).toHaveAttribute('data-theme', 'oscuro');
-  await page.getByRole('link', { name: 'Órdenes' }).first().click();
+  await page.getByRole('link', { name: 'Órdenes', exact: true }).first().click();
   await page.waitForURL(/\/panel\/ordenes$/);
   await expect(html).toHaveAttribute('data-theme', 'oscuro');
   // Portal del cliente y acceso: también claro si no se ha elegido.
@@ -262,7 +262,7 @@ test.describe('aviso de cookies', () => {
     await page.getByRole('region', { name: 'Cookies' }).getByRole('button', { name: 'Rechazar' }).click();
     await page.getByRole('button', { name: 'Modo oscuro' }).click();
     await expect(html).toHaveAttribute('data-theme', 'oscuro');
-    await page.getByRole('link', { name: 'Órdenes' }).first().click();
+    await page.getByRole('link', { name: 'Órdenes', exact: true }).first().click();
     await page.waitForURL(/\/panel\/ordenes$/);
     await expect(html).toHaveAttribute('data-theme', 'oscuro');
     await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);

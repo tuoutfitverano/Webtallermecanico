@@ -337,7 +337,7 @@ test.describe('Portal · permisos en la base de datos', () => {
 
     await login(page, 'mecanico@e2e.test', `/panel/clientes/${job.customerId}`);
     const access = page.getByRole('region', { name: 'Acceso al portal del cliente' });
-    await expect(access).toContainText('Las invitaciones al portal las envía el propietario o un administrador.');
+    await expect(access).toContainText('Las invitaciones al portal las envía la oficina del taller (propietario, administrador o recepción).');
     await expect(access.getByRole('button')).toHaveCount(0);
   });
 });

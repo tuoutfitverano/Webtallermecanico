@@ -145,13 +145,15 @@ create_user mecanico@e2e.test "Marcos Mecánico"
 create_user otro@e2e.test "Óscar Otro Taller"
 create_user gestora@e2e.test "Gloria Gestora"
 create_user temporal@e2e.test "Tomás Temporal"
+create_user recepcion@e2e.test "Raquel Recepción"
 "${PSQL[@]}" -d "$DB" >/dev/null <<'SQL'
--- Taller demo: propietaria y mecánico. Otro taller con sus propios datos.
+-- Taller demo: propietaria, administradora, recepción y mecánicos. Otro taller con sus propios datos.
 select private.add_workshop_owner('d0000000-0000-0000-0000-000000000001', 'propietaria@e2e.test');
 insert into public.workshop_members (workshop_id, user_id, role)
   select 'd0000000-0000-0000-0000-000000000001', id,
-         case email when 'gestora@e2e.test' then 'administrador'::public.member_role else 'mecanico'::public.member_role end
-  from auth.users where email in ('mecanico@e2e.test', 'gestora@e2e.test', 'temporal@e2e.test');
+         case email when 'gestora@e2e.test' then 'administrador'::public.member_role
+                    when 'recepcion@e2e.test' then 'recepcionista'::public.member_role else 'mecanico'::public.member_role end
+  from auth.users where email in ('mecanico@e2e.test', 'gestora@e2e.test', 'temporal@e2e.test', 'recepcion@e2e.test');
 select private.create_workshop('taller-otro', 'Taller Otro', 'otro@e2e.test');
 insert into public.vehicles (workshop_id, plate, make, model, year, year_kind)
   select id, '9999ZZZ', 'Renault', 'Clio', 2015, 'fabricacion' from public.workshops where slug = 'taller-otro';

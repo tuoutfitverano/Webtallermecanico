@@ -183,7 +183,7 @@ const address = (p: Party | null) => p ? [p.address, [p.postal_code, p.city].fil
             {invoice.repair_orders && <> · <a href={`/panel/ordenes/${invoice.repair_orders.id}`}>{orderLabel(invoice.repair_orders.number)}</a></>}
           </p>
         </div>
-        {invoice.status === 'emitida' && <div class="pnl-actions"><a class="btn" href={`/panel/facturas/${invoice.id}/imprimir`}><Icon name="printer" />Imprimir o guardar PDF</a></div>}
+        {invoice.status === 'emitida' && <div class="pnl-actions"><a class="btn" href={`/panel/facturas/${invoice.id}/imprimir`} data-astro-reload><Icon name="printer" />Imprimir o guardar PDF</a></div>}
       </header>
       <Flash kind={flash.kind} text={flash.text} />
       {invoice.kind === 'rectificativa' && <div class="explain" style="margin-bottom:16px"><strong>Rectifica otra factura</strong><p>Motivo: {invoice.rectification_reason} · <a href={`/panel/facturas/${invoice.rectifies_id}`}>Ver la factura original</a></p></div>}

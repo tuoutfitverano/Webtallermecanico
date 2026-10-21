@@ -40,7 +40,8 @@ interface Quote {
   vehicles: { id: string; plate: string; make: string; model: string } | null;
   repair_orders: { id: string; number: number } | null;
 }
-const SELECT = 'id, number, version, status, title, notes, internal_notes, valid_until, conditions, subtotal_cents, tax_cents, total_cents, taxes, sent_at, responded_at, response_source, response_name, response_comment, snapshot_hash, token_expires_at, created_at, order_id, customers(id, full_name, phone, email, user_id), vehicles(id, plate, make, model), repair_orders(id, number)';
+// La orden se elige por su clave: entre presupuestos y órdenes hay dos relaciones (order_id y approved_quote_id).
+const SELECT = 'id, number, version, status, title, notes, internal_notes, valid_until, conditions, subtotal_cents, tax_cents, total_cents, taxes, sent_at, responded_at, response_source, response_name, response_comment, snapshot_hash, token_expires_at, created_at, order_id, customers(id, full_name, phone, email, user_id), vehicles(id, plate, make, model), repair_orders!quotes_order_id_workshop_id_fkey(id, number)';
 const ctx = panel;
 async function load() {
   if (!ctx.workshop || !ctx.isOffice || !isUuid(id)) return null;

@@ -36,7 +36,7 @@ const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
   </head>
   <body>
     <nav class="tools" aria-label="Acciones">
-      <a href={back}>← Volver</a>
+      <a href={back} data-astro-reload>← Volver</a>
       <button type="button" id="imprimir">Imprimir o guardar en PDF</button>
     </nav>
     <main class="doc">
