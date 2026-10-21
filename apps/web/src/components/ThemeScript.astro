@@ -2,8 +2,9 @@
 /**
  * En la cabecera de cada plantilla, antes de pintar: aplica el modo guardado y
  * la respuesta al aviso de cookies (oculta el aviso si ya se respondió). Si hay
- * cookie, manda ella (es lo que ha pintado el servidor); sin cookie, localStorage
- * (vista previa sin servidor). Un valor desconocido no cambia nada.
+ * cookie, manda ella (es lo que ha pintado el servidor); sin cookie, lo de esta
+ * visita (sessionStorage) o, con cookies aceptadas, localStorage (vista previa
+ * sin servidor). Un valor desconocido no cambia nada.
  */
 import { THEMES } from '../lib/theme.ts';
 import { CONSENTS } from '../lib/consent.ts';
@@ -11,11 +12,17 @@ import { CONSENTS } from '../lib/consent.ts';
 <script define:vars={{ themes: THEMES, consents: CONSENTS }}>
   const root = document.documentElement;
   const read = f => { try { return f(); } catch { return null; } };
-  const stored = name => read(() => new RegExp('(?:^|;\\s*)' + name + '=([^;]*)').exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem(name));
+  const fromCookie = name => read(() => new RegExp('(?:^|;\\s*)' + name + '=([^;]*)').exec(document.cookie)?.[1]);
+  const consent = () => fromCookie('consentimiento') ?? read(() => localStorage.getItem('consentimiento'));
+  // Preferencia: cookie; si no, la de esta visita (sessionStorage); si no y se aceptaron
+  // las cookies, la guardada en el dispositivo (localStorage). Un valor viejo guardado
+  // sin consentimiento no se impone a lo elegido.
+  const preference = name => fromCookie(name) ?? read(() => sessionStorage.getItem(name))
+    ?? (consent() === 'aceptadas' ? read(() => localStorage.getItem(name)) : null);
   const apply = () => {
-    const t = stored('tema');
+    const t = preference('tema');
     if (t && themes.includes(t)) root.dataset.theme = t;
-    const c = stored('consentimiento');
+    const c = consent();
     if (c && consents.includes(c)) root.dataset.cookies = c;
   };
   apply();

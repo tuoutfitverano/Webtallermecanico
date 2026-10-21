@@ -71,10 +71,11 @@ const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
     <!-- Color elegido: también en localStorage (vista previa sin servidor o sin cookies). -->
     <script define:vars={{ ids: PANEL_COLORS.map(c => c.id) }}>
       // Si hay cookie, manda ella (es lo que ha pintado el servidor), sea válida o no;
-      // sin cookie, localStorage. Solo se aceptan colores de la lista: si no, el predeterminado.
+      // sin cookie, lo de esta visita o (con cookies aceptadas) localStorage. Solo se aceptan colores de la lista: si no, el predeterminado.
       const read = f => { try { return f(); } catch { return null; } };
       const apply = () => {
-        const c = read(() => /(?:^|;\s*)color_panel=([^;]*)/.exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem('color_panel'));
+        const c = read(() => /(?:^|;\s*)color_panel=([^;]*)/.exec(document.cookie)?.[1]) ?? read(() => sessionStorage.getItem('color_panel'))
+          ?? (document.documentElement.dataset.cookies === 'aceptadas' ? read(() => localStorage.getItem('color_panel')) : null);
         if (c && ids.includes(c)) document.documentElement.dataset.color = c;
       };
       apply();

@@ -30,10 +30,10 @@ insert into public.customers (id, workshop_id, full_name, phone, user_id, intern
   ('c2000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'Cliente Dos (A)', '600000002', '00000000-0000-0000-0000-0000000000c2', null),
   ('c1000000-0000-0000-0000-00000000000b', 'bbbbbbbb-0000-0000-0000-000000000000', 'Cliente Uno (B)', '600000001', '00000000-0000-0000-0000-0000000000c1', null);
 
-insert into public.vehicles (id, workshop_id, customer_id, plate, make, model, fuel, internal_notes) values
-  ('7e000001-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-00000000000a', '1950 bxf', 'Volkswagen', 'Golf', 'gasolina', 'Nota interna secreta'),
-  ('7e000002-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c2000000-0000-0000-0000-00000000000a', '1234-KLM', 'Seat', 'León', 'diesel', null),
-  ('7e000001-0000-0000-0000-00000000000b', 'bbbbbbbb-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-00000000000b', '5678BCD', 'Toyota', 'Corolla', 'hibrido', null);
+insert into public.vehicles (id, workshop_id, customer_id, plate, make, model, year, year_kind, fuel, internal_notes) values
+  ('7e000001-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-00000000000a', '1950 bxf', 'Volkswagen', 'Golf', 2015, 'fabricacion', 'gasolina', 'Nota interna secreta'),
+  ('7e000002-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c2000000-0000-0000-0000-00000000000a', '1234-KLM', 'Seat', 'León', 2015, 'fabricacion', 'diesel', null),
+  ('7e000001-0000-0000-0000-00000000000b', 'bbbbbbbb-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-00000000000b', '5678BCD', 'Toyota', 'Corolla', 2015, 'fabricacion', 'hibrido', null);
 
 insert into public.workshop_sites (workshop_id, published, is_demo_content, content) values
   ('aaaaaaaa-0000-0000-0000-000000000000', true, true, '{"tagline":"Demo"}'),

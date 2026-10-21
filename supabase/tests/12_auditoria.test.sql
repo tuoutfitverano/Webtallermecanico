@@ -85,8 +85,8 @@ values ('c9000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-0000000
 update public.customers set created_by = '00000000-0000-0000-0000-0000000000a1', created_at = '2000-01-01', marketing_consent = true,
        privacy_consent_at = now()
  where id = 'c9000000-0000-0000-0000-00000000000a';
-insert into public.vehicles (id, workshop_id, plate, make, model, created_by, created_at)
-values ('7e000009-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', '9090BCD', 'Kia', 'Rio', '00000000-0000-0000-0000-0000000000a1', '2000-01-01');
+insert into public.vehicles (id, workshop_id, plate, make, model, year, year_kind, created_by, created_at)
+values ('7e000009-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', '9090BCD', 'Kia', 'Rio', 2015, 'fabricacion', '00000000-0000-0000-0000-0000000000a1', '2000-01-01');
 reset role;
 select tests.eq((select created_by::text || '|' || (created_at > now() - interval '1 minute') || '|' || marketing_consent || '|' || coalesce(privacy_consent_at::text, '-')
                  from public.customers where id = 'c9000000-0000-0000-0000-00000000000a'),

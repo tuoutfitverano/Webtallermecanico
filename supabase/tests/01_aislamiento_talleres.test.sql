@@ -10,13 +10,13 @@ select tests.eq((select count(*) from public.customers), 2::bigint, 'A ve solo s
 select tests.eq((select count(*) from public.workshops), 1::bigint, 'A ve solo su taller');
 select tests.eq((select count(*) from public.web_requests), 1::bigint, 'A ve solo sus solicitudes');
 select tests.eq((select count(*) from public.vehicles where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000'), 0::bigint, 'A no ve vehículos de B ni filtrando por su id');
-select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model) values ('bbbbbbbb-0000-0000-0000-000000000000', '9999BBB', 'Ford', 'Focus')$$,
+select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, year, year_kind) values ('bbbbbbbb-0000-0000-0000-000000000000', '9999BBB', 'Ford', 'Focus', 2015, 'fabricacion')$$,
   'A no puede crear vehículos en B', '%row-level security%');
 select tests.eq(tests.affected($$update public.vehicles set model = 'Hackeado' where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000'$$), 0::bigint, 'A no puede modificar vehículos de B');
 select tests.eq(tests.affected($$delete from public.customers where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000'$$), 0::bigint, 'A no puede borrar clientes de B');
 select tests.throws($$update public.vehicles set workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000' where plate = '1950BXF'$$,
   'A no puede mover un vehículo a otro taller');
-select tests.throws($$insert into public.vehicles (workshop_id, customer_id, plate, make, model) values ('aaaaaaaa-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-00000000000b', '4444CCC', 'Kia', 'Ceed')$$,
+select tests.throws($$insert into public.vehicles (workshop_id, customer_id, plate, make, model, year, year_kind) values ('aaaaaaaa-0000-0000-0000-000000000000', 'c1000000-0000-0000-0000-00000000000b', '4444CCC', 'Kia', 'Ceed', 2015, 'fabricacion')$$,
   'A no puede asignar a su vehículo un cliente de B', '%foreign key%');
 reset role;
 

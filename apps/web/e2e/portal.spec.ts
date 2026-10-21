@@ -94,7 +94,7 @@ async function setupCustomer(opts: { link?: boolean; name?: string } = {}) {
   const c = await api('/customers', owner.token, 'POST', { workshop_id: DEMO, full_name: name, email });
   expect(c.status, JSON.stringify(c.json)).toBe(201);
   const customerId = rows(c)[0]!.id as string;
-  const v = await api('/vehicles', owner.token, 'POST', { workshop_id: DEMO, customer_id: customerId, plate: plate.normalized, make: 'Seat', model: 'León' });
+  const v = await api('/vehicles', owner.token, 'POST', { workshop_id: DEMO, customer_id: customerId, plate: plate.normalized, make: 'Seat', model: 'León', year: 2015, year_kind: 'fabricacion' });
   expect(v.status, JSON.stringify(v.json)).toBe(201);
   const vehicleId = rows(v)[0]!.id as string;
   const o = await api('/repair_orders', owner.token, 'POST', {

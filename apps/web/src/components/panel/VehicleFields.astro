@@ -19,6 +19,7 @@ interface Props {
 const { values, errors = {}, customers, askPlateConfirmation = false, lookup } = Astro.props;
 const err = (k: string) => errors[k];
 ---
+<p class="hint">Matrícula, marca, modelo y año son obligatorios; lo demás es opcional.</p>
 <div class="form-row">
   <div class={`field ${err('plate') ? 'has-error' : ''}`}>
     <label for="plate">Matrícula</label>
@@ -64,14 +65,14 @@ const err = (k: string) => errors[k];
 </div>
 <div class="form-row">
   <div class={`field ${err('year') ? 'has-error' : ''}`}>
-    <label for="year">Año <span class="muted">(opcional: déjalo vacío si no se sabe)</span></label>
-    <input class="input" id="year" name="year" inputmode="numeric" maxlength="4" autocomplete="off" value={values.year ?? ''} aria-invalid={err('year') ? 'true' : undefined} />
+    <label for="year">Año</label>
+    <input class="input" id="year" name="year" required inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Ej.: 2019" value={values.year ?? ''} aria-invalid={err('year') ? 'true' : undefined} />
     {err('year') && <p class="field-error">{err('year')}</p>}
   </div>
   <div class={`field ${err('yearKind') ? 'has-error' : ''}`}>
     <label for="year_kind">Ese año es de…</label>
-    <select class="select" id="year_kind" name="year_kind">
-      <option value="">—</option>
+    <select class="select" id="year_kind" name="year_kind" required>
+      <option value="">Elige…</option>
       {YEAR_KINDS.map(k => <option value={k} selected={k === values.year_kind}>{YEAR_KIND_LABELS[k]}</option>)}
     </select>
     {err('yearKind') && <p class="field-error">{err('yearKind')}</p>}

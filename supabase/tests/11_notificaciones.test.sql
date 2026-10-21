@@ -78,9 +78,9 @@ select tests.eq((select count(*) from public.notifications where order_id = curr
 insert into public.customers (id, workshop_id, full_name, email) values
   ('c3000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'Cliente sin portal', 'tres@correo.test'),
   ('c4000000-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'Cliente sin correo', null);
-insert into public.vehicles (id, workshop_id, customer_id, plate, make, model) values
-  ('7e000003-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c3000000-0000-0000-0000-00000000000a', '3333CCC', 'Kia', 'Ceed'),
-  ('7e000004-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c4000000-0000-0000-0000-00000000000a', '4444CCC', 'Kia', 'Rio');
+insert into public.vehicles (id, workshop_id, customer_id, plate, make, model, year, year_kind) values
+  ('7e000003-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c3000000-0000-0000-0000-00000000000a', '3333CCC', 'Kia', 'Ceed', 2015, 'fabricacion'),
+  ('7e000004-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000000', 'c4000000-0000-0000-0000-00000000000a', '4444CCC', 'Kia', 'Rio', 2015, 'fabricacion');
 select tests.login('00000000-0000-0000-0000-0000000000a1');
 set local role authenticated;
 insert into public.repair_orders (workshop_id, vehicle_id, customer_id, problem_description) values

@@ -153,8 +153,8 @@ insert into public.workshop_members (workshop_id, user_id, role)
          case email when 'gestora@e2e.test' then 'administrador'::public.member_role else 'mecanico'::public.member_role end
   from auth.users where email in ('mecanico@e2e.test', 'gestora@e2e.test', 'temporal@e2e.test');
 select private.create_workshop('taller-otro', 'Taller Otro', 'otro@e2e.test');
-insert into public.vehicles (workshop_id, plate, make, model)
-  select id, '9999ZZZ', 'Renault', 'Clio' from public.workshops where slug = 'taller-otro';
+insert into public.vehicles (workshop_id, plate, make, model, year, year_kind)
+  select id, '9999ZZZ', 'Renault', 'Clio', 2015, 'fabricacion' from public.workshops where slug = 'taller-otro';
 SQL
 
 # --- Web Astro con las claves de prueba ---

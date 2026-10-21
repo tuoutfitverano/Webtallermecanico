@@ -97,6 +97,8 @@ export const vehicleInputSchema = z
     const check = checkPlate(v.plate, { allowNonStandard: v.confirmNonStandardPlate });
     if (!check.ok) ctx.addIssue({ code: 'custom', path: ['plate'], message: check.error });
 
+    // Matrícula, marca, modelo y año son obligatorios (el año, con su tipo).
+    if (v.year === null) ctx.addIssue({ code: 'custom', path: ['year'], message: 'Indica el año del vehículo.' });
     if (v.year !== null && v.year > maxVehicleYear()) {
       ctx.addIssue({ code: 'custom', path: ['year'], message: `El año no puede ser posterior a ${maxVehicleYear()}.` });
     }

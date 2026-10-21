@@ -2,8 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { maxVehicleYear, validateVehicle } from './vehicles.ts';
 
 describe('validateVehicle', () => {
-  it('acepta el vehículo de demostración sin inventar el año', () => {
-    const r = validateVehicle({ plate: '1950 bxf', make: ' Volkswagen ', model: 'Golf', fuel: 'gasolina', year: null });
+  it('matrícula, marca, modelo y año son obligatorios', () => {
+    const r = validateVehicle({ plate: '', make: '', model: '', year: null });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors.plate).toBeDefined();
+      expect(r.errors.make).toBe('Indica la marca.');
+      expect(r.errors.model).toBe('Indica el modelo.');
+      expect(r.errors.year).toBe('Indica el año del vehículo.');
+    }
+  });
+
+  it('normaliza un vehículo completo', () => {
+    const r = validateVehicle({ plate: '1950 bxf', make: ' Volkswagen ', model: 'Golf', fuel: 'gasolina', year: 2018, yearKind: 'primera_matriculacion' });
     expect(r).toEqual({
       ok: true,
       data: {
@@ -11,8 +22,8 @@ describe('validateVehicle', () => {
         plateKind: 'actual',
         make: 'Volkswagen',
         model: 'Golf',
-        year: null,
-        yearKind: null,
+        year: 2018,
+        yearKind: 'primera_matriculacion',
         fuel: 'gasolina',
         customerId: null,
         internalNotes: null,
@@ -21,7 +32,7 @@ describe('validateVehicle', () => {
   });
 
   it('no deja fijar el origen de datos ni la verificación desde el formulario', () => {
-    const r = validateVehicle({ plate: '1950BXF', make: 'VW', model: 'Golf', dataSource: 'proveedor_externo', verificationStatus: 'verificado' });
+    const r = validateVehicle({ plate: '1950BXF', make: 'VW', model: 'Golf', year: 2015, yearKind: 'fabricacion', dataSource: 'proveedor_externo', verificationStatus: 'verificado' });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.data).not.toHaveProperty('dataSource');
@@ -42,7 +53,7 @@ describe('validateVehicle', () => {
     const r = validateVehicle({ plate: 'WOB12345', make: 'BMW', model: 'X1' });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.plate).toMatch(/confirma/);
-    const ok = validateVehicle({ plate: 'WOB12345', make: 'BMW', model: 'X1', confirmNonStandardPlate: true });
+    const ok = validateVehicle({ plate: 'WOB12345', make: 'BMW', model: 'X1', confirmNonStandardPlate: true, year: 2012, yearKind: 'fabricacion' });
     expect(ok.ok && ok.data.plateKind).toBe('no_reconocida');
   });
 

@@ -3,8 +3,9 @@
  * los botones de modo y de color:
  *  · «cookies»: acepta o rechaza las cookies de preferencias (cookie técnica
  *    «consentimiento»). Al rechazar se borran las preferencias guardadas.
- *  · «tema» y «color»: el modo claro u oscuro y el color del panel; solo se
- *    guardan si las cookies de preferencias están aceptadas.
+ *  · «tema» y «color»: el modo claro u oscuro y el color del panel; con las
+ *    cookies de preferencias aceptadas se guardan 1 año; si no, solo durante
+ *    la visita (cookie de sesión).
  */
 import type { APIRoute } from 'astro';
 import { PANEL_COLOR_COOKIE, isPanelColor } from '../../lib/panel/colors.ts';
@@ -28,8 +29,10 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
     if (answer === 'rechazadas') for (const name of PREFERENCE_COOKIES) cookies.delete(name, { path: '/' });
   }
   const accepted = (answer ?? consentFrom(cookies.get(CONSENT_COOKIE)?.value)) === 'aceptadas';
-  if (accepted && isPanelColor(color)) cookies.set(PANEL_COLOR_COOKIE, color, options);
-  if (accepted && isTheme(theme)) cookies.set(THEME_COOKIE, theme, options);
+  // Con las cookies de preferencias aceptadas, 1 año; si no, solo esta visita (cookie de sesión).
+  const keep = accepted ? options : { ...options, maxAge: undefined };
+  if (isPanelColor(color)) cookies.set(PANEL_COLOR_COOKIE, color, keep);
+  if (isTheme(theme)) cookies.set(THEME_COOKIE, theme, keep);
   return new Response(null, { status: 303, headers: { location: next, 'cache-control': 'no-store' } });
 };
 

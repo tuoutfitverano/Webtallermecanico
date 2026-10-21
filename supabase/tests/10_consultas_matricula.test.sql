@@ -92,19 +92,19 @@ set local role authenticated;
 select tests.eq((select count(*) from public.vehicle_lookups), 0::bigint, 'otro taller no ve las consultas de A');
 select tests.eq((select state from public.start_vehicle_lookup('bbbbbbbb-0000-0000-0000-000000000000', '5776CNS', 'openapi', gen_random_uuid())),
   'nueva', 'otro taller NO reutiliza la respuesta de A (no se comparten datos entre talleres)');
-select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, lookup_id)
-  values ('bbbbbbbb-0000-0000-0000-000000000000', '5776CNS', 'AUDI', 'A3', current_setting('tests.l1')::uuid)$$,
+select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, year, year_kind, lookup_id)
+  values ('bbbbbbbb-0000-0000-0000-000000000000', '5776CNS', 'AUDI', 'A3', 2003, 'primera_matriculacion', current_setting('tests.l1')::uuid)$$,
   'otro taller no puede usar la consulta de A para su vehículo (lo frena el disparador; detrás está la clave foránea)', '%no corresponde%');
 reset role;
 
 -- ===================== Guardar el vehículo con los datos revisados =====================
 select tests.login('00000000-0000-0000-0000-0000000000a2');
 set local role authenticated;
-select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, lookup_id)
-  values ('aaaaaaaa-0000-0000-0000-000000000000', '1111BBB', 'AUDI', 'A3', current_setting('tests.l1')::uuid)$$,
+select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, year, year_kind, lookup_id)
+  values ('aaaaaaaa-0000-0000-0000-000000000000', '1111BBB', 'AUDI', 'A3', 2003, 'primera_matriculacion', current_setting('tests.l1')::uuid)$$,
   'la consulta tiene que ser de la misma matrícula', '%no corresponde%');
-select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, data_source)
-  values ('aaaaaaaa-0000-0000-0000-000000000000', '2222BBB', 'AUDI', 'A3', 'proveedor_externo')$$,
+select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, year, year_kind, data_source)
+  values ('aaaaaaaa-0000-0000-0000-000000000000', '2222BBB', 'AUDI', 'A3', 2003, 'primera_matriculacion', 'proveedor_externo')$$,
   'nadie se inventa el origen "proveedor externo" sin consulta', '%solo lo asigna el sistema%');
 with x as (
   insert into public.vehicles (workshop_id, plate, make, model, year, year_kind, fuel, lookup_id, lookup_fields)
@@ -129,9 +129,9 @@ select tests.eq((select lookup_fields -> 'model' ->> 'value' from public.vehicle
 update public.vehicles set make = 'Seat' where id = current_setting('tests.v1')::uuid;
 select tests.eq((select (lookup_fields -> 'make' ->> 'state') || '|' || data_source::text from public.vehicles where id = current_setting('tests.v1')::uuid),
   'modificado|proveedor_externo', 'editar un dato a mano lo marca como modificado');
-update public.vehicles set year = null, year_kind = null where id = current_setting('tests.v1')::uuid;
+update public.vehicles set year = 2004 where id = current_setting('tests.v1')::uuid;
 select tests.eq((select data_source::text from public.vehicles where id = current_setting('tests.v1')::uuid), 'manual',
-  'si ya no queda ningún dato del proveedor, el origen pasa a "manual"');
+  'si ya no queda ningún dato confirmado del proveedor, el origen pasa a "manual"');
 update public.vehicles set plate = '9876BCD' where id = current_setting('tests.v1')::uuid;
 select tests.eq((select coalesce(lookup_id::text, 'sin consulta') || '|' || data_source::text from public.vehicles where id = current_setting('tests.v1')::uuid),
   'sin consulta|manual', 'cambiar la matrícula desvincula la consulta');
@@ -147,8 +147,8 @@ select tests.eq((select data_source::text || '|' || coalesce(lookup_id::text, '-
 update public.vehicle_lookups set completed_at = now() - interval '2 days' where id = current_setting('tests.l1')::uuid;
 select tests.login('00000000-0000-0000-0000-0000000000a1');
 set local role authenticated;
-select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, lookup_id)
-  values ('aaaaaaaa-0000-0000-0000-000000000000', '5776CNS', 'AUDI', 'A3', current_setting('tests.l1')::uuid)$$,
+select tests.throws($$insert into public.vehicles (workshop_id, plate, make, model, year, year_kind, lookup_id)
+  values ('aaaaaaaa-0000-0000-0000-000000000000', '5776CNS', 'AUDI', 'A3', 2003, 'primera_matriculacion', current_setting('tests.l1')::uuid)$$,
   'una consulta de hace más de 24 h no se usa', '%caducado%');
 select tests.eq((select state from public.start_vehicle_lookup('aaaaaaaa-0000-0000-0000-000000000000', '5776CNS', 'openapi', gen_random_uuid())),
   'nueva', 'pasadas 24 h se vuelve a consultar');

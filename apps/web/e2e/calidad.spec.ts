@@ -46,7 +46,7 @@ async function fixtures() {
   await post('/rpc/accept_customer_invitation', await token(email), { p_token: inv!.token });
   const letters = 'BCDFGHJKLMNPRSTVWXYZ';
   const plate = `${Math.floor(1000 + Math.random() * 9000)}${Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * 20)]).join('')}`;
-  const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate, make: 'Seat', model: 'Ibiza' });
+  const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate, make: 'Seat', model: 'Ibiza', year: 2015, year_kind: 'fabricacion' });
   const [o] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v!.id, customer_id: c!.id, problem_description: 'Revisión general' });
   ids = { customer: c!.id!, order: o!.id!, email };
   return ids;
@@ -172,7 +172,7 @@ test('modo claro y oscuro: cambia al momento, se recuerda y cada zona tiene el s
   await page.reload();
   await expect(html).toHaveAttribute('data-theme', 'oscuro');
   // Panel del taller: claro si no se ha elegido; la elección se mantiene al navegar por el panel.
-  const forget = async () => { await page.evaluate(() => localStorage.clear()); await context.clearCookies(); await acceptCookies(context); };
+  const forget = async () => { await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }); await context.clearCookies(); await acceptCookies(context); };
   await forget();
   await login(page, 'propietaria@e2e.test', '/panel');
   await expect(html).toHaveAttribute('data-theme', 'claro');
@@ -207,18 +207,20 @@ test.describe('aviso de cookies', () => {
       const axe = await new AxeBuilder({ page }).include('[data-cookie-bar]').withTags(['wcag2a', 'wcag2aa']).analyze();
       expect(axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id)).toEqual([]);
     }
-    // Sin responder, el modo cambia al momento pero no se guarda.
+    // Sin responder, el modo se mantiene durante la visita (cookie de sesión), pero no se guarda en el dispositivo.
+    const tema = async () => (await context.cookies()).find(c => c.name === 'tema');
     await page.getByRole('button', { name: 'Modo claro' }).first().click();
     await expect(html).toHaveAttribute('data-theme', 'claro');
-    expect(await cookie(context, 'tema')).toBeUndefined();
+    expect(await tema()).toMatchObject({ value: 'claro', expires: -1 });
+    expect(await page.evaluate(() => localStorage.getItem('tema'))).toBeNull();
     await page.reload();
-    await expect(html).toHaveAttribute('data-theme', 'oscuro');
-    // Aceptar: el aviso se va y lo elegido se guarda (también lo elegido antes de aceptar).
-    await page.getByRole('button', { name: 'Modo claro' }).first().click();
+    await expect(html).toHaveAttribute('data-theme', 'claro');
+    // Aceptar: el aviso se va y lo elegido en la visita (también en páginas anteriores) se guarda 1 año.
     await accept.click();
     await expect(bar).toBeHidden();
     expect(await cookie(context, 'consentimiento')).toBe('aceptadas');
-    expect(await cookie(context, 'tema')).toBe('claro');
+    expect((await tema())?.value).toBe('claro');
+    expect((await tema())!.expires).toBeGreaterThan(Date.now() / 1000 + 300 * 24 * 3600);
     await page.reload();
     await expect(html).toHaveAttribute('data-theme', 'claro');
     await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
@@ -229,11 +231,17 @@ test.describe('aviso de cookies', () => {
     await choice.getByRole('button', { name: 'Rechazar' }).click();
     await expect(choice).toContainText('Rechazadas');
     expect(await cookie(context, 'consentimiento')).toBe('rechazadas');
-    expect(await cookie(context, 'tema')).toBeUndefined();
+    // Se borra del dispositivo; lo elegido sigue solo hasta cerrar el navegador.
+    expect(await tema()).toMatchObject({ value: 'claro', expires: -1 });
     expect(await page.evaluate(() => localStorage.getItem('tema'))).toBeNull();
     await page.reload();
-    await expect(html).toHaveAttribute('data-theme', 'oscuro');
+    await expect(html).toHaveAttribute('data-theme', 'claro');
     await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
+    // Al cerrar el navegador (sin cookies de sesión), vuelve el modo de la zona.
+    await context.clearCookies({ name: 'tema' });
+    await page.evaluate(() => sessionStorage.clear());
+    await page.reload();
+    await expect(html).toHaveAttribute('data-theme', 'oscuro');
   });
 
   test('el aviso no tapa nada: en un móvil pequeño se puede pulsar «Entrar» sin responderlo', async ({ page }) => {
@@ -256,6 +264,29 @@ test.describe('aviso de cookies', () => {
     await page.waitForURL(/\/panel\/ordenes$/);
     await expect(html).toHaveAttribute('data-theme', 'oscuro');
     await expect(page.locator('[data-cookie-bar]')).toHaveCount(0);
+    // También al cargar cada sección de cero (lo pinta ya el servidor) y en «Mi cuenta».
+    for (const path of ['/panel/clientes', '/panel/equipo', '/panel', '/cuenta']) {
+      await page.goto(path);
+      await expect(html).toHaveAttribute('data-theme', 'oscuro');
+    }
+    // Y al volver a claro, claro en todas.
+    await page.goto('/panel');
+    await page.getByRole('button', { name: 'Modo claro' }).click();
+    for (const path of ['/panel/ordenes', '/panel/vehiculos', '/cuenta']) {
+      await page.goto(path);
+      await expect(html).toHaveAttribute('data-theme', 'claro');
+    }
+  });
+
+  test('sin responder al aviso, el modo elegido sigue en todas las secciones del panel', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test', '/panel');
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-theme', 'claro');
+    await page.getByRole('button', { name: 'Modo oscuro' }).click();
+    for (const path of ['/panel/ordenes', '/panel/clientes', '/panel/equipo', '/panel/avisos', '/cuenta', '/panel']) {
+      await page.goto(path);
+      await expect(html, path).toHaveAttribute('data-theme', 'oscuro');
+    }
   });
 });
 

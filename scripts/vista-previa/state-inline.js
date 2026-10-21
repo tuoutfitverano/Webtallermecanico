@@ -1,6 +1,6 @@
 /* global __COLORS__ -- lo sustituye build.py por la lista de colores de lib/panel/colors.ts */
 // Vista previa: aplica antes de pintar la elección que viene de la página anterior
-// (?vp=modo.color.cookies, window.name o localStorage). Ver state.ts.
+// (?vp=modo.color.cookies, window.name, sessionStorage o localStorage). Ver state.ts.
 (() => {
   const root = document.documentElement;
   const lists = { t: ['claro', 'oscuro'], c: __COLORS__, k: ['aceptadas', 'rechazadas'] };
@@ -14,10 +14,13 @@
   const read = f => { try { return f(); } catch { return null; } };
   const fromUrl = parse(read(() => new URLSearchParams(location.search).get('vp')));
   const fromName = parse(read(() => (window.name.startsWith('vp:') ? window.name.slice(3) : '')));
+  const fromVisit = parse(read(() => sessionStorage.getItem('vp')));
+  // Lo guardado en el dispositivo solo cuenta si se aceptaron las cookies.
   const fromStorage = parse(read(() => localStorage.getItem('vp')));
+  if (fromStorage.k !== 'aceptadas') for (const key of ['t', 'c']) delete fromStorage[key];
   const state = {};
   for (const key of ['t', 'c', 'k']) {
-    const v = fromUrl[key] ?? fromName[key] ?? fromStorage[key];
+    const v = fromUrl[key] ?? fromName[key] ?? fromVisit[key] ?? fromStorage[key];
     if (v) state[key] = v;
   }
   if (state.t) root.dataset.theme = state.t;

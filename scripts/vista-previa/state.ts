@@ -4,7 +4,8 @@
  *
  * En la app de Claude la vista previa puede no tener cookies ni localStorage
  * entre páginas, así que la elección viaja también en el propio enlace
- * (?vp=modo.color.cookies) y en window.name (dura lo que la pestaña). En la web
+ * (?vp=modo.color.cookies), en window.name y en sessionStorage (duran lo que la
+ * pestaña). En la web
  * desplegada no hace falta nada de esto: lo guarda el servidor (cookies).
  * Solo se guarda en localStorage si se han aceptado las cookies de preferencias.
  * El script en línea de state-inline.js lo aplica antes de pintar cada página.
@@ -18,6 +19,7 @@ const hasState = () => Boolean(state.t || state.c || state.k);
 function save() {
   const v = encode();
   try { window.name = `vp:${v}`; } catch { /* sin window.name: queda el enlace */ }
+  try { sessionStorage.setItem('vp', v); } catch { /* sin almacenamiento de la visita */ }
   try { if (state.k === 'aceptadas') localStorage.setItem('vp', v); else localStorage.removeItem('vp'); } catch { /* sin almacenamiento */ }
 }
 

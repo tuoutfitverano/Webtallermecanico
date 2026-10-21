@@ -82,7 +82,7 @@ async function setup(opts: { email?: string; link?: boolean; phone?: string } = 
     await api('/rpc/accept_customer_invitation', client.token, 'POST', { p_token: inv!.token });
   }
   // La orden se crea con el cliente ya vinculado (si no, no hay aviso en el portal: nadie lo leería).
-  const [v] = rows(await api('/vehicles', owner.token, 'POST', { workshop_id: DEMO, customer_id: c!.id, plate: newPlate(), make: 'Seat', model: 'León' }));
+  const [v] = rows(await api('/vehicles', owner.token, 'POST', { workshop_id: DEMO, customer_id: c!.id, plate: newPlate(), make: 'Seat', model: 'León', year: 2015, year_kind: 'fabricacion' }));
   const [o] = rows(await api('/repair_orders', owner.token, 'POST', {
     workshop_id: DEMO, vehicle_id: v!.id, customer_id: c!.id, problem_description: 'Revisión de frenos', internal_notes: SECRET_NOTE,
   }));

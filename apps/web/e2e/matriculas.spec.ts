@@ -128,6 +128,8 @@ test.describe('Consulta por matrícula · flujo en el panel', () => {
     await page.getByLabel('Matrícula', { exact: true }).fill(plate.typed);
     await page.getByLabel('Marca', { exact: true }).fill('Citroën');
     await page.getByLabel('Modelo', { exact: true }).fill('C3');
+    await page.getByLabel(/^Año/).fill('2018');
+    await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
     await page.getByRole('button', { name: 'Guardar vehículo' }).click();
     await expect(page.getByRole('status')).toContainText('Vehículo registrado.');
     await expect(page.getByRole('region', { name: 'Ficha' })).toContainText('Introducidos manualmente');
@@ -141,6 +143,8 @@ test.describe('Consulta por matrícula · flujo en el panel', () => {
     await page.getByLabel('Matrícula', { exact: true }).fill(plate.typed);
     await page.getByLabel('Marca', { exact: true }).fill('Kia');
     await page.getByLabel('Modelo', { exact: true }).fill('Ceed');
+    await page.getByLabel(/^Año/).fill('2020');
+    await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
     await page.getByLabel('Modelo', { exact: true }).press('Enter');
     await expect(page.getByRole('status')).toContainText('Vehículo registrado.');
     expect(await mockCalls(plate.normalized)).toBe(0);

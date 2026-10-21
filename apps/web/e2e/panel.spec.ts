@@ -65,6 +65,8 @@ async function createJob(page: Page, opts: { assign?: string } = {}) {
   await page.getByLabel('Matrícula').fill(plate.typed);
   await page.getByLabel('Marca').fill('Seat');
   await page.getByLabel('Modelo').fill('Ibiza');
+  await page.getByLabel(/^Año/).fill('2016');
+  await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
   await page.getByRole('button', { name: 'Guardar vehículo' }).click();
   await expect(page.getByRole('status')).toContainText('Vehículo registrado.');
   const vehicleUrl = page.url().replace(/\?.*$/, '');
@@ -138,12 +140,14 @@ test.describe('Panel · propietaria', () => {
     await page.getByLabel('Matrícula').fill(plate.typed);
     await page.getByLabel('Marca').fill('Volkswagen');
     await page.getByLabel('Modelo').fill('Golf');
+    await page.getByLabel(/^Año/).fill('2014');
+    await page.getByLabel(/Ese año es de/).selectOption('primera_matriculacion');
     await page.getByLabel(/Combustible/).selectOption('gasolina');
     await page.getByRole('button', { name: 'Guardar vehículo' }).click();
     await expect(page.getByRole('status')).toContainText('Vehículo registrado.');
     await expect(page.locator('h1 .plate')).toHaveText(plate.display);
     const ficha = page.locator('.facts');
-    await expect(ficha).toContainText('Pendiente'); // año
+    await expect(ficha).toContainText('2014');
     await expect(ficha).toContainText('Gasolina');
     await expect(ficha).toContainText('Introducidos manualmente');
     await expect(ficha).toContainText('Pendiente de verificar');
@@ -153,15 +157,23 @@ test.describe('Panel · propietaria', () => {
     await page.getByLabel('Matrícula').fill(plate.normalized.toLowerCase());
     await page.getByLabel('Marca').fill('Otra');
     await page.getByLabel('Modelo').fill('Coche');
+    await page.getByLabel(/^Año/).fill('2010');
+    await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
     await page.getByRole('button', { name: 'Guardar vehículo' }).click();
     await expect(page.getByRole('alert')).toContainText('Ya hay un vehículo con esa matrícula en tu taller.');
 
-    // Año sin decir de qué tipo: error claro.
+    // Matrícula, marca, modelo y año obligatorios: el navegador avisa y no envía…
     await page.goto('/panel/vehiculos/nuevo');
+    for (const field of [page.getByLabel('Matrícula'), page.getByLabel('Marca'), page.getByLabel('Modelo'), page.getByLabel(/^Año/), page.getByLabel(/Ese año es de/)]) {
+      await expect(field).toHaveAttribute('required', '');
+    }
     await page.getByLabel('Matrícula').fill(newPlate().typed);
     await page.getByLabel('Marca').fill('Seat');
     await page.getByLabel('Modelo').fill('León');
+    expect(await page.getByLabel(/^Año/).evaluate(el => (el as HTMLInputElement).validity.valueMissing)).toBe(true);
+    // …y si se salta el navegador, el servidor también lo exige (año sin decir de qué tipo: error claro).
     await page.getByLabel(/^Año/).fill('2019');
+    await page.locator('form:has(#year)').evaluate(f => { (f as HTMLFormElement).noValidate = true; });
     await page.getByRole('button', { name: 'Guardar vehículo' }).click();
     await expect(page.getByText('Indica si es el año de fabricación o de primera matriculación.')).toBeVisible();
 

@@ -3,7 +3,8 @@
  * el acceso, el panel y el portal). Se guarda en este dispositivo (cookie «tema»
  * y, para la vista previa sin servidor, localStorage); no es un dato personal.
  *
- * Solo se guarda si se aceptan las cookies de preferencias (lib/consent.ts).
+ * Se mantiene en todas las páginas durante la visita; con las cookies de
+ * preferencias aceptadas, 1 año (lib/consent.ts).
  *
  * Sin elección, cada zona usa el suyo: el área privada (acceso, panel del
  * taller y portal del cliente), claro; la web pública, oscuro.

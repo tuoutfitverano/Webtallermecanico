@@ -42,7 +42,7 @@ test('capturas de las fases 5 y 6', async ({ page, browser, isMobile }) => {
   const [c] = await post('/customers', owner, { workshop_id: DEMO, full_name: 'Lucía Fernández', email, phone: '600 123 456' });
   const plate = `${Math.floor(1000 + Math.random() * 8999)}LMN`;
   const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate, make: 'Seat', model: 'León', year: 2019, year_kind: 'primera_matriculacion', fuel: 'gasolina' });
-  const [v2] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}KPR`, make: 'Toyota', model: 'Yaris', fuel: 'hibrido' });
+  const [v2] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}KPR`, make: 'Toyota', model: 'Yaris', year: 2021, year_kind: 'primera_matriculacion', fuel: 'hibrido' });
   const [o] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v!.id, customer_id: c!.id, problem_description: 'Ruido al frenar y revisión de los 60.000 km', diagnosis: 'Pastillas y discos delanteros desgastados', work_done: 'Cambio de pastillas y discos delanteros; revisión completa', internal_notes: 'Nota interna' });
   await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v2!.id, customer_id: c!.id, problem_description: 'Testigo de motor encendido' });
   await patch(`/repair_orders?id=eq.${o!.id}`, owner, { status: 'diagnosis', customer_notes: 'Hemos revisado el coche: hay que cambiar pastillas y discos.' });
@@ -88,10 +88,10 @@ test('capturas de la fase 7', async ({ page, browser, isMobile }) => {
   await fetch(`${PROXY}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: JSON.stringify({ email, password: PASSWORD, email_confirm: true }) });
   const [inv] = await post('/rpc/create_customer_invitation', owner, { p_customer_id: c!.id });
   await post('/rpc/accept_customer_invitation', await token(email), { p_token: inv!.token });
-  const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}MRT`, make: 'Renault', model: 'Clio' });
+  const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}MRT`, make: 'Renault', model: 'Clio', year: 2017, year_kind: 'primera_matriculacion' });
   const [o] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v!.id, customer_id: c!.id, problem_description: 'Cambio de aceite y filtros' });
   const [c2] = await post('/customers', owner, { workshop_id: DEMO, full_name: 'Jorge Díaz', email: `rechazo-${Date.now()}@e2e.test` });
-  const [v2] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c2!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}JRD`, make: 'Ford', model: 'Focus' });
+  const [v2] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c2!.id, plate: `${Math.floor(1000 + Math.random() * 8999)}JRD`, make: 'Ford', model: 'Focus', year: 2016, year_kind: 'primera_matriculacion' });
   const [o2] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v2!.id, customer_id: c2!.id, problem_description: 'Revisión' });
 
   await login(page, 'propietaria@e2e.test', `/panel/ordenes/${o!.id}`);

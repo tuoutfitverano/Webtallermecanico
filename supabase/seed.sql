@@ -124,11 +124,11 @@ values (
 insert into public.workshop_domains (hostname, workshop_id, is_primary, verified_at)
 values ('demo.localhost', 'd0000000-0000-0000-0000-000000000001', true, now());
 
--- Vehículo de ejemplo aportado manualmente. Matrícula de la serie «X…», aún no emitida:
--- no puede coincidir con ningún coche real. El año NO se conoce todavía:
--- se deja vacío en lugar de inventarlo.
+-- Vehículo de DEMOSTRACIÓN (ficticio). Matrícula de la serie «X…», aún no emitida:
+-- no puede coincidir con ningún coche real. El año es obligatorio (20261027090000);
+-- como todo el vehículo, es un dato de ejemplo.
 insert into public.vehicles (workshop_id, plate, make, model, year, year_kind, fuel, data_source, verification_status, internal_notes)
 values (
-  'd0000000-0000-0000-0000-000000000001', '1950XBF', 'Volkswagen', 'Golf', null, null, 'gasolina',
-  'manual', 'pendiente', 'Registro de demostración. Año pendiente de introducir.'
+  'd0000000-0000-0000-0000-000000000001', '1950XBF', 'Volkswagen', 'Golf', 2018, 'primera_matriculacion', 'gasolina',
+  'manual', 'pendiente', 'Registro de demostración: datos ficticios.'
 );
