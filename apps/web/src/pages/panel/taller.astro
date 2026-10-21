@@ -17,7 +17,7 @@ import { logAuth } from '../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../lib/auth/messages.ts';
 import { emailAvailable, turnstileSiteKey, vehicleLookupAvailable, whatsappAvailable } from '../../lib/server/config.ts';
 import { formatDate } from '../../lib/panel/format.ts';
-import { fieldErrors, workshopProfileSchema } from '@talleres/core';
+import { billingSettingsSchema, fieldErrors, formatCents, parseEuros, workshopProfileSchema } from '@talleres/core';
 
 export const prerender = false;
 
@@ -27,8 +27,16 @@ if (panel instanceof Response) return panel;
 interface WorkshopRow {
   name: string; legal_name: string | null; tax_id: string | null; contact_email: string | null;
   contact_phone: string | null; logo_url: string | null; status: string; created_at: string;
+  address_line: string | null; postal_code: string | null; city: string | null; province: string | null;
 }
-const values = { name: '', legal_name: '', tax_id: '', contact_email: '', contact_phone: '', logo_url: '' };
+interface Billing {
+  default_tax_rate: number; quote_validity_days: number; labour_rate_cents: number | null; invoice_series: string; rectifying_series: string;
+  payment_terms_days: number; quote_conditions: string | null; invoice_footer: string | null;
+}
+const values = { name: '', legal_name: '', tax_id: '', contact_email: '', contact_phone: '', logo_url: '', address_line: '', postal_code: '', city: '', province: '' };
+const billValues = { default_tax_rate: '', quote_validity_days: '', labour_rate: '', invoice_series: '', rectifying_series: '', payment_terms_days: '', quote_conditions: '', invoice_footer: '' };
+let billErrors: Partial<Record<string, string>> = {};
+let billPosted = false;
 let errors: Partial<Record<string, string>> = {};
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('guardado') === '1' ? 'Datos del taller guardados.' : '' };
 let posted = false;
@@ -44,6 +52,7 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'datos') {
     const parsed = workshopProfileSchema.safeParse({
       name: values.name, legalName: values.legal_name, taxId: values.tax_id,
       contactEmail: values.contact_email, contactPhone: values.contact_phone, logoUrl: values.logo_url,
+      addressLine: values.address_line, postalCode: values.postal_code, city: values.city, province: values.province,
     });
     if (!parsed.success) {
       errors = fieldErrors(parsed.error);
@@ -52,7 +61,10 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'datos') {
     } else {
       const d = parsed.data;
       const { data, error } = await panel.supabase.from('workshops')
-        .update({ name: d.name, legal_name: d.legalName, tax_id: d.taxId, contact_email: d.contactEmail, contact_phone: d.contactPhone, logo_url: d.logoUrl })
+        .update({
+          name: d.name, legal_name: d.legalName, tax_id: d.taxId, contact_email: d.contactEmail, contact_phone: d.contactPhone, logo_url: d.logoUrl,
+          address_line: d.addressLine, postal_code: d.postalCode, city: d.city, province: d.province,
+        })
         .eq('id', panel.workshop.id).select('id');
       if (error || !data?.length) {
         logAuth('panel_workshop_update_error', error?.code);
@@ -66,17 +78,64 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'datos') {
   }
 }
 
+if (panel.form && panel.workshop && field(panel.form, 'action') === 'facturacion') {
+  billPosted = true;
+  for (const k of Object.keys(billValues) as Array<keyof typeof billValues>) billValues[k] = field(panel.form, k);
+  const num = (t: string) => (t.trim() === '' ? Number.NaN : Number(t.trim().replace(',', '.')));
+  const labour = billValues.labour_rate.trim() === '' ? null : parseEuros(billValues.labour_rate);
+  const parsed = billingSettingsSchema.safeParse({
+    defaultTaxRate: num(billValues.default_tax_rate), quoteValidityDays: num(billValues.quote_validity_days),
+    labourRateCents: labour, invoiceSeries: billValues.invoice_series, rectifyingSeries: billValues.rectifying_series,
+    paymentTermsDays: num(billValues.payment_terms_days), quoteConditions: billValues.quote_conditions, invoiceFooter: billValues.invoice_footer,
+  });
+  if (!panel.isManager) {
+    flash = { kind: 'bad', text: 'Solo el propietario o un administrador pueden cambiar estos ajustes.' };
+    Astro.response.status = 403;
+  } else if (!parsed.success || (billValues.labour_rate.trim() !== '' && labour === null)) {
+    billErrors = parsed.success ? {} : fieldErrors(parsed.error);
+    if (billValues.labour_rate.trim() !== '' && labour === null) billErrors.labourRateCents = 'Escribe el precio, p. ej. 45 o 45,50.';
+    flash = { kind: 'bad', text: 'Revisa los ajustes marcados.' };
+    Astro.response.status = 422;
+  } else {
+    const d = parsed.data;
+    const { data, error } = await panel.supabase.from('workshop_billing_settings').update({
+      default_tax_rate: d.defaultTaxRate, quote_validity_days: d.quoteValidityDays, labour_rate_cents: d.labourRateCents,
+      invoice_series: d.invoiceSeries, rectifying_series: d.rectifyingSeries, payment_terms_days: d.paymentTermsDays,
+      quote_conditions: d.quoteConditions, invoice_footer: d.invoiceFooter,
+    }).eq('workshop_id', panel.workshop.id).select('workshop_id');
+    if (error || !data?.length) {
+      logAuth('panel_billing_settings_error', error?.code);
+      flash = { kind: 'bad', text: error ? dbErrorMessage(error) : 'No se han guardado los ajustes.' };
+      Astro.response.status = 400;
+    } else {
+      flash = { kind: 'ok', text: 'Ajustes de presupuestos y facturas guardados.' };
+      billPosted = false;
+    }
+  }
+}
+
 let workshop: WorkshopRow | null = null;
+let billing: Billing | null = null;
 let site: { published: boolean; is_demo_content: boolean } | null = null;
 let domains: Array<{ hostname: string; is_primary: boolean }> = [];
 let loadError = false;
 if (panel.workshop && panel.isManager) {
   const id = panel.workshop.id;
-  const [w, s, d] = await Promise.all([
-    panel.supabase.from('workshops').select('name, legal_name, tax_id, contact_email, contact_phone, logo_url, status, created_at').eq('id', id).maybeSingle(),
+  const [w, s, d, b] = await Promise.all([
+    panel.supabase.from('workshops').select('name, legal_name, tax_id, contact_email, contact_phone, logo_url, status, created_at, address_line, postal_code, city, province').eq('id', id).maybeSingle(),
     panel.supabase.from('workshop_sites').select('published, is_demo_content').eq('workshop_id', id).maybeSingle(),
     panel.supabase.from('workshop_domains').select('hostname, is_primary').eq('workshop_id', id).order('is_primary', { ascending: false }),
+    panel.supabase.from('workshop_billing_settings').select('default_tax_rate, quote_validity_days, labour_rate_cents, invoice_series, rectifying_series, payment_terms_days, quote_conditions, invoice_footer').eq('workshop_id', id).maybeSingle(),
   ]);
+  billing = (b.data as Billing | null) ?? null;
+  if (billing && !billPosted) {
+    Object.assign(billValues, {
+      default_tax_rate: String(Number(billing.default_tax_rate)).replace('.', ','), quote_validity_days: String(billing.quote_validity_days),
+      labour_rate: billing.labour_rate_cents === null ? '' : (Number(billing.labour_rate_cents) / 100).toFixed(2).replace('.', ','),
+      invoice_series: billing.invoice_series, rectifying_series: billing.rectifying_series, payment_terms_days: String(billing.payment_terms_days),
+      quote_conditions: billing.quote_conditions ?? '', invoice_footer: billing.invoice_footer ?? '',
+    });
+  }
   if (w.error || !w.data) { logAuth('panel_workshop_load_error', w.error?.code); loadError = true; }
   workshop = (w.data as WorkshopRow | null) ?? null;
   site = s.data ?? null;
@@ -85,12 +144,14 @@ if (panel.workshop && panel.isManager) {
     Object.assign(values, {
       name: workshop.name, legal_name: workshop.legal_name ?? '', tax_id: workshop.tax_id ?? '', contact_email: workshop.contact_email ?? '',
       contact_phone: workshop.contact_phone ?? '', logo_url: workshop.logo_url ?? '',
+      address_line: workshop.address_line ?? '', postal_code: workshop.postal_code ?? '', city: workshop.city ?? '', province: workshop.province ?? '',
     });
   }
 }
 
 const STATUS_LABELS: Record<string, string> = { demo: 'Demostración', activo: 'Activo', suspendido: 'Suspendido' };
 const err = (k: string) => errors[k];
+const berr = (k: string) => billErrors[k];
 const integrations = [
   { name: 'Formularios de la web (antispam)', on: Boolean(turnstileSiteKey()), off: 'Sin antispam configurado: la web no acepta solicitudes (responde «no disponible»), nunca finge que se han enviado.' },
   { name: 'Emails a clientes', on: emailAvailable(), off: 'Sin proveedor de email: los avisos aparecen en el portal del cliente y los emails quedan pendientes.' },
@@ -145,6 +206,25 @@ const integrations = [
                 {err('contactPhone') && <p class="field-error">{err('contactPhone')}</p>}
               </div>
             </div>
+            <div class={`field ${err('addressLine') ? 'has-error' : ''}`}>
+              <label for="address_line">Dirección <span class="muted">(sale en presupuestos y facturas)</span></label>
+              <input class="input" id="address_line" name="address_line" maxlength="200" autocomplete="off" value={values.address_line} />
+            </div>
+            <div class="form-row">
+              <div class={`field ${err('postalCode') ? 'has-error' : ''}`}>
+                <label for="postal_code">Código postal</label>
+                <input class="input" id="postal_code" name="postal_code" inputmode="numeric" maxlength="5" autocomplete="off" value={values.postal_code} aria-invalid={err('postalCode') ? 'true' : undefined} />
+                {err('postalCode') && <p class="field-error">{err('postalCode')}</p>}
+              </div>
+              <div class="field">
+                <label for="city">Localidad</label>
+                <input class="input" id="city" name="city" maxlength="80" autocomplete="off" value={values.city} />
+              </div>
+            </div>
+            <div class="field">
+              <label for="province">Provincia</label>
+              <input class="input" id="province" name="province" maxlength="80" autocomplete="off" value={values.province} />
+            </div>
             <div class={`field ${err('logoUrl') ? 'has-error' : ''}`}>
               <label for="logo_url">Dirección del logotipo <span class="muted">(opcional, https)</span></label>
               <input class="input mono" id="logo_url" name="logo_url" type="url" inputmode="url" maxlength="500" placeholder="https://…" value={values.logo_url} aria-invalid={err('logoUrl') ? 'true' : undefined} />
@@ -186,10 +266,67 @@ const integrations = [
                 </li>
               ))}
             </ul>
-            <p class="hint" style="margin-top:10px">Qué avisos reciben tus clientes se decide en <a href="/panel/avisos#ajustes">Avisos</a>.</p>
+            <p class="hint" style="margin-top:10px">Qué avisos reciben tus clientes se decide en <a href="/panel/avisos#ajustes">Avisos</a>; los recordatorios, en <a href="/panel/recordatorios">Recordatorios</a>.</p>
           </section>
         </div>
       </div>
+
+      <section class="card" aria-labelledby="fact-t" id="facturacion">
+        <h2 id="fact-t" class="card-title"><Icon name="euro" />Presupuestos y facturas</h2>
+        <p class="hint">Facturación operativa, <strong>no certificada VERI*FACTU</strong>: revisa estos ajustes con tu asesoría. Para emitir facturas hacen falta la razón social y el NIF del taller (arriba).</p>
+        <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+          <input type="hidden" name="action" value="facturacion" />
+          <div class="form-row">
+            <div class={`field ${berr('defaultTaxRate') ? 'has-error' : ''}`}>
+              <label for="default_tax_rate">IVA por defecto (%)</label>
+              <input class="input" id="default_tax_rate" name="default_tax_rate" inputmode="decimal" value={billValues.default_tax_rate} />
+              {berr('defaultTaxRate') && <p class="field-error">{berr('defaultTaxRate')}</p>}
+            </div>
+            <div class={`field ${berr('labourRateCents') ? 'has-error' : ''}`}>
+              <label for="labour_rate">Precio de la hora de mano de obra (€, sin IVA) <span class="muted">(opcional)</span></label>
+              <input class="input" id="labour_rate" name="labour_rate" inputmode="decimal" placeholder="Ej.: 45,00" value={billValues.labour_rate} />
+              {berr('labourRateCents') && <p class="field-error">{berr('labourRateCents')}</p>}
+            </div>
+          </div>
+          <div class="form-row">
+            <div class={`field ${berr('quoteValidityDays') ? 'has-error' : ''}`}>
+              <label for="quote_validity_days">Validez de los presupuestos (días)</label>
+              <input class="input" id="quote_validity_days" name="quote_validity_days" inputmode="numeric" value={billValues.quote_validity_days} />
+              {berr('quoteValidityDays') && <p class="field-error">{berr('quoteValidityDays')}</p>}
+            </div>
+            <div class={`field ${berr('paymentTermsDays') ? 'has-error' : ''}`}>
+              <label for="payment_terms_days">Plazo de pago de las facturas (días; 0 = al contado)</label>
+              <input class="input" id="payment_terms_days" name="payment_terms_days" inputmode="numeric" value={billValues.payment_terms_days} />
+              {berr('paymentTermsDays') && <p class="field-error">{berr('paymentTermsDays')}</p>}
+            </div>
+          </div>
+          <div class="form-row">
+            <div class={`field ${berr('invoiceSeries') ? 'has-error' : ''}`}>
+              <label for="invoice_series">Serie de facturas</label>
+              <input class="input mono" id="invoice_series" name="invoice_series" maxlength="6" autocapitalize="characters" value={billValues.invoice_series} />
+              {berr('invoiceSeries') && <p class="field-error">{berr('invoiceSeries')}</p>}
+            </div>
+            <div class={`field ${berr('rectifyingSeries') ? 'has-error' : ''}`}>
+              <label for="rectifying_series">Serie de rectificativas</label>
+              <input class="input mono" id="rectifying_series" name="rectifying_series" maxlength="6" autocapitalize="characters" value={billValues.rectifying_series} />
+              {berr('rectifyingSeries') && <p class="field-error">{berr('rectifyingSeries')}</p>}
+            </div>
+          </div>
+          <p class="hint">La numeración es correlativa por serie y año (p. ej. {billValues.invoice_series || 'F'}{new Date().getFullYear()}-0001). Cambiar la serie no renumera las facturas ya emitidas.</p>
+          <div class={`field ${berr('quoteConditions') ? 'has-error' : ''}`}>
+            <label for="quote_conditions">Condiciones de los presupuestos <span class="muted">(opcional; las ve el cliente)</span></label>
+            <textarea class="textarea" id="quote_conditions" name="quote_conditions" maxlength="2000" rows="3">{billValues.quote_conditions}</textarea>
+            {berr('quoteConditions') && <p class="field-error">{berr('quoteConditions')}</p>}
+          </div>
+          <div class={`field ${berr('invoiceFooter') ? 'has-error' : ''}`}>
+            <label for="invoice_footer">Pie de las facturas <span class="muted">(opcional; p. ej. datos bancarios o registro mercantil)</span></label>
+            <textarea class="textarea" id="invoice_footer" name="invoice_footer" maxlength="1000" rows="2">{billValues.invoice_footer}</textarea>
+            {berr('invoiceFooter') && <p class="field-error">{berr('invoiceFooter')}</p>}
+          </div>
+          {billing && billing.labour_rate_cents !== null && <p class="hint">Ahora: {formatCents(Number(billing.labour_rate_cents))} la hora.</p>}
+          <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar ajustes</span></button>
+        </form>
+      </section>
     </>
   )}
 </PanelLayout>

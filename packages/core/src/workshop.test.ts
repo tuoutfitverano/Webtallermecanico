@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, orderLabel, orderUpdateSchema, workshopProfileSchema, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES } from './workshop.ts';
+import { billingSettingsSchema, customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, orderLabel, orderUpdateSchema, workshopProfileSchema, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES } from './workshop.ts';
 
 describe('clientes', () => {
   it('acepta un cliente con solo nombre y normaliza el correo', () => {
@@ -61,12 +61,19 @@ describe('órdenes de reparación', () => {
 describe('datos del taller', () => {
   it('acepta solo el nombre y deja el resto vacío', () => {
     const r = workshopProfileSchema.parse({ name: '  Taller Uno ', legalName: '', taxId: '', contactEmail: '', contactPhone: '', logoUrl: '' });
-    expect(r).toEqual({ name: 'Taller Uno', legalName: null, taxId: null, contactEmail: null, contactPhone: null, logoUrl: null });
+    expect(r).toEqual({ name: 'Taller Uno', legalName: null, taxId: null, contactEmail: null, contactPhone: null, logoUrl: null, addressLine: null, postalCode: null, city: null, province: null });
   });
   it('normaliza correo y NIF', () => {
     const r = workshopProfileSchema.parse({ name: 'Taller', contactEmail: 'Hola@Taller.ES', taxId: 'b12345678' });
     expect(r.contactEmail).toBe('hola@taller.es');
     expect(r.taxId).toBe('B12345678');
+  });
+  it('ajustes de facturación con los límites de la base de datos', () => {
+    const ok = billingSettingsSchema.parse({ defaultTaxRate: 21, quoteValidityDays: 30, labourRateCents: 4500, invoiceSeries: ' f ', rectifyingSeries: 'r', paymentTermsDays: 0 });
+    expect(ok).toMatchObject({ invoiceSeries: 'F', rectifyingSeries: 'R', quoteConditions: null });
+    const bad = billingSettingsSchema.safeParse({ defaultTaxRate: 120, quoteValidityDays: 0, labourRateCents: null, invoiceSeries: 'F', rectifyingSeries: 'F', paymentTermsDays: 400 });
+    expect(bad.success).toBe(false);
+    if (!bad.success) expect(Object.keys(fieldErrors(bad.error)).sort()).toEqual(['defaultTaxRate', 'paymentTermsDays', 'quoteValidityDays', 'rectifyingSeries']);
   });
   it('rechaza nombre vacío, correo, teléfono y logotipo no válidos', () => {
     const r = workshopProfileSchema.safeParse({ name: ' ', contactEmail: 'no', contactPhone: '12', logoUrl: 'http://x.es/logo.png' });

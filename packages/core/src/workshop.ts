@@ -117,8 +117,19 @@ export const workshopProfileSchema = z
     contactEmail: optText(254),
     contactPhone: optText(30),
     logoUrl: optText(500),
+    // Dirección (cabecera de presupuestos y facturas).
+    addressLine: optText(200),
+    postalCode: optText(5),
+    city: optText(80),
+    province: optText(80),
   })
   .superRefine((v, ctx) => {
+    if (v.postalCode && !/^\d{5}$/.test(v.postalCode)) {
+      ctx.addIssue({ code: 'custom', path: ['postalCode'], message: 'El código postal tiene 5 cifras.' });
+    }
+    if (v.taxId && !/^[A-Z0-9]{8,12}$/.test(v.taxId.toUpperCase().replace(/[\s.-]/g, ''))) {
+      ctx.addIssue({ code: 'custom', path: ['taxId'], message: 'NIF/CIF no válido (8 a 12 letras y números).' });
+    }
     if (v.contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.contactEmail)) {
       ctx.addIssue({ code: 'custom', path: ['contactEmail'], message: 'Correo electrónico no válido.' });
     }
@@ -132,9 +143,27 @@ export const workshopProfileSchema = z
       ctx.addIssue({ code: 'custom', path: ['logoUrl'], message: 'Debe ser una dirección que empiece por https://' });
     }
   })
-  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase() : null }));
+  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase().replace(/[\s.-]/g, '') : null }));
 
 export type WorkshopProfileData = z.output<typeof workshopProfileSchema>;
+
+/** Ajustes de presupuestos y facturas del taller (los mismos límites que la base de datos). */
+export const billingSettingsSchema = z
+  .object({
+    defaultTaxRate: z.number({ error: 'IVA no válido.' }).min(0, 'IVA no válido.').max(100, 'IVA no válido.'),
+    quoteValidityDays: z.number({ error: 'Días no válidos.' }).int('Días no válidos.').min(1, 'Entre 1 y 365 días.').max(365, 'Entre 1 y 365 días.'),
+    labourRateCents: z.number().int().min(0).max(100_000_000).nullable(),
+    invoiceSeries: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, 'De 1 a 6 letras o números.'),
+    rectifyingSeries: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, 'De 1 a 6 letras o números.'),
+    paymentTermsDays: z.number({ error: 'Días no válidos.' }).int('Días no válidos.').min(0, 'Entre 0 y 365 días.').max(365, 'Entre 0 y 365 días.'),
+    quoteConditions: optText(2000),
+    invoiceFooter: optText(1000),
+  })
+  .superRefine((v, ctx) => {
+    if (v.invoiceSeries === v.rectifyingSeries) {
+      ctx.addIssue({ code: 'custom', path: ['rectifyingSeries'], message: 'La serie de rectificativas debe ser distinta de la de facturas.' });
+    }
+  });
 
 /** Convierte los errores de zod en { campo: mensaje } para los formularios. */
 export function fieldErrors(error: z.ZodError): Partial<Record<string, string>> {

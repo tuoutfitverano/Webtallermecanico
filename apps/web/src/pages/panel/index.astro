@@ -10,7 +10,7 @@ import NoWorkshop from '../../components/panel/NoWorkshop.astro';
 import Flash from '../../components/panel/Flash.astro';
 import { loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
-import { formatDateTime } from '../../lib/panel/format.ts';
+import { formatDateTime, todayMadrid } from '../../lib/panel/format.ts';
 import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
 
 export const prerender = false;
@@ -26,9 +26,13 @@ let recent: OrderRow[] = [];
 let error = false;
 let team: Awaited<ReturnType<typeof loadTeam>> = [];
 let newRequests: number | null = null;
+interface Attention { presupuestos_sin_respuesta_3d: number; facturas_vencidas: number; ordenes_sin_asignar: number; recordatorios_pendientes: number }
+let attention: Attention | null = null;
+let late = 0;
 if (panel.workshop) {
   const id = panel.workshop.id;
-  const [s, r, t, w] = await Promise.all([
+  const today = todayMadrid();
+  const [s, r, t, w, st] = await Promise.all([
     panel.supabase.rpc('workshop_dashboard', { p_workshop_id: id }),
     panel.supabase.rpc('search_repair_orders', { p_workshop_id: id, p_query: '', p_limit: 8 }),
     loadTeam(panel),
@@ -36,8 +40,15 @@ if (panel.workshop) {
     panel.isOffice
       ? panel.supabase.from('web_requests').select('id', { count: 'exact', head: true }).eq('workshop_id', id).eq('status', 'nueva')
       : Promise.resolve({ count: null }),
+    // Lo que pide atención hoy (solo oficina; datos reales, nunca de ejemplo).
+    panel.isOffice
+      ? panel.supabase.rpc('workshop_stats', { p_workshop_id: id, p_from: today, p_to: today })
+      : Promise.resolve({ data: null, error: null }),
   ]);
   newRequests = w.count;
+  const stats = (st.data ?? null) as { atencion: Attention; ordenes: { retrasadas: number } } | null;
+  attention = stats?.atencion ?? null;
+  late = Number(stats?.ordenes.retrasadas ?? 0);
   if (s.error || r.error) {
     logAuth('panel_dashboard_error', s.error?.code ?? r.error?.code);
     error = true;
@@ -82,6 +93,24 @@ const kpis = summary ? [
           ))}
         </section>
       )}
+
+      {attention && (() => {
+        const items = [
+          { n: late, text: 'trabajos pasados de la fecha prevista', href: '/panel/planificacion' },
+          { n: Number(attention.ordenes_sin_asignar), text: 'órdenes abiertas sin mecánico asignado', href: '/panel/planificacion' },
+          { n: Number(attention.presupuestos_sin_respuesta_3d), text: 'presupuestos sin respuesta desde hace más de 3 días', href: '/panel/presupuestos?estado=pendientes' },
+          { n: Number(attention.facturas_vencidas), text: 'facturas vencidas sin cobrar', href: '/panel/facturas?estado=vencidas' },
+          { n: Number(attention.recordatorios_pendientes), text: 'recordatorios por revisar', href: '/panel/recordatorios' },
+        ].filter(i => i.n > 0);
+        return items.length > 0 && (
+          <section class="card" aria-labelledby="atencion">
+            <h2 id="atencion" class="card-title"><Icon name="alert" />Requiere atención</h2>
+            <ul class="plain-list attention">
+              {items.map(i => <li><a href={i.href}><strong>{i.n}</strong> {i.text}</a></li>)}
+            </ul>
+          </section>
+        );
+      })()}
 
       {panel.isOffice && (
         <section class="card" aria-labelledby="atajos">

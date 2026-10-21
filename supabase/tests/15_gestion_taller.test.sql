@@ -167,6 +167,15 @@ select tests.login('00000000-0000-0000-0000-0000000000c2');
 set local role authenticated;
 select tests.eq((select count(*) from public.portal_quotes()), 1::bigint, 'el cliente ve solo la versión vigente (no borradores ni sustituidas)');
 select tests.eq((public.portal_quote(current_setting('tests.q2b')::uuid) ->> 'total_cents'), '10890', 'y su detalle');
+reset role;
+update public.vehicles set next_service_date = '2027-05-01', next_service_km = 140000, next_service_notes = 'Cambio de aceite', vin = 'WVWZZZ1KZ8W123456'
+ where customer_id = 'c2000000-0000-0000-0000-00000000000a';
+select tests.login('00000000-0000-0000-0000-0000000000c2');
+set local role authenticated;
+select tests.ok((select bool_and(next_service_km = 140000 and next_service_notes = 'Cambio de aceite') from public.portal_vehicles()),
+  'el portal enseña la próxima revisión del vehículo');
+select tests.ok((select bool_and(not (to_jsonb(v) ? 'vin') and not (to_jsonb(v) ? 'internal_notes')) from public.portal_vehicles() v),
+  'pero no el bastidor ni las notas internas');
 select tests.eq((select link_path from public.portal_notifications() where event::text = 'presupuesto_enviado' order by created_at desc limit 1),
   '/portal/presupuestos/' || current_setting('tests.q2b'), 'el aviso del portal lleva a ese presupuesto');
 select tests.eq(public.portal_quote(current_setting('tests.q1')::uuid), null::jsonb, 'nunca el presupuesto de otro cliente');

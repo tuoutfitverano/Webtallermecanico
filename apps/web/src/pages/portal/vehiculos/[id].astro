@@ -6,7 +6,7 @@ import StatusBadge from '../../../components/panel/StatusBadge.astro';
 import NotLinked from '../../../components/portal/NotLinked.astro';
 import { portalPage } from '../../../lib/server/portal.ts';
 import { isUuid } from '../../../lib/server/panel.ts';
-import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
+import { formatDate, formatDateTime, formatDay } from '../../../lib/panel/format.ts';
 import { formatPlate, FUEL_LABELS, orderLabel, YEAR_KIND_LABELS, type FuelType, type RepairStatus, type YearKind } from '@talleres/core';
 
 export const prerender = false;
@@ -15,7 +15,8 @@ const portal = await portalPage(Astro);
 if (portal instanceof Response) return portal;
 const id = Astro.params.id ?? '';
 
-interface Vehicle { id: string; workshop_name: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null }
+interface Vehicle { id: string; workshop_name: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null;
+  version: string | null; mileage: number | null; next_service_date: string | null; next_service_km: number | null; next_service_notes: string | null }
 interface Order { id: string; number: number; status: RepairStatus; received_at: string; last_update: string; problem_description: string }
 let vehicle: Vehicle | null = null;
 let orders: Order[] = [];
@@ -28,6 +29,8 @@ if (portal.records.length > 0 && isUuid(id)) {
   orders = vehicle ? (o.data ?? []) as Order[] : [];
 }
 if (portal.records.length > 0 && !vehicle) Astro.response.status = 404;
+const km = (n: number) => `${n.toLocaleString('es-ES')} km`;
+const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next_service_km !== null || vehicle.next_service_notes));
 ---
 <PortalLayout portal={portal} title={vehicle ? `${vehicle.make} ${vehicle.model}` : 'Vehículo'} section="vehiculos">
   <a class="pnl-back" href="/portal/vehiculos"><Icon name="arrow" />Mis vehículos</a>
@@ -61,12 +64,24 @@ if (portal.records.length > 0 && !vehicle) Astro.response.status = 404;
           <h2 id="datos" class="card-title"><Icon name="car" />Datos del vehículo</h2>
           <dl class="facts">
             <dt>Matrícula</dt><dd>{formatPlate(vehicle.plate)}</dd>
-            <dt>Marca y modelo</dt><dd>{vehicle.make} {vehicle.model}</dd>
+            <dt>Marca y modelo</dt><dd>{vehicle.make} {vehicle.model}{vehicle.version && ` ${vehicle.version}`}</dd>
             {vehicle.year && <><dt>Año</dt><dd>{vehicle.year}{vehicle.year_kind ? ` (${YEAR_KIND_LABELS[vehicle.year_kind].toLowerCase()})` : ''}</dd></>}
             {vehicle.fuel && <><dt>Combustible</dt><dd>{FUEL_LABELS[vehicle.fuel]}</dd></>}
+            {vehicle.mileage !== null && <><dt>Últimos kilómetros anotados</dt><dd>{km(vehicle.mileage)}</dd></>}
             <dt>Taller</dt><dd>{vehicle.workshop_name}</dd>
           </dl>
           <p class="hint" style="margin-top:12px">Si algún dato no es correcto, díselo a tu taller.</p>
+        </section>
+        <section class="card" aria-labelledby="revision">
+          <h2 id="revision" class="card-title"><Icon name="calendar" />Próxima revisión</h2>
+          {hasService ? (
+            <dl class="facts">
+              {vehicle.next_service_date && <><dt>Fecha recomendada</dt><dd>{formatDay(vehicle.next_service_date)}</dd></>}
+              {vehicle.next_service_km !== null && <><dt>O a los</dt><dd>{km(vehicle.next_service_km)}</dd></>}
+              {vehicle.next_service_notes && <><dt>Recomendación del taller</dt><dd>{vehicle.next_service_notes}</dd></>}
+            </dl>
+          ) : <p class="hint">Tu taller todavía no ha anotado la próxima revisión.</p>}
+          <p class="hint" style="margin-top:12px">Si quieres que te lo recordemos, actívalo en <a href="/portal/datos">Mis datos</a>.</p>
         </section>
       </div>
     </>
