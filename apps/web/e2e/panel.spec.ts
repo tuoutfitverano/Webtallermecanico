@@ -416,6 +416,10 @@ test.describe('Web pública', () => {
     page.on('request', r => { if (r.url().includes('/demo/autovalue/giro/')) frames.push(r.url()); });
     await page.goto('/');
     await expect(page.locator('html')).toHaveClass(/stage-on/);
+    // Sin bajar no se descarga ningún fotograma (solo la imagen fija); al empezar a bajar, sí.
+    await page.waitForTimeout(500);
+    expect(frames).toEqual([]);
+    await page.evaluate(() => scrollTo(0, 2));
     await expect(page.locator('.stage')).toHaveClass(/is-live/);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('La mecánica evoluciona.');
     const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));

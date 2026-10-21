@@ -4,8 +4,9 @@
  *
  *  · Solo se activa con JavaScript, sin «reducir movimiento» y sin ahorro de
  *    datos. Si no, se queda la imagen fija (nada depende de esto).
- *  · Los fotogramas se cargan en orden; mientras falta alguno se dibuja el
- *    cargado más cercano. Solo se descargan los que se usan (data-turn o data-end-frame).
+ *  · Al abrir la página no se descarga nada más que la imagen fija; el fondo y
+ *    los fotogramas llegan al empezar a bajar. Se cargan en orden; mientras
+ *    falta alguno se dibuja el cargado más cercano. Solo se descargan los que se usan (data-turn o data-end-frame).
  *  · Las transiciones se funden con las secciones: el giro empieza en cuanto se
  *    baja y acaba con la sección siguiente ya entrando; el zoom empieza mientras
  *    salen los servicios. Arranque y parada suaves, sin «número aparte».
@@ -22,6 +23,9 @@ const easeIn = (t: number) => t * t * t;
 const TARGET_W = 0.11;
 const TARGET_H = 0.09;
 const MIN_ZOOM = 16;
+
+/** Señales de que la persona va a bajar por la página. */
+const INTENT = ['scroll', 'wheel', 'touchstart', 'keydown'] as const;
 
 function enabled(): boolean {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
@@ -65,12 +69,12 @@ function start(stage: HTMLElement) {
   const backdropUrl = (big && stage.dataset.backdropHd) || stage.dataset.backdrop || '';
   const wantsBackdrop = Boolean(backdropUrl);
   const ready = () => frames[0] && (!wantsBackdrop || backdrop);
-  if (wantsBackdrop) {
+  const loadBackdrop = () => {
     const img = new Image();
     img.decoding = 'async';
     img.onload = () => { backdrop = img; if (ready()) stage.classList.add('is-live'); queue(); };
     img.src = backdropUrl;
-  }
+  };
 
   // ---- Fotogramas, por paso del giro (en orden: el primero, el que se ve al cargar)
   const frames: Array<HTMLImageElement | null> = Array.from({ length: steps + 1 }, () => null);
@@ -85,7 +89,19 @@ function start(stage: HTMLElement) {
     img.onerror = loadNext;
     img.src = url(i);
   };
-  for (let k = 0; k < 4; k++) loadNext();
+
+  // Nada se descarga al abrir la página (se ve la imagen fija, que es el mismo encuadre):
+  // el fondo y los fotogramas llegan al empezar a bajar (o si ya se abre desplazada).
+  let started = false;
+  const startLoading = () => {
+    if (started) return;
+    started = true;
+    for (const type of INTENT) removeEventListener(type, startLoading);
+    if (wantsBackdrop) loadBackdrop();
+    for (let k = 0; k < 4; k++) loadNext();
+  };
+  if (scrollY > 0) startLoading();
+  else for (const type of INTENT) addEventListener(type, startLoading, { passive: true });
 
   // ---- Cristal de la ventanilla: colores medios de su mitad de arriba y de abajo
   // (del fotograma en el que acaba el giro). Al acercarse, la foto se sustituye por este cristal
