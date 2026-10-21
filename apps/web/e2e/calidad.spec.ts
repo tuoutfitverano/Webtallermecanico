@@ -297,7 +297,7 @@ test('todos los tamaños (móvil, tablet y PC, en vertical y horizontal): nada s
         await page.goto(path);
         const r = await page.evaluate(() => {
           const vw = document.documentElement.clientWidth;
-          const out = [...document.querySelectorAll('[data-theme-toggle], .pnl-top button, .pm-header a, .pm-menu')]
+          const out = [...document.querySelectorAll('[data-theme-toggle], .pnl-top button, .auth-top a, .auth-top button, .pm-header a, .pm-menu')]
             .filter(el => el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
             .filter(el => { const b = el.getBoundingClientRect(); return b.right > vw + 1 || b.left < -1; })
             .map(el => (el.textContent ?? '').trim().slice(0, 30));
@@ -321,11 +321,11 @@ test('todos los tamaños (móvil, tablet y PC, en vertical y horizontal): nada s
     const page = await ctx.newPage();
     await check(page, ['/', '/acceso']);
     await login(page, 'propietaria@e2e.test', '/panel');
-    await check(page, ['/panel', `/panel/ordenes/${f.order}`]);
+    await check(page, ['/panel', `/panel/ordenes/${f.order}`, '/cuenta']);
     await ctx.clearCookies(); await acceptCookies(ctx);
     await ctx.addCookies([{ name: 'tema', value: tema, url: `http://${HOST}` }]);
     await login(page, f.email, '/portal');
-    await check(page, ['/portal']);
+    await check(page, ['/portal', '/portal/datos', '/cuenta']);
     await ctx.close();
   }
   expect(problems, problems.join('\n')).toEqual([]);

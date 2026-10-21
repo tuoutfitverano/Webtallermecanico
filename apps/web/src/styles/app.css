@@ -172,3 +172,9 @@
 @media (max-width: 440px) { [data-area='app'] .pnl-role { display: none; } }
 /* Los campos de texto ya marcan el foco con su borde: sin doble anillo. */
 [data-area='app'] :is(.input, .select, .textarea):focus-visible { outline: none; border-color: var(--fg); }
+/* Móvil con sesión iniciada: la barra superior (marca, modo, «Mi área» y «Salir») cabe sin
+   ensanchar la página; el nombre «Área de talleres» queda solo en la inicial. */
+@media (max-width: 520px) {
+  [data-area='app'] .auth-top:has(.auth-top-user) .brand-name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  [data-area='app'] .auth-top-user { gap: 8px; }
+}
