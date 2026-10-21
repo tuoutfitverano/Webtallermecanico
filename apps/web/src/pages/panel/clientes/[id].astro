@@ -13,11 +13,12 @@ import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import StatusBadge from '../../../components/panel/StatusBadge.astro';
 import CustomerFields from '../../../components/panel/CustomerFields.astro';
+import { readCustomerForm } from '../../../lib/panel/customer-form.ts';
 import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
-import { customerInputSchema, fieldErrors, formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
+import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
 
 export const prerender = false;
 
@@ -27,6 +28,7 @@ const id = Astro.params.id ?? '';
 
 interface Customer {
   id: string; full_name: string; phone: string | null; email: string | null; internal_notes: string | null; created_at: string;
+  tax_id: string | null; address_line: string | null; postal_code: string | null; city: string | null; province: string | null;
   user_id: string | null; portal_linked_at: string | null;
 }
 interface Invitation { id: string; email: string; expires_at: string; created_at: string }
@@ -41,16 +43,15 @@ let inviteEmail: string | null = null;
 if (panel.form && panel.workshop && isUuid(id)) {
   const action = field(panel.form, 'action');
   if (action === 'editar') {
-    editValues = { full_name: field(panel.form, 'full_name'), phone: field(panel.form, 'phone'), email: field(panel.form, 'email'), internal_notes: field(panel.form, 'internal_notes') };
-    const parsed = customerInputSchema.safeParse({ fullName: editValues.full_name, phone: editValues.phone, email: editValues.email, internalNotes: editValues.internal_notes });
-    if (!parsed.success) {
-      errors = fieldErrors(parsed.error);
+    const parsed = readCustomerForm(panel.form);
+    editValues = parsed.values;
+    if (!parsed.ok) {
+      errors = parsed.errors;
       flash = { kind: 'bad', text: 'Revisa los campos marcados.' };
       Astro.response.status = 422;
     } else {
-      const d = parsed.data;
       const { data, error } = await panel.supabase.from('customers')
-        .update({ full_name: d.fullName, phone: d.phone, email: d.email, internal_notes: d.internalNotes })
+        .update(parsed.row)
         .eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
       if (error || !data?.length) {
         logAuth('panel_customer_update_error', error?.code);
@@ -141,7 +142,7 @@ let prefs = { operational_email: true, marketing_email: false, operational_whats
 let consentLog: Array<{ id: number; channel: string; purpose: string; granted: boolean; source: string; created_at: string }> = [];
 if (panel.workshop && isUuid(id)) {
   const [c, v, o, i, pr, cl] = await Promise.all([
-    panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
+    panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, tax_id, address_line, postal_code, city, province, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
     panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
     panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
     // Solo los gestores pueden leer las invitaciones (RLS); a un mecánico le llega vacío.

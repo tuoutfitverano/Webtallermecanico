@@ -1,0 +1,202 @@
+---
+/**
+ * Estadísticas del taller (oficina). Todo sale de workshop_stats, que cuenta
+ * los datos reales con los permisos de quien mira (SECURITY INVOKER): sin
+ * datos, se ven ceros; nunca cifras de ejemplo.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDay, formatMinutes, todayMadrid } from '../../lib/panel/format.ts';
+import { PERIODS, resolvePeriod } from '../../lib/panel/periods.ts';
+import { formatCents, REPAIR_STATUS_LABELS, type RepairStatus } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const period = resolvePeriod(Astro.url.searchParams, todayMadrid());
+
+interface Stats {
+  ordenes: { abiertas: number; por_estado: Record<string, number>; recibidas: number; entregadas: number; listas_para_recoger: number; retrasadas: number };
+  vehiculos_atendidos: number;
+  presupuestos: { pendientes: number; enviados: number; aceptados: number; rechazados: number; caducados: number; importe_aceptado_cents: number };
+  facturacion: { emitidas: number; importe_emitido_cents: number; base_emitida_cents: number; cobrado_cents: number; pendiente_cents: number; vencido_cents: number; borradores: number };
+  carga_mecanicos: Array<{ user_id: string; nombre: string; abiertas: number; minutos_estimados: number; minutos_reales: number }>;
+  tiempos: { ordenes: number; estimado_min: number; real_min: number };
+  evolucion: Array<{ semana: string; ordenes: number; facturado_cents: number }>;
+  atencion: { presupuestos_sin_respuesta_3d: number; facturas_vencidas: number; ordenes_sin_asignar: number; recordatorios_pendientes: number };
+}
+let stats: Stats | null = null;
+let loadError = false;
+if (panel.workshop && panel.isOffice) {
+  const { data, error } = await panel.supabase.rpc('workshop_stats', { p_workshop_id: panel.workshop.id, p_from: period.from, p_to: period.to });
+  if (error) { logAuth('panel_stats_error', error.code); loadError = true; }
+  stats = (data ?? null) as Stats | null;
+}
+const n = (v: number | null | undefined) => Number(v ?? 0).toLocaleString('es-ES');
+const answered = stats ? Number(stats.presupuestos.aceptados) + Number(stats.presupuestos.rechazados) : 0;
+const acceptance = stats && answered > 0 ? Math.round((Number(stats.presupuestos.aceptados) / answered) * 100) : null;
+const weeks = stats?.evolucion ?? [];
+const maxOrders = Math.max(1, ...weeks.map(w => Number(w.ordenes)));
+const maxBilled = Math.max(1, ...weeks.map(w => Number(w.facturado_cents)));
+const statusOrder: RepairStatus[] = ['recibido', 'diagnosis', 'esperando_recambios', 'en_reparacion', 'listo'];
+---
+<PanelLayout panel={panel} title="Estadísticas" section="estadisticas">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Estadísticas</h1>
+      <p class="pnl-sub">Del {formatDay(period.from)} al {formatDay(period.to)}. Calculadas con los datos reales del taller.</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Las estadísticas las ve la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      <nav class="filter-tabs" aria-label="Periodo">
+        {PERIODS.map(p => <a href={`/panel/estadisticas?periodo=${p.id}`} aria-current={p.id === period.id ? 'page' : undefined}>{p.label}</a>)}
+      </nav>
+      <form method="get" class="filters" aria-label="Otro periodo">
+        <div class="field"><label for="desde">Desde</label><input class="input" type="date" id="desde" name="desde" value={period.from} required /></div>
+        <div class="field"><label for="hasta">Hasta</label><input class="input" type="date" id="hasta" name="hasta" value={period.to} required /></div>
+        <button class="btn" type="submit">Ver periodo</button>
+      </form>
+      {period.error && <Flash kind="bad" text={`${period.error} Se muestra este mes.`} />}
+      {loadError && <Flash kind="bad" text="No se han podido calcular las estadísticas. Recarga la página." />}
+      {stats && (
+        <>
+          <h2 class="section-title">Ahora mismo</h2>
+          <section class="kpis" aria-label="Situación actual">
+            <a class="kpi" href="/panel/ordenes"><span class="kpi-value">{n(stats.ordenes.abiertas)}</span><span class="kpi-label">Órdenes abiertas</span></a>
+            <a class="kpi" href="/panel/planificacion"><span class="kpi-value">{n(stats.ordenes.retrasadas)}</span><span class="kpi-label">Retrasadas</span></a>
+            <a class="kpi" href="/panel/ordenes?estado=listo"><span class="kpi-value">{n(stats.ordenes.listas_para_recoger)}</span><span class="kpi-label">Listas para recoger</span></a>
+            <a class="kpi" href="/panel/presupuestos?estado=pendientes"><span class="kpi-value">{n(stats.presupuestos.pendientes)}</span><span class="kpi-label">Presupuestos sin respuesta</span></a>
+          </section>
+
+          <h2 class="section-title">En el periodo</h2>
+          <section class="kpis" aria-label="Actividad del periodo">
+            <div class="kpi"><span class="kpi-value">{n(stats.ordenes.recibidas)}</span><span class="kpi-label">Vehículos recibidos</span></div>
+            <div class="kpi"><span class="kpi-value">{n(stats.ordenes.entregadas)}</span><span class="kpi-label">Entregados</span></div>
+            <div class="kpi"><span class="kpi-value">{n(stats.vehiculos_atendidos)}</span><span class="kpi-label">Vehículos distintos</span></div>
+            <div class="kpi"><span class="kpi-value">{acceptance === null ? '—' : `${acceptance} %`}</span><span class="kpi-label">Presupuestos aceptados{answered > 0 && ` (${n(stats.presupuestos.aceptados)} de ${n(answered)})`}</span></div>
+          </section>
+
+          <div class="grid-2">
+            <section class="card" aria-labelledby="fact-t">
+              <h2 id="fact-t" class="card-title"><Icon name="euro" />Facturación</h2>
+              <dl class="facts">
+                <dt>Facturas emitidas</dt><dd>{n(stats.facturacion.emitidas)}</dd>
+                <dt>Importe facturado (IVA incl.)</dt><dd>{formatCents(Number(stats.facturacion.importe_emitido_cents))}</dd>
+                <dt>Base imponible</dt><dd>{formatCents(Number(stats.facturacion.base_emitida_cents))}</dd>
+                <dt>Cobrado en el periodo</dt><dd>{formatCents(Number(stats.facturacion.cobrado_cents))}</dd>
+                <dt>Pendiente de cobro (hoy)</dt><dd>{formatCents(Number(stats.facturacion.pendiente_cents))}</dd>
+                <dt>Vencido (hoy)</dt><dd>{formatCents(Number(stats.facturacion.vencido_cents))}</dd>
+                <dt>Borradores sin emitir</dt><dd>{n(stats.facturacion.borradores)}</dd>
+              </dl>
+              <p class="hint">Facturación operativa, no certificada VERI*FACTU.</p>
+            </section>
+            <section class="card" aria-labelledby="pres-t">
+              <h2 id="pres-t" class="card-title"><Icon name="file" />Presupuestos</h2>
+              <dl class="facts">
+                <dt>Enviados</dt><dd>{n(stats.presupuestos.enviados)}</dd>
+                <dt>Aceptados</dt><dd>{n(stats.presupuestos.aceptados)}</dd>
+                <dt>Rechazados</dt><dd>{n(stats.presupuestos.rechazados)}</dd>
+                <dt>Caducados</dt><dd>{n(stats.presupuestos.caducados)}</dd>
+                <dt>Importe aceptado</dt><dd>{formatCents(Number(stats.presupuestos.importe_aceptado_cents))}</dd>
+              </dl>
+            </section>
+          </div>
+
+          <div class="grid-2">
+            <section class="card" aria-labelledby="estado-t">
+              <h2 id="estado-t" class="card-title"><Icon name="board" />Órdenes abiertas por estado</h2>
+              <dl class="facts">
+                {statusOrder.map(s => <><dt>{REPAIR_STATUS_LABELS[s]}</dt><dd>{n(stats!.ordenes.por_estado[s] ?? 0)}</dd></>)}
+              </dl>
+            </section>
+            <section class="card" aria-labelledby="tiempo-t">
+              <h2 id="tiempo-t" class="card-title"><Icon name="clock" />Tiempo estimado y real</h2>
+              {Number(stats.tiempos.ordenes) === 0 ? <p class="hint">Sin órdenes entregadas en el periodo con tiempo estimado y fichajes.</p> : (
+                <dl class="facts">
+                  <dt>Órdenes comparadas</dt><dd>{n(stats.tiempos.ordenes)}</dd>
+                  <dt>Estimado</dt><dd>{formatMinutes(Number(stats.tiempos.estimado_min))}</dd>
+                  <dt>Real (fichado)</dt><dd>{formatMinutes(Number(stats.tiempos.real_min))}</dd>
+                </dl>
+              )}
+            </section>
+          </div>
+
+          <section class="card" aria-labelledby="carga-t">
+            <h2 id="carga-t" class="card-title"><Icon name="users" />Carga del equipo</h2>
+            {stats.carga_mecanicos.length === 0 ? <p class="hint">Todavía no hay mecánicos en el equipo.</p> : (
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>Persona</th><th class="num-col">Órdenes abiertas</th><th class="num-col">Tiempo estimado pendiente</th><th class="num-col">Tiempo fichado en el periodo</th></tr></thead>
+                  <tbody>
+                    {stats.carga_mecanicos.map(m => (
+                      <tr><td>{m.nombre}</td><td class="num-col">{n(m.abiertas)}</td><td class="num-col">{formatMinutes(Number(m.minutos_estimados))}</td><td class="num-col">{formatMinutes(Number(m.minutos_reales))}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          {weeks.length > 1 && (
+            <div class="grid-2">
+              <section class="card" aria-labelledby="ev-o-t">
+                <h2 id="ev-o-t" class="card-title"><Icon name="chart" />Vehículos recibidos por semana</h2>
+                <div class="bars" role="img" aria-label={`Vehículos recibidos por semana: ${weeks.map(w => `${formatDay(w.semana)}, ${w.ordenes}`).join('; ')}`}>
+                  {weeks.map(w => (
+                    <div class="bar-col" title={`Semana del ${formatDay(w.semana)}: ${n(w.ordenes)}`}>
+                      <span class="bar" style={`--h:${(Number(w.ordenes) / maxOrders) * 100}%`}></span>
+                    </div>
+                  ))}
+                </div>
+                <p class="bars-axis"><span>{formatDay(weeks[0]!.semana)}</span><span>máx. {n(maxOrders)}</span><span>{formatDay(weeks[weeks.length - 1]!.semana)}</span></p>
+              </section>
+              <section class="card" aria-labelledby="ev-f-t">
+                <h2 id="ev-f-t" class="card-title"><Icon name="chart" />Facturado por semana</h2>
+                <div class="bars" role="img" aria-label={`Facturado por semana: ${weeks.map(w => `${formatDay(w.semana)}, ${formatCents(Number(w.facturado_cents))}`).join('; ')}`}>
+                  {weeks.map(w => (
+                    <div class="bar-col" title={`Semana del ${formatDay(w.semana)}: ${formatCents(Number(w.facturado_cents))}`}>
+                      <span class="bar" style={`--h:${(Number(w.facturado_cents) / maxBilled) * 100}%`}></span>
+                    </div>
+                  ))}
+                </div>
+                <p class="bars-axis"><span>{formatDay(weeks[0]!.semana)}</span><span>máx. {formatCents(maxBilled === 1 ? 0 : maxBilled)}</span><span>{formatDay(weeks[weeks.length - 1]!.semana)}</span></p>
+              </section>
+            </div>
+          )}
+          {weeks.length > 1 && (
+            <details class="card">
+              <summary>Ver la tabla por semanas</summary>
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>Semana del</th><th class="num-col">Vehículos recibidos</th><th class="num-col">Facturado</th></tr></thead>
+                  <tbody>{weeks.map(w => <tr><td>{formatDay(w.semana)}</td><td class="num-col">{n(w.ordenes)}</td><td class="num-col">{formatCents(Number(w.facturado_cents))}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </details>
+          )}
+        </>
+      )}
+    </>
+  )}
+</PanelLayout>
+
+<style>
+  .section-title { font-size: .8125rem; text-transform: uppercase; letter-spacing: .08em; color: var(--p-muted); margin: 8px 0 10px; font-weight: 600; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-bottom: 20px; }
+  .filters .field { min-width: 0; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 8px; border-bottom: 1px solid var(--p-line); }
+  .bar-col { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
+  .bar-col:hover .bar { background: rgb(var(--p-on-rgb) / 1); }
+  .bar { display: block; width: 100%; max-width: 28px; margin: 0 auto; height: max(var(--h), 2px); background: rgb(var(--p-on-rgb) / .72); border-radius: 4px 4px 0 0; }
+  .bars-axis { display: flex; justify-content: space-between; gap: 8px; font-size: .75rem; color: var(--p-muted); margin: 6px 0 0; }
+  details.card summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+</style>

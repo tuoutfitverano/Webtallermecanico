@@ -4,9 +4,12 @@ import { customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, or
 describe('clientes', () => {
   it('acepta un cliente con solo nombre y normaliza el correo', () => {
     const r = customerInputSchema.parse({ fullName: '  Ana García ', phone: '', email: 'ANA@Correo.ES', internalNotes: '' });
-    expect(r).toEqual({ fullName: 'Ana García', phone: null, email: 'ana@correo.es', internalNotes: null });
+    expect(r).toEqual({ fullName: 'Ana García', phone: null, email: 'ana@correo.es', internalNotes: null, taxId: null, addressLine: null, postalCode: null, city: null, province: null });
   });
   it('rechaza teléfonos y correos no válidos, y nombres vacíos', () => {
+    const fiscal = customerInputSchema.parse({ fullName: 'Talleres Pérez SL', taxId: 'b-12.345.678', postalCode: '28001', city: 'Madrid' });
+    expect(fiscal).toMatchObject({ taxId: 'B12345678', postalCode: '28001', city: 'Madrid', addressLine: null });
+    expect(customerInputSchema.safeParse({ fullName: 'Ana', taxId: '12', postalCode: '2800' }).success).toBe(false);
     const r = customerInputSchema.safeParse({ fullName: 'A', phone: '123', email: 'no-es-correo' });
     expect(r.success).toBe(false);
     const errors = fieldErrors(r.error!);

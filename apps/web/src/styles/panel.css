@@ -461,3 +461,4 @@ a.vcard:hover { border-color: var(--p-line-2); }
 .board-form { display: flex; gap: 6px; align-items: center; }
 .board-form .select, .board-form .input { min-height: 36px; padding-block: 4px; flex: 1; min-width: 0; }
 @media (pointer: coarse) { .board-form .select, .board-form .input { min-height: 44px; } }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em; overflow-wrap: anywhere; }

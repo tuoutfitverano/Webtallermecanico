@@ -69,6 +69,18 @@ const optionalText = (max: number) =>
     .nullish()
     .transform(v => (v ? v : null));
 
+/** Bastidor: 17 caracteres sin I, O ni Q (ISO 3779). Igual que en la base de datos. */
+export const VIN_PATTERN = /^[A-HJ-NPR-Z0-9]{17}$/;
+export const MAX_KM = 3_000_000;
+const kilometres = (message: string) =>
+  z
+    .number({ error: message })
+    .int(message)
+    .min(0, message)
+    .max(MAX_KM, message)
+    .nullish()
+    .transform(v => v ?? null);
+
 /**
  * Datos que el usuario puede enviar al registrar un vehículo.
  * Ojo: el origen de los datos y el estado de verificación NO están aquí a
@@ -92,6 +104,21 @@ export const vehicleInputSchema = z
     fuel: z.enum(FUEL_TYPES, { error: 'Elige un combustible de la lista.' }).nullish().transform(v => v ?? null),
     customerId: z.uuid('Cliente no válido.').nullish().transform(v => v ?? null),
     internalNotes: optionalText(2000),
+    // Opcionales: versión, bastidor, kilómetros y próxima revisión.
+    version: optionalText(80),
+    vin: z
+      .string()
+      .nullish()
+      .transform(v => (v ? v.toUpperCase().replace(/\s/g, '') : null))
+      .refine(v => v === null || VIN_PATTERN.test(v), 'El bastidor (VIN) tiene 17 letras y números, sin I, O ni Q.'),
+    mileage: kilometres('Kilómetros no válidos.'),
+    nextServiceDate: z
+      .string()
+      .nullish()
+      .transform(v => (v ? v : null))
+      .refine(v => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v), 'Fecha no válida.'),
+    nextServiceKm: kilometres('Kilómetros de la próxima revisión no válidos.'),
+    nextServiceNotes: optionalText(500),
   })
   .superRefine((v, ctx) => {
     const check = checkPlate(v.plate, { allowNonStandard: v.confirmNonStandardPlate });
@@ -118,6 +145,12 @@ export const vehicleInputSchema = z
       fuel: v.fuel,
       customerId: v.customerId,
       internalNotes: v.internalNotes,
+      version: v.version,
+      vin: v.vin,
+      mileage: v.mileage,
+      nextServiceDate: v.nextServiceDate,
+      nextServiceKm: v.nextServiceKm,
+      nextServiceNotes: v.nextServiceNotes,
     };
   });
 

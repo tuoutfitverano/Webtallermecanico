@@ -12,26 +12,23 @@ import CustomerFields from '../../../components/panel/CustomerFields.astro';
 import { field, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
-import { customerInputSchema, fieldErrors } from '@talleres/core';
+import { readCustomerForm } from '../../../lib/panel/customer-form.ts';
 
 export const prerender = false;
 
 const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
 
-const values = { full_name: '', phone: '', email: '', internal_notes: '' };
+let values: Record<string, string> = { full_name: '', phone: '', email: '', internal_notes: '' };
 let errors: Partial<Record<string, string>> = {};
 let error = '';
 let duplicates: Array<{ id: string; full_name: string; phone: string | null; email: string | null }> = [];
 
 if (panel.form && panel.workshop) {
-  values.full_name = field(panel.form, 'full_name');
-  values.phone = field(panel.form, 'phone');
-  values.email = field(panel.form, 'email');
-  values.internal_notes = field(panel.form, 'internal_notes');
-  const parsed = customerInputSchema.safeParse({ fullName: values.full_name, phone: values.phone, email: values.email, internalNotes: values.internal_notes });
-  if (!parsed.success) {
-    errors = fieldErrors(parsed.error);
+  const parsed = readCustomerForm(panel.form);
+  values = parsed.values;
+  if (!parsed.ok) {
+    errors = parsed.errors;
     error = 'Revisa los campos marcados.';
     Astro.response.status = 422;
   } else {
@@ -42,7 +39,7 @@ if (panel.form && panel.workshop) {
     }
     if (duplicates.length === 0) {
       const { data, error: e } = await panel.supabase.from('customers')
-        .insert({ workshop_id: panel.workshop.id, full_name: d.fullName, phone: d.phone, email: d.email, internal_notes: d.internalNotes })
+        .insert({ workshop_id: panel.workshop.id, ...parsed.row })
         .select('id').single();
       if (e || !data) {
         logAuth('panel_customer_create_error', e?.code);

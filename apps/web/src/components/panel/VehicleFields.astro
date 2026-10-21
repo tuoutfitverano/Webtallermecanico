@@ -85,6 +85,44 @@ const err = (k: string) => errors[k];
     {FUEL_TYPES.map(f => <option value={f} selected={f === values.fuel}>{FUEL_LABELS[f]}</option>)}
   </select>
 </div>
+<div class="form-row">
+  <div class={`field ${err('version') ? 'has-error' : ''}`}>
+    <label for="version">Versión <span class="muted">(opcional)</span></label>
+    <input class="input" id="version" name="version" maxlength="80" autocomplete="off" placeholder="Ej.: 1.5 TSI Life" value={values.version ?? ''} />
+    {err('version') && <p class="field-error">{err('version')}</p>}
+  </div>
+  <div class={`field ${err('vin') ? 'has-error' : ''}`}>
+    <label for="vin">Bastidor (VIN) <span class="muted">(opcional)</span></label>
+    <input class="input" id="vin" name="vin" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="17 caracteres" value={values.vin ?? ''} aria-invalid={err('vin') ? 'true' : undefined} />
+    {err('vin') && <p class="field-error">{err('vin')}</p>}
+  </div>
+</div>
+<div class={`field ${err('mileage') ? 'has-error' : ''}`}>
+  <label for="mileage">Kilómetros actuales <span class="muted">(opcional)</span></label>
+  <input class="input" id="mileage" name="mileage" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="Ej.: 120500" value={values.mileage ?? ''} aria-invalid={err('mileage') ? 'true' : undefined} />
+  {err('mileage') && <p class="field-error">{err('mileage')}</p>}
+  <p class="hint">Se actualiza solo cuando una orden entra con más kilómetros.</p>
+</div>
+<fieldset class="next-service">
+  <legend>Próxima revisión <span class="muted">(opcional; la ve el cliente en su portal)</span></legend>
+  <div class="form-row">
+    <div class={`field ${err('nextServiceDate') ? 'has-error' : ''}`}>
+      <label for="next_service_date">Fecha</label>
+      <input class="input" type="date" id="next_service_date" name="next_service_date" value={values.next_service_date ?? ''} />
+      {err('nextServiceDate') && <p class="field-error">{err('nextServiceDate')}</p>}
+    </div>
+    <div class={`field ${err('nextServiceKm') ? 'has-error' : ''}`}>
+      <label for="next_service_km">A los kilómetros</label>
+      <input class="input" id="next_service_km" name="next_service_km" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="Ej.: 135000" value={values.next_service_km ?? ''} />
+      {err('nextServiceKm') && <p class="field-error">{err('nextServiceKm')}</p>}
+    </div>
+  </div>
+  <div class={`field ${err('nextServiceNotes') ? 'has-error' : ''}`}>
+    <label for="next_service_notes">Recomendación</label>
+    <input class="input" id="next_service_notes" name="next_service_notes" maxlength="500" placeholder="Ej.: Cambio de aceite y filtros" value={values.next_service_notes ?? ''} />
+    {err('nextServiceNotes') && <p class="field-error">{err('nextServiceNotes')}</p>}
+  </div>
+</fieldset>
 <div class="field note-internal">
   <label for="internal_notes">Notas internas <span class="muted">(solo para el taller)</span></label>
   <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="2000" rows="3">{values.internal_notes ?? ''}</textarea>
@@ -95,3 +133,8 @@ const err = (k: string) => errors[k];
 ) : (
   <p class="hint">Los datos se guardan como <strong>introducidos manualmente</strong> y con verificación externa <strong>pendiente</strong>.{!lookup && ' No se consulta la matrícula en ningún servicio externo.'}</p>
 )}
+
+<style>
+  .next-service { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 10px; }
+  .next-service legend { padding: 0; font-weight: 600; margin-bottom: 4px; }
+</style>

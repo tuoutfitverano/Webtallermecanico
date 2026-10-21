@@ -1,5 +1,9 @@
 ---
-/** Ficha de vehículo: datos, origen y verificación, edición, historial de reparaciones y borrado. */
+/**
+ * Ficha de vehículo: datos, kilómetros y próxima revisión, origen y verificación,
+ * edición, historial (reparaciones con km y trabajos; la oficina ve además
+ * presupuestos y facturas) y borrado.
+ */
 import PanelLayout from '../../../layouts/PanelLayout.astro';
 import Icon from '../../../components/Icon.astro';
 import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
@@ -10,9 +14,9 @@ import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { readVehicleForm } from '../../../lib/panel/vehicle-form.ts';
-import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
+import { formatDate, formatDateTime, formatDay } from '../../../lib/panel/format.ts';
 import {
-  DATA_SOURCE_LABELS, FUEL_LABELS, formatPlate, orderLabel, VERIFICATION_LABELS, YEAR_KIND_LABELS,
+  DATA_SOURCE_LABELS, formatCents, FUEL_LABELS, formatPlate, INVOICE_KIND_LABELS, orderLabel, quoteLabel, QUOTE_STATUS_LABELS, VERIFICATION_LABELS, YEAR_KIND_LABELS,
   type DataSource, type FuelType, type RepairStatus, type VerificationStatus, type YearKind,
 } from '@talleres/core';
 
@@ -31,6 +35,8 @@ const id = Astro.params.id ?? '';
 interface Vehicle {
   id: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null;
   customer_id: string | null; internal_notes: string | null; data_source: DataSource; verification_status: VerificationStatus; created_at: string;
+  version: string | null; vin: string | null; mileage: number | null; mileage_at: string | null;
+  next_service_date: string | null; next_service_km: number | null; next_service_notes: string | null;
   customers: { id: string; full_name: string } | null;
   lookup_fields: Record<string, { value: string | number; state: 'confirmado' | 'modificado' | 'no_usado' }> | null;
   vehicle_lookups: { provider: string; completed_at: string; result: VehicleData } | null;
@@ -78,25 +84,36 @@ if (panel.form && panel.workshop && isUuid(id)) {
 }
 
 let vehicle: Vehicle | null = null;
-let orders: Array<{ id: string; number: number; status: RepairStatus; received_at: string; problem_description: string }> = [];
+let orders: Array<{ id: string; number: number; status: RepairStatus; received_at: string; problem_description: string; mileage_in: number | null; work_done: string | null; repair_order_items: Array<{ description: string }> }> = [];
 let customers: Array<{ id: string; full_name: string; phone: string | null }> = [];
+let quotes: Array<{ id: string; number: number; version: number; status: string; total_cents: number | null; created_at: string; title: string | null }> = [];
+let invoices: Array<{ id: string; full_number: string | null; kind: 'ordinaria' | 'rectificativa'; status: string; total_cents: number | null; issue_date: string | null; created_at: string }> = [];
 if (panel.workshop && isUuid(id)) {
-  const [v, o, c] = await Promise.all([
+  const ws = panel.workshop.id;
+  const office = panel.isOffice;
+  const [v, o, c, q, f] = await Promise.all([
     panel.supabase.from('vehicles')
-      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, customers(id, full_name), lookup_fields, vehicle_lookups(provider, completed_at, result)')
-      .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
-    panel.supabase.from('repair_orders').select('id, number, status, received_at, problem_description')
-      .eq('vehicle_id', id).eq('workshop_id', panel.workshop.id).order('received_at', { ascending: false }).limit(50),
-    panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 200 }),
+      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, version, vin, mileage, mileage_at, next_service_date, next_service_km, next_service_notes, customers(id, full_name), lookup_fields, vehicle_lookups(provider, completed_at, result)')
+      .eq('id', id).eq('workshop_id', ws).maybeSingle(),
+    panel.supabase.from('repair_orders').select('id, number, status, received_at, problem_description, mileage_in, work_done, repair_order_items(description)')
+      .eq('vehicle_id', id).eq('workshop_id', ws).order('received_at', { ascending: false }).limit(50),
+    panel.supabase.rpc('search_customers', { p_workshop_id: ws, p_query: '', p_limit: 200 }),
+    office ? panel.supabase.from('quotes').select('id, number, version, status, total_cents, created_at, title').eq('vehicle_id', id).eq('workshop_id', ws).neq('status', 'sustituido').order('created_at', { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
+    office ? panel.supabase.from('invoices').select('id, full_number, kind, status, total_cents, issue_date, created_at').eq('vehicle_id', id).eq('workshop_id', ws).order('created_at', { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
   ]);
   vehicle = (v.data as unknown as Vehicle | null) ?? null;
-  orders = (o.data ?? []) as typeof orders;
+  orders = (o.data ?? []) as unknown as typeof orders;
   customers = (c.data ?? []) as typeof customers;
+  quotes = (q.data ?? []) as typeof quotes;
+  invoices = (f.data ?? []) as typeof invoices;
 }
+const km = (n: number | null | undefined) => (n === null || n === undefined ? '' : `${n.toLocaleString('es-ES')} km`);
 if (panel.workshop && !vehicle) Astro.response.status = 404;
 const values: Record<string, string> = editValues ?? (vehicle ? {
   plate: vehicle.plate, make: vehicle.make, model: vehicle.model, year: vehicle.year?.toString() ?? '',
   year_kind: vehicle.year_kind ?? '', fuel: vehicle.fuel ?? '', customer_id: vehicle.customer_id ?? '', internal_notes: vehicle.internal_notes ?? '',
+  version: vehicle.version ?? '', vin: vehicle.vin ?? '', mileage: vehicle.mileage?.toString() ?? '',
+  next_service_date: vehicle.next_service_date ?? '', next_service_km: vehicle.next_service_km?.toString() ?? '', next_service_notes: vehicle.next_service_notes ?? '',
 } : {});
 ---
 <PanelLayout panel={panel} title={vehicle ? formatPlate(vehicle.plate) : 'Vehículo'} section="vehiculos">
@@ -120,7 +137,13 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
             <dl class="facts">
               <dt>Cliente</dt><dd>{vehicle.customers ? <a href={`/panel/clientes/${vehicle.customers.id}`}>{vehicle.customers.full_name}</a> : 'Sin cliente asignado'}</dd>
               <dt>Año</dt><dd>{vehicle.year ? `${vehicle.year}${vehicle.year_kind ? ` (${YEAR_KIND_LABELS[vehicle.year_kind].toLowerCase()})` : ''}` : 'Pendiente'}</dd>
+              {vehicle.version && <><dt>Versión</dt><dd>{vehicle.version}</dd></>}
               <dt>Combustible</dt><dd>{vehicle.fuel ? FUEL_LABELS[vehicle.fuel] : 'Sin indicar'}</dd>
+              {vehicle.vin && <><dt>Bastidor (VIN)</dt><dd class="mono">{vehicle.vin}</dd></>}
+              <dt>Kilómetros</dt><dd>{vehicle.mileage !== null ? <>{km(vehicle.mileage)}{vehicle.mileage_at && <span class="muted small"> · {formatDate(vehicle.mileage_at)}</span>}</> : 'Sin registrar'}</dd>
+              <dt>Próxima revisión</dt><dd>{vehicle.next_service_date || vehicle.next_service_km !== null
+                ? [vehicle.next_service_date && formatDay(vehicle.next_service_date), vehicle.next_service_km !== null && `a los ${km(vehicle.next_service_km)}`].filter(Boolean).join(' o ')
+                : 'Sin fijar'}{vehicle.next_service_notes && <><br /><span class="muted small">{vehicle.next_service_notes}</span></>}</dd>
               <dt>Fuente de los datos</dt><dd>{DATA_SOURCE_LABELS[vehicle.data_source]}</dd>
               <dt>Verificación externa</dt><dd>{VERIFICATION_LABELS[vehicle.verification_status]}</dd>
               {vehicle.internal_notes && <><dt>Notas internas</dt><dd class="note-internal">{vehicle.internal_notes}</dd></>}
@@ -146,14 +169,34 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
               <ul class="list">{orders.map(o => (
                 <li><a class="row" href={`/panel/ordenes/${o.id}`}>
                   <span class="row-main">
-                    <span class="row-title"><span class="num">{orderLabel(o.number)}</span>{formatDateTime(o.received_at)}</span>
+                    <span class="row-title"><span class="num">{orderLabel(o.number)}</span>{formatDateTime(o.received_at)}{o.mileage_in !== null && <span class="muted small">{km(o.mileage_in)}</span>}</span>
                     <span class="row-meta">{o.problem_description}</span>
+                    {o.repair_order_items.length > 0 && <span class="row-meta">Trabajos: {o.repair_order_items.slice(0, 4).map(i => i.description).join(' · ')}{o.repair_order_items.length > 4 && ` · y ${o.repair_order_items.length - 4} más`}</span>}
                   </span>
                   <span class="row-side"><StatusBadge status={o.status} /></span>
                 </a></li>
               ))}</ul>
             )}
           </section>
+          {panel.isOffice && (quotes.length > 0 || invoices.length > 0) && (
+            <section class="card" aria-labelledby="docs">
+              <h2 id="docs" class="card-title"><Icon name="file" />Presupuestos y facturas</h2>
+              <ul class="list">
+                {quotes.map(q => (
+                  <li><a class="row" href={`/panel/presupuestos/${q.id}`}>
+                    <span class="row-main"><span class="row-title"><span class="num">{quoteLabel(q.number, q.version)}</span>Presupuesto</span><span class="row-meta">{q.title ?? 'Sin título'} · {formatDate(q.created_at)}</span></span>
+                    <span class="row-side"><span class="pill">{QUOTE_STATUS_LABELS[q.status as keyof typeof QUOTE_STATUS_LABELS] ?? q.status}</span>{q.total_cents !== null && <span class="money-big">{formatCents(Number(q.total_cents))}</span>}</span>
+                  </a></li>
+                ))}
+                {invoices.map(f => (
+                  <li><a class="row" href={`/panel/facturas/${f.id}`}>
+                    <span class="row-main"><span class="row-title"><span class="num">{f.full_number ?? 'Borrador'}</span>{INVOICE_KIND_LABELS[f.kind]}</span><span class="row-meta">{f.issue_date ? `Emitida ${formatDay(f.issue_date)}` : `Creada ${formatDate(f.created_at)}`}</span></span>
+                    <span class="row-side">{f.total_cents !== null && <span class="money-big">{formatCents(Number(f.total_cents))}</span>}</span>
+                  </a></li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
         <section class="card" aria-labelledby="editar">
           <details open={openEdit}>

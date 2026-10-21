@@ -1,7 +1,7 @@
 ---
 /** Campos del formulario de cliente (alta y edición). */
 interface Props {
-  values: { full_name?: string | null; phone?: string | null; email?: string | null; internal_notes?: string | null };
+  values: { full_name?: string | null; phone?: string | null; email?: string | null; internal_notes?: string | null; tax_id?: string | null; address_line?: string | null; postal_code?: string | null; city?: string | null; province?: string | null };
   errors?: Partial<Record<string, string>>;
 }
 const { values, errors = {} } = Astro.props;
@@ -24,8 +24,44 @@ const err = (k: string) => errors[k];
     {err('email') && <p class="field-error" id="email-err">{err('email')}</p>}
   </div>
 </div>
+<details class="fiscal" open={Boolean(values.tax_id || values.address_line || err('taxId') || err('postalCode'))}>
+  <summary>Datos para facturar <span class="muted">(opcional)</span></summary>
+  <div class="form-stack">
+    <p class="hint">Hacen falta para una factura completa (empresa o autónomo). Para particulares basta con el nombre.</p>
+    <div class={`field ${err('taxId') ? 'has-error' : ''}`}>
+      <label for="tax_id">NIF, NIE o CIF</label>
+      <input class="input" id="tax_id" name="tax_id" maxlength="20" autocomplete="off" autocapitalize="characters" value={values.tax_id ?? ''} aria-invalid={err('taxId') ? 'true' : undefined} />
+      {err('taxId') && <p class="field-error">{err('taxId')}</p>}
+    </div>
+    <div class={`field ${err('addressLine') ? 'has-error' : ''}`}>
+      <label for="address_line">Dirección</label>
+      <input class="input" id="address_line" name="address_line" maxlength="200" autocomplete="off" value={values.address_line ?? ''} />
+      {err('addressLine') && <p class="field-error">{err('addressLine')}</p>}
+    </div>
+    <div class="form-row">
+      <div class={`field ${err('postalCode') ? 'has-error' : ''}`}>
+        <label for="postal_code">Código postal</label>
+        <input class="input" id="postal_code" name="postal_code" inputmode="numeric" maxlength="5" autocomplete="off" value={values.postal_code ?? ''} aria-invalid={err('postalCode') ? 'true' : undefined} />
+        {err('postalCode') && <p class="field-error">{err('postalCode')}</p>}
+      </div>
+      <div class={`field ${err('city') ? 'has-error' : ''}`}>
+        <label for="city">Localidad</label>
+        <input class="input" id="city" name="city" maxlength="80" autocomplete="off" value={values.city ?? ''} />
+      </div>
+    </div>
+    <div class={`field ${err('province') ? 'has-error' : ''}`}>
+      <label for="province">Provincia</label>
+      <input class="input" id="province" name="province" maxlength="80" autocomplete="off" value={values.province ?? ''} />
+    </div>
+  </div>
+</details>
 <div class={`field note-internal ${err('internalNotes') ? 'has-error' : ''}`}>
   <label for="internal_notes">Notas internas <span class="muted">(solo para el taller; el cliente nunca las ve)</span></label>
   <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="2000" rows="3">{values.internal_notes ?? ''}</textarea>
   {err('internalNotes') && <p class="field-error">{err('internalNotes')}</p>}
 </div>
+
+<style>
+  .fiscal summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; gap: 6px; }
+  .fiscal .form-stack { margin-top: 6px; }
+</style>

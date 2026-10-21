@@ -27,8 +27,27 @@ describe('validateVehicle', () => {
         fuel: 'gasolina',
         customerId: null,
         internalNotes: null,
+        version: null,
+        vin: null,
+        mileage: null,
+        nextServiceDate: null,
+        nextServiceKm: null,
+        nextServiceNotes: null,
       },
     });
+  });
+
+  it('versión, bastidor, kilómetros y próxima revisión (opcionales)', () => {
+    const base = { plate: '1950BXF', make: 'VW', model: 'Golf', year: 2018, yearKind: 'fabricacion' as const };
+    const r = validateVehicle({ ...base, version: ' 1.5 TSI ', vin: 'wvw zzz1kz 8w123456', mileage: 120500, nextServiceDate: '2027-03-01', nextServiceKm: 135000, nextServiceNotes: 'Cambio de aceite' });
+    expect(r.ok && r.data).toMatchObject({ version: '1.5 TSI', vin: 'WVWZZZ1KZ8W123456', mileage: 120500, nextServiceDate: '2027-03-01', nextServiceKm: 135000 });
+    const bad = validateVehicle({ ...base, vin: 'WVWZZZ1KZ8W12345O', mileage: -1, nextServiceDate: '01/03/2027' });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) {
+      expect(bad.errors.vin).toMatch(/17/);
+      expect(bad.errors.mileage).toBeDefined();
+      expect(bad.errors.nextServiceDate).toBe('Fecha no válida.');
+    }
   });
 
   it('no deja fijar el origen de datos ni la verificación desde el formulario', () => {

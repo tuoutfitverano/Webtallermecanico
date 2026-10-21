@@ -14,8 +14,20 @@ export const customerInputSchema = z
     phone: optText(30),
     email: optText(254),
     internalNotes: optText(2000),
+    // Datos para facturar (opcionales; la factura completa necesita NIF y dirección).
+    taxId: optText(20),
+    addressLine: optText(200),
+    postalCode: optText(5),
+    city: optText(80),
+    province: optText(80),
   })
   .superRefine((v, ctx) => {
+    if (v.taxId && !/^[A-Z0-9]{8,12}$/.test(v.taxId.toUpperCase().replace(/[\s.-]/g, ''))) {
+      ctx.addIssue({ code: 'custom', path: ['taxId'], message: 'NIF/NIE/CIF no válido (8 a 12 letras y números).' });
+    }
+    if (v.postalCode && !/^\d{5}$/.test(v.postalCode)) {
+      ctx.addIssue({ code: 'custom', path: ['postalCode'], message: 'El código postal tiene 5 cifras.' });
+    }
     if (v.phone) {
       const digits = v.phone.replace(/\D/g, '');
       if (digits.length < 9 || digits.length > 15 || !/^[+\d\s().-]+$/.test(v.phone)) {
@@ -26,7 +38,7 @@ export const customerInputSchema = z
       ctx.addIssue({ code: 'custom', path: ['email'], message: 'Correo electrónico no válido.' });
     }
   })
-  .transform(v => ({ ...v, email: v.email ? v.email.toLowerCase() : null }));
+  .transform(v => ({ ...v, email: v.email ? v.email.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase().replace(/[\s.-]/g, '') : null }));
 
 export type CustomerData = z.output<typeof customerInputSchema>;
 
