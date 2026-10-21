@@ -4,13 +4,14 @@
  * pero con pocas secciones y textos pensados para quien no es mecánico.
  */
 import { ClientRouter } from 'astro:transitions';
-import '@fontsource/instrument-serif/latin-400-italic.css';
 import '@fontsource/barlow/latin-300.css';
 import '@fontsource/barlow/latin-400.css';
 import '@fontsource/barlow/latin-500.css';
 import '@fontsource/barlow/latin-600.css';
+import '@fontsource-variable/archivo/standard.css';
 import '../styles/site.css';
 import '../styles/panel.css';
+import '../styles/app.css';
 import ColorPicker from '../components/panel/ColorPicker.astro';
 import ThemeScript from '../components/ThemeScript.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
@@ -37,14 +38,14 @@ const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' 
 ];
 const linked = portal.records.length > 0;
 const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_name : portal.records.length > 1 ? `${portal.records.length} talleres` : '';
-// Color de las tarjetas elegido en este dispositivo (verde si no hay elección).
+// Color de las tarjetas elegido en este dispositivo (grafito si no hay elección).
 const color = panelColor(Astro.cookies.get(PANEL_COLOR_COOKIE)?.value);
 // Modo claro u oscuro de este dispositivo (claro si no se ha elegido).
 const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.portal);
 const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
 ---
 <!doctype html>
-<html lang="es" transition:animate="none" data-color={color} data-theme={theme} data-cookies={consent ?? undefined}>
+<html lang="es" data-area="app" transition:animate="none" data-color={color} data-theme={theme} data-cookies={consent ?? undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -57,7 +58,7 @@ const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
     <!-- Color elegido: también en localStorage (vista previa sin servidor o sin cookies). -->
     <script define:vars={{ ids: PANEL_COLORS.map(c => c.id) }}>
       // Si hay cookie, manda ella (es lo que ha pintado el servidor), sea válida o no;
-      // sin cookie, localStorage. Solo se aceptan colores de la lista: si no, verde.
+      // sin cookie, localStorage. Solo se aceptan colores de la lista: si no, el predeterminado.
       const read = f => { try { return f(); } catch { return null; } };
       const apply = () => {
         const c = read(() => /(?:^|;\s*)color_panel=([^;]*)/.exec(document.cookie)?.[1]) ?? read(() => localStorage.getItem('color_panel'));

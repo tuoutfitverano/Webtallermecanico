@@ -36,12 +36,13 @@ def font(m):
     path = m.group(1).replace('/@fs', '', 1)
     if path not in fonts:
         fonts[path] = base64.b64encode(open(path, 'rb').read()).decode()
-    return f'url(data:font/woff2;base64,{fonts[path]}) format("woff2")'
+    return f'url(data:font/woff2;base64,{fonts[path]}) format("{m.group(2)}")'
 
 
 def style_file(css):
     css = re.sub(r',\s*url\(/@fs[^)]*\.woff\)\s*format\(["\']woff["\']\)', '', css)
-    css = re.sub(r'url\((/@fs[^)]*\.woff2)\)\s*format\(["\']woff2["\']\)', font, css)
+    # Fuentes normales (woff2) y variables (woff2-variations, p. ej. Archivo).
+    css = re.sub(r'url\((/@fs[^)]*\.woff2)\)\s*format\(["\'](woff2(?:-variations)?)["\']\)', font, css)
     assert '/@fs' not in css
     name = f'assets/s-{hashlib.sha1(css.encode()).hexdigest()[:10]}.css'
     if name not in styles:

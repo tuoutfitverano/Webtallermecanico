@@ -3,13 +3,15 @@
  * Página no encontrada (404).
  *
  *  · En la web de un taller: con su nombre, su acento y salidas útiles (inicio,
- *    pedir cita, llamar y área de clientes), en el modo claro u oscuro elegido.
+ *    pedir cita, llamar y área de clientes), en el modo claro u oscuro elegido
+ *    y con la tipografía del diseño premium (Archivo ancho en mayúsculas).
  *  · Fuera de una web de taller (dominio desconocido o área privada): con el
  *    estilo de la plataforma.
  *
  * Responde con estado 404 y no se indexa. Muestra la dirección pedida (Astro la
  * escapa) para que se vea qué estaba mal escrito; nunca detalles técnicos.
  */
+import '@fontsource-variable/archivo/standard.css';
 import AuthLayout from '../layouts/AuthLayout.astro';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Icon from '../components/Icon.astro';
@@ -31,15 +33,14 @@ const canAsk = Boolean(site?.sections.solicitudes);
 {site ? (
   <SiteLayout site={site} title={`Página no encontrada · ${site.name}`} noindex>
     <div class="nf">
-      <div class="ambient" aria-hidden="true"></div>
       <header class="nf-top">
-        <a href="/" class="nf-brand heading">{site.name}</a>
+        <a href="/" class="nf-brand">{site.name}</a>
         <ThemeToggle current={theme} class="round-btn liquid-glass" />
       </header>
       <main class="nf-main" aria-labelledby="nf-t">
         <p class="nf-code" aria-hidden="true">404</p>
-        <p class="label">// Error 404</p>
-        <h1 id="nf-t" class="nf-title heading">Esta página no existe</h1>
+        <p class="label">Error 404</p>
+        <h1 id="nf-t" class="nf-title">Esta página no existe</h1>
         <p class="nf-lead">No encontramos <code class="nf-path">{path}</code>. Puede que la dirección esté mal escrita o que la página ya no exista.</p>
         <nav class="nf-actions" aria-label="Qué puedes hacer">
           <a class="btn btn-primary" href="/"><Icon name="arrow" class="nf-back" />Volver al inicio</a>
@@ -53,7 +54,7 @@ const canAsk = Boolean(site?.sections.solicitudes);
 ) : (
   <AuthLayout title="Página no encontrada" back={{ href: '/', label: 'Volver al inicio' }}>
     <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
-      <p class="label">// Error 404</p>
+      <p class="label">Error 404</p>
       <h1 id="titulo" class="auth-title heading">Página no encontrada</h1>
       <p class="auth-lead">No encontramos <code class="nf-path">{path}</code>. La dirección no existe o ha cambiado.</p>
       <nav class="auth-links"><a href="/">Ir al inicio</a><a href="/mi-area">Mi área</a></nav>
@@ -63,25 +64,33 @@ const canAsk = Boolean(site?.sections.solicitudes);
 
 <style>
   .nf { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; overflow: hidden; }
-  .nf .ambient { opacity: .7; }
+  .nf::before {
+    content: ''; position: absolute; inset: 0 0 auto; height: 360px; pointer-events: none;
+    background: radial-gradient(60% 100% at 30% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
+  }
+  .nf-brand, .nf-title, .nf-code, .nf .label, .nf .btn { font-family: 'Archivo Variable', 'Archivo', 'Helvetica Neue', Arial, sans-serif; font-style: normal; text-transform: uppercase; }
   .nf-top {
     position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: max(16px, env(safe-area-inset-top, 0px)) var(--gutter-r) 0 var(--gutter);
   }
-  .nf-brand { font-size: 1.5rem; text-decoration: none; color: var(--fg); min-height: 44px; display: inline-flex; align-items: center; }
+  .nf-brand { font-stretch: 118%; font-size: 1rem; font-weight: 800; letter-spacing: .04em; text-decoration: none; color: var(--fg); min-height: 44px; display: inline-flex; align-items: center; }
   .nf-main {
     position: relative; z-index: 1; flex: 1; width: 100%; max-width: 720px; margin-inline: auto;
     display: flex; flex-direction: column; justify-content: center; gap: 16px;
     padding: 32px var(--gutter-r) 64px var(--gutter);
   }
   .nf-code {
-    margin: 0 0 -8px; font-family: var(--font-heading); font-style: italic; line-height: .85; letter-spacing: -.04em;
-    font-size: clamp(6rem, 30vw, 13rem);
+    margin: 0 0 -4px; font-stretch: 125%; font-weight: 900; line-height: .8; letter-spacing: -.035em;
+    font-size: clamp(5.5rem, 28vw, 12rem);
     color: transparent; -webkit-text-stroke: 1px color-mix(in srgb, var(--fg) 45%, transparent);
     background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 55%, var(--fg)) 0%, transparent 95%);
     -webkit-background-clip: text; background-clip: text; user-select: none;
   }
-  .nf-title { margin: 0; font-size: clamp(2.25rem, 7vw, 3.75rem); line-height: 1; letter-spacing: -1px; text-wrap: balance; }
+  .nf-title { margin: 0; font-stretch: 118%; font-weight: 800; font-size: clamp(1.9rem, 6.5vw, 3.5rem); line-height: .95; letter-spacing: -.015em; text-wrap: balance; }
+  .nf .label { display: flex; align-items: center; gap: 12px; margin: 0; font-stretch: 110%; font-size: .75rem; font-weight: 600; letter-spacing: .18em; color: var(--fg-80); }
+  .nf .label::before { content: ''; width: 28px; height: 1px; background: var(--accent); }
+  .nf .btn { font-stretch: 112%; font-size: .78rem; font-weight: 650; letter-spacing: .1em; }
+  @media (max-width: 420px) { .nf .btn { letter-spacing: .05em; } }
   .nf-lead { margin: 0; color: var(--fg-80); font-size: 1.0625rem; line-height: 1.6; max-width: 56ch; }
   .nf-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; padding: 1px 6px; border-radius: 6px; background: var(--field); border: 1px solid var(--line); overflow-wrap: anywhere; }
   .nf-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }

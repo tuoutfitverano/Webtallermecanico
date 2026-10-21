@@ -6,7 +6,7 @@
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { PANEL_COLORS } from '../src/lib/panel/colors.ts';
+import { DEFAULT_PANEL_COLOR, PANEL_COLORS } from '../src/lib/panel/colors.ts';
 import { acceptCookies } from './consent.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
@@ -119,7 +119,7 @@ test('panel en cada color pastel: contraste y accesibilidad', async ({ page, con
   const f = await fixtures();
   await login(page, 'propietaria@e2e.test', '/panel');
   // En el panel el modo claro es el predeterminado; el oscuro se comprueba también (menos pantallas).
-  for (const c of PANEL_COLORS.filter(x => x.id !== 'verde')) {
+  for (const c of PANEL_COLORS.filter(x => x.id !== DEFAULT_PANEL_COLOR)) {
     await context.addCookies([{ name: 'color_panel', value: c.id, url: page.url() }, { name: 'tema', value: 'oscuro', url: page.url() }]);
     await audit(page, ['/panel', `/panel/ordenes/${f.order}`], false);
     await context.addCookies([{ name: 'tema', value: 'claro', url: page.url() }]);
@@ -336,7 +336,7 @@ test('portal en cada color pastel: contraste y accesibilidad', async ({ page, co
   test.setTimeout(240_000);
   const f = await fixtures();
   await login(page, f.email, '/portal');
-  for (const c of PANEL_COLORS.filter(x => x.id !== 'verde')) {
+  for (const c of PANEL_COLORS.filter(x => x.id !== DEFAULT_PANEL_COLOR)) {
     await context.addCookies([{ name: 'color_panel', value: c.id, url: page.url() }]);
     await audit(page, ['/portal', `/portal/reparaciones/${f.order}`, '/portal/vehiculos', '/portal/datos'], false);
   }
@@ -344,7 +344,7 @@ test('portal en cada color pastel: contraste y accesibilidad', async ({ page, co
 
 test('color del panel: se aplica al momento, se recuerda y un valor inventado se ignora', async ({ page, context }) => {
   await login(page, 'propietaria@e2e.test', '/panel');
-  await expect(page.locator('html')).toHaveAttribute('data-color', 'verde');
+  await expect(page.locator('html')).toHaveAttribute('data-color', DEFAULT_PANEL_COLOR);
   await page.getByRole('button', { name: 'Color del panel' }).or(page.locator('[data-color-pick] > summary')).first().click();
   await page.getByRole('button', { name: 'Lavanda' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-color', 'lavanda');
@@ -356,10 +356,10 @@ test('color del panel: se aplica al momento, se recuerda y un valor inventado se
   const card = page.locator('.kpi').first();
   expect(await card.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(227, 220, 244)');
   expect(await card.evaluate(el => getComputedStyle(el).color)).toBe('rgb(28, 30, 29)');
-  // Un valor manipulado en la cookie no rompe nada: vuelve al verde.
+  // Un valor manipulado en la cookie no rompe nada: vuelve al predeterminado.
   await context.addCookies([{ name: 'color_panel', value: '"><script>', url: page.url() }]);
   await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-color', 'verde');
+  await expect(page.locator('html')).toHaveAttribute('data-color', DEFAULT_PANEL_COLOR);
 });
 
 test.describe('color del panel sin JavaScript', () => {

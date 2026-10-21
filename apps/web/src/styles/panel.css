@@ -1,7 +1,7 @@
 /* =========================================================
-   Panel del taller: misma identidad (paleta verde y crema —o el pastel que elija cada
-   persona—, Instrument Serif para títulos,
-   Barlow para texto) pero más denso y funcional que la web pública:
+   Panel del taller y portal del cliente: la identidad del diseño premium de la web
+   (carbón, grafito y blanco roto —o el verde o el pastel que elija cada persona—;
+   titulares en Archivo ancho, en app.css; texto en Barlow) pero más denso y funcional:
    superficies opacas, buen contraste y objetivos táctiles grandes.
    ========================================================= */
 :root {
@@ -13,17 +13,17 @@
     puede elegir un tono pastel (lib/panel/colors.ts → <html data-color>); dentro de
     las superficies el texto, las líneas y los estados se recalculan (ver más abajo).
   */
-  --p-surface: #1F4536;
-  --p-surface-2: color-mix(in srgb, #1F4536 82%, #8A9A7B);
+  --p-surface: #141517;
+  --p-surface-2: #202125;
   --p-on-rgb: 239 232 218;
-  /* Salvia aclarada: legible también sobre las tarjetas (#1F4536). */
-  --p-on-muted: color-mix(in srgb, #8A9A7B 45%, #EFE8DA);
-  --p-on-ink: #0F2A22;
+  /* Gris metálico aclarado: legible sobre el grafito. */
+  --p-on-muted: color-mix(in srgb, #8d9196 50%, #EFE8DA);
+  --p-on-ink: #141517;
   /* Sobre el fondo negro */
   --p-line: rgb(239 232 218 / .12);
   --p-line-2: rgb(239 232 218 / .2);
   --p-text: #EFE8DA;
-  --p-muted: color-mix(in srgb, #8A9A7B 45%, #EFE8DA);
+  --p-muted: color-mix(in srgb, #8d9196 50%, #EFE8DA);
   /* Colores de estado con contraste sobre fondo oscuro */
   --tone-slate: #cbd5e1;
   --tone-info: #7dd3fc;
@@ -37,17 +37,26 @@
 }
 
 /*
-  Modo claro (data-theme="claro"; en el panel es el predeterminado): fondo crema
-  claro, texto verde muy oscuro y estados en versión oscura. Con el color «verde»
-  la barra lateral sigue verde y las tarjetas pasan a blanco roto; con un pastel,
-  todo lleva ese pastel.
+  Modo claro (data-theme="claro"; en el panel es el predeterminado): fondo blanco
+  roto, texto casi negro y estados en versión oscura. Con «grafito» o «verde» la
+  barra lateral sigue oscura y las tarjetas pasan a blanco; con un pastel, todo
+  lleva ese pastel.
 */
+/* Verde (el color anterior), a elegir. */
+:root[data-color='verde'] {
+  --p-surface: #1F4536;
+  --p-surface-2: color-mix(in srgb, #1F4536 82%, #8A9A7B);
+  /* Salvia aclarada: legible también sobre las tarjetas (#1F4536). */
+  --p-on-muted: color-mix(in srgb, #8A9A7B 45%, #EFE8DA);
+  --p-on-ink: #0F2A22;
+}
+
 :root[data-theme='claro'] {
   --p-bg: var(--bg);
-  --p-text: #0F2A22;
-  --p-muted: #4A5C52;
-  --p-line: rgb(15 42 34 / .13);
-  --p-line-2: rgb(15 42 34 / .22);
+  --p-text: #141517;
+  --p-muted: #4F5358;
+  --p-line: rgb(20 21 23 / .13);
+  --p-line-2: rgb(20 21 23 / .22);
   --p-top-bg: rgb(245 241 233 / .92);
   --p-tabs-bg: rgb(251 249 244 / .97);
   --p-shadow: rgb(40 34 22 / .18);
@@ -61,15 +70,16 @@
   --tone-bad: #9f1239;
   --tone-bad-soft: #991b1b;
 }
-:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
+:root[data-theme='claro']:is([data-color='grafito'], [data-color='verde']) :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
   --p-surface: #FFFDF8;
   --p-surface-2: #F1ECE1;
-  --p-on-muted: #4A5C52;
+  --p-on-muted: #4F5358;
 }
+:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) { --p-on-muted: #4A5C52; }
 
 /* Tonos pastel (y tarjetas claras): superficies claras, texto oscuro y estados en versión oscura. */
-:root[data-color]:not([data-color='verde']),
-:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
+:root[data-color]:not([data-color='verde']):not([data-color='grafito']),
+:root[data-theme='claro']:is([data-color='grafito'], [data-color='verde']) :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
   --p-on-rgb: 28 30 29;
   --p-on-ink: var(--p-surface);
   --p-tone-slate: #334155;

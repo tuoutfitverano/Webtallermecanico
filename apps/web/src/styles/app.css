@@ -1,0 +1,174 @@
+/* =========================================================
+   Área privada (acceso, cuenta, panel del taller y portal del cliente) con el
+   diseño premium de la web: carbón, grafito y blanco roto; titulares en
+   Archivo ancho y en mayúsculas; etiquetas con raya; botones en píldora con
+   letras espaciadas. Sin cristal ni luces de fondo.
+
+   Se carga DESPUÉS de site.css y panel.css, solo en las plantillas del área
+   privada (<html data-area="app">). Mismos tokens en claro y en oscuro: los
+   colores salen de las variables de site.css y panel.css.
+   ========================================================= */
+
+:root[data-area='app'] {
+  --font-display: 'Archivo Variable', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --ink: #141517;
+  --app-card: #111214;
+  --app-raise: 0 1px 0 rgb(var(--fg-rgb) / .04) inset;
+}
+/* Claro: blanco roto y texto casi negro (como la web en claro). */
+:root[data-area='app'][data-theme='claro'] {
+  --fg: #141517;
+  --fg-rgb: 20 21 23;
+  --ink: #F5F1E9;
+  --fg-90: rgb(20 21 23 / .9);
+  --fg-80: rgb(20 21 23 / .84);
+  --fg-60: rgb(20 21 23 / .72);
+  --fg-45: rgb(20 21 23 / .64);
+  --line: rgb(20 21 23 / .14);
+  --line-2: rgb(20 21 23 / .24);
+  --field: #FFFDF8;
+  --app-card: #FFFDF8;
+  --app-raise: 0 1px 2px rgb(40 34 22 / .06);
+}
+
+/* ---------- Tipografía ---------- */
+[data-area='app'] :is(.heading, .auth-title, .account-title, .panel-title, .pnl-title, .vcard-title, .workshop-name, .nf-title) {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-stretch: 116%;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: -.015em;
+  line-height: .98;
+  text-wrap: balance;
+}
+[data-area='app'] .auth-title { font-size: clamp(1.75rem, 6.4vw, 2.5rem); margin-bottom: 14px; }
+[data-area='app'] .account-title { font-size: clamp(2rem, 7vw, 3rem); }
+[data-area='app'] .panel-title { font-size: 1.375rem; letter-spacing: 0; }
+[data-area='app'] .workshop-name { font-size: 1.125rem; letter-spacing: .01em; }
+[data-area='app'] .pnl-title { font-size: clamp(1.625rem, 5.5vw, 2.5rem); }
+[data-area='app'] .vcard-title { font-size: 1.375rem; }
+
+/* Etiquetas («kicker»): mayúsculas espaciadas con una raya delante. */
+[data-area='app'] .label {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px;
+  font-family: var(--font-display); font-stretch: 110%;
+  font-size: .75rem; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--fg-80);
+}
+[data-area='app'] .label::before { content: ''; width: 28px; height: 1px; flex: none; background: currentColor; opacity: .7; }
+
+/* Títulos de tarjeta, cabeceras de tabla y leyendas: el mismo lenguaje, más pequeño. */
+[data-area='app'] :is(.card-title, .color-pick-title) {
+  font-family: var(--font-display); font-stretch: 112%;
+  font-size: .8125rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+}
+[data-area='app'] :is(.data-table th, .team-table th) {
+  font-family: var(--font-display); font-stretch: 110%;
+  font-size: .6875rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+}
+[data-area='app'] .kpi-value {
+  font-family: var(--font-display); font-style: normal; font-stretch: 112%;
+  font-weight: 800; font-size: 2.5rem; letter-spacing: -.02em;
+}
+[data-area='app'] .kpi-label { font-size: .8125rem; letter-spacing: .02em; }
+
+/* ---------- Botones ---------- */
+[data-area='app'] .btn {
+  font-family: var(--font-display); font-stretch: 112%;
+  font-size: .78rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase;
+  border-radius: 999px; transition: background-color .25s, color .25s, border-color .25s;
+}
+[data-area='app'] .btn:hover { border-color: var(--fg); background: transparent; }
+[data-area='app'] .btn-primary { background: var(--fg); color: var(--ink); border-color: var(--fg); }
+[data-area='app'] .btn-primary:hover { background: rgb(var(--fg-rgb) / .86); }
+[data-area='app'] .btn-sm { font-size: .7rem; letter-spacing: .08em; padding-inline: 14px; }
+[data-area='app'] .btn-danger { color: var(--tone-bad-soft, var(--bad)); }
+/* Móviles pequeños: el texto del botón cabe sin salirse. */
+@media (max-width: 420px) { [data-area='app'] .btn { letter-spacing: .05em; padding-inline: 16px; } }
+[data-area='app'] :is(a, button, summary, input[type='checkbox'], input[type='radio']):focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+
+/* Botón «Volver» y pestañas de filtro: píldoras finas en mayúsculas. */
+[data-area='app'] :is(.back-link, .pnl-back, .filter-tabs a) {
+  font-family: var(--font-display); font-stretch: 110%;
+  font-size: .7rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+}
+
+/* ---------- Formularios ---------- */
+[data-area='app'] :is(.input, .select, .textarea) { border-radius: 10px; }
+[data-area='app'] .field > label { font-weight: 500; }
+
+/* ---------- Acceso, registro, cuenta e invitaciones ---------- */
+[data-area='app'] .auth-body > .ambient { display: none; }
+[data-area='app'] .auth-body { background: var(--bg); }
+/* Una línea fina de luz en lo alto, como la cabecera de la web. */
+[data-area='app'] .auth-body::before {
+  content: ''; position: fixed; inset: 0 0 auto; height: 280px; z-index: 0; pointer-events: none;
+  background: radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+}
+[data-area='app'] .auth-top { border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+[data-area='app'] :is(.auth-body .liquid-glass, .auth-body .liquid-glass-strong) {
+  background: var(--app-card);
+  border: 1px solid var(--line);
+  box-shadow: var(--app-raise);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+[data-area='app'] :is(.auth-body .liquid-glass, .auth-body .liquid-glass-strong)::before { display: none; }
+[data-area='app'] .auth-card { border-radius: 18px; padding: clamp(24px, 5vw, 36px) clamp(18px, 4.5vw, 32px); }
+[data-area='app'] .panel { border-radius: 16px; }
+[data-area='app'] .auth-links a { font-size: .875rem; }
+
+/* Marca: inicial en Archivo dentro de un círculo fino (igual en el acceso y el panel). */
+[data-area='app'] .brand-mark {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line-2); background: transparent;
+  font-family: var(--font-display); font-style: normal; font-stretch: 120%; font-weight: 800; font-size: 1rem; text-transform: uppercase;
+  -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none;
+}
+[data-area='app'] .brand-mark::before { display: none; }
+[data-area='app'] :is(.brand-name, .pnl-brand-text) {
+  font-family: var(--font-display); font-style: normal; font-stretch: 115%;
+  font-size: .875rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+}
+[data-area='app'] .role-pill { font-family: var(--font-display); font-stretch: 110%; font-size: .65rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+
+/* ---------- Panel y portal ---------- */
+[data-area='app'] .pnl-workshop-name {
+  font-family: var(--font-display); font-style: normal; font-stretch: 112%;
+  font-size: 1rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase;
+}
+[data-area='app'] .pnl-role { font-family: var(--font-display); font-stretch: 110%; font-size: .625rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+[data-area='app'] .pnl-nav-link, [data-area='app'] .pnl-side-link {
+  font-family: var(--font-display); font-stretch: 110%;
+  font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  border-radius: 999px;
+}
+[data-area='app'] .pnl-side { gap: 28px; }
+[data-area='app'] .pnl-side .pnl-brand { padding: 4px 4px 18px; border-bottom: 1px solid var(--p-line); }
+[data-area='app'] :is(.card, .kpi, .vcard) { border-radius: 16px; }
+[data-area='app'] .kpi { justify-content: space-between; }
+[data-area='app'] .kpi:hover { border-color: var(--p-line-2); }
+/* El título de la página lleva una raya de acento debajo, como las secciones de la web. */
+[data-area='app'] .pnl-head > div:first-child > .pnl-title::after {
+  content: ''; display: block; width: 44px; height: 2px; margin-top: 14px; background: var(--accent);
+}
+[data-area='app'] .pnl-title .status { vertical-align: .35em; }
+[data-area='app'] .row-title { font-weight: 600; }
+[data-area='app'] .empty strong { font-family: var(--font-display); font-stretch: 110%; font-size: .875rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+[data-area='app'] .status-picker button { font-size: .7rem; }
+[data-area='app'] .pnl-tab { font-family: var(--font-display); font-stretch: 108%; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: .6rem; }
+[data-area='app'] .pnl-tabs-6 .pnl-tab { font-size: .55rem; letter-spacing: .02em; }
+@media (orientation: landscape) and (max-height: 500px) { [data-area='app'] .pnl-tab { font-size: .65rem; } }
+[data-area='app'] .pnl-more-menu a { font-family: var(--font-display); font-stretch: 110%; font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+
+/* ---------- Página no encontrada ---------- */
+[data-area='app'] .nf-path { border-radius: 6px; }
+[data-area='app'] .status { text-transform: none; }
+/* Móvil: el nombre del taller cabe entero (letra más estrecha) y la etiqueta del rol cede el sitio. */
+@media (max-width: 600px) {
+  [data-area='app'] .pnl-workshop-name { font-size: .875rem; font-stretch: 100%; letter-spacing: .02em; }
+}
+@media (max-width: 440px) { [data-area='app'] .pnl-role { display: none; } }
+/* Los campos de texto ya marcan el foco con su borde: sin doble anillo. */
+[data-area='app'] :is(.input, .select, .textarea):focus-visible { outline: none; border-color: var(--fg); }
