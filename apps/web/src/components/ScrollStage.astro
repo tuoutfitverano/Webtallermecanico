@@ -3,7 +3,8 @@
  * Escenario con el coche de fondo para la portada y los servicios:
  *  1. Portada: el coche (primer fotograma, dentro de su fondo si lo hay) detrás del texto, oscurecido.
  *  2. Al bajar hacia los servicios, el coche gira al ritmo del scroll (vuelta completa
- *     o la parte que diga frames.turn; turnGap/zoomGap = espacio propio de cada transición).
+ *     o la parte que diga frames.turn, o hasta frames.endFrame, hacia delante o hacia atrás
+ *     con frames.reverse; turnGap/zoomGap = espacio propio de cada transición).
  *  3. Antes de la tercera sección, la cámara se acerca hasta la ventanilla
  *     tintada (focusX/focusY) y la pantalla queda oscura: transición a la siguiente.
  *
@@ -26,6 +27,8 @@ const { frames } = Astro.props;
   data-focus-x={frames.focusX}
   data-focus-y={frames.focusY}
   data-turn={frames.turn}
+  data-end-frame={frames.endFrame ?? undefined}
+  data-reverse={frames.reverse ? 'true' : undefined}
   style={`--turn-gap:${frames.turnGap * 100}vh;--zoom-gap:${frames.zoomGap * 100}vh`}
 >
   <div class="stage-sticky" aria-hidden="true">

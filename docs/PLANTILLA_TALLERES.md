@@ -79,6 +79,7 @@ El archivo **no se lee en producción**: la web lee la base de datos. El archivo
      - `software`: qué funciones se enseñan (`ordenes`, `clientes`, `portal`, `avisos`, `solicitudes`, `equipo`, `matriculas`);
      - opcionales: `scrollFrames` (coche que gira) y `heroVideo` (vídeo de portada; solo https y con licencia);
      - en `scrollFrames`, el ritmo: `turn` (parte del giro: `1` vuelta completa, `0.5` media vuelta) y `turnGap` / `zoomGap` (espacio de cada transición en alturas de pantalla; AutoValue usa `0.35` y `0.85` para que se funda con las secciones).
+     - dónde acaba el giro: `endFrame` (número del último fotograma; si está, manda sobre `turn`) y `reverse: true` para girar hacia el otro lado (000 → último → … → `endFrame`, el último fotograma de la secuencia debe ser casi igual al primero). AutoValue: `reverse: true`, `endFrame: 51` (vista trasera en tres cuartos, como la foto de referencia) y `focusX`/`focusY` = `0.36`/`0.40`, el centro de la luna trasera de ese fotograma.
 3. **Imágenes:** déjalas en `apps/web/public/<slug>/` y usa rutas como `/talleres-garcia/logo.svg`. Solo fotos y vídeos propios del taller o con licencia.
 4. **Comprueba:** `npm test`. Si hay una clave mal escrita o un valor que la web ignoraría, la prueba dice cuál.
 5. **Genera el SQL:** `npm run taller:sql -- talleres/talleres-garcia.json > talleres-garcia.sql`. Revísalo y ejecútalo en el **SQL Editor** de Supabase. Crea el taller y su propietario si no existen, carga la web y añade los dominios.

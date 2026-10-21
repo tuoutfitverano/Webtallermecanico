@@ -411,7 +411,7 @@ test.describe('Panel · móvil y usuarios sin taller', () => {
 
 // ======================================================================
 test.describe('Web pública', () => {
-  test('el coche gira media vuelta con el scroll y se acerca a la ventanilla antes del software', async ({ page }) => {
+  test('el coche gira hacia atrás hasta la vista trasera y se acerca a la luna trasera antes del software', async ({ page }) => {
     const frames: string[] = [];
     page.on('request', r => { if (r.url().includes('/demo/autovalue/giro/')) frames.push(r.url()); });
     await page.goto('/');
@@ -420,16 +420,16 @@ test.describe('Web pública', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('La mecánica evoluciona.');
     const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));
     expect(await dim()).toBeGreaterThan(0.5); // portada: coche oscurecido detrás del texto
-    // A mitad del giro (media vuelta, ya fundida con la portada) el coche se ve limpio.
+    // A mitad del giro (ya fundido con la portada) el coche se ve limpio.
     // La portada puede ser más alta que la pantalla: se baja la mitad de la portada.
     await page.evaluate(() => { const h = document.querySelector<HTMLElement>('.stage-content > section')!; scrollTo(0, h.getBoundingClientRect().top + scrollY + h.offsetHeight * 0.5); });
     await expect.poll(dim).toBeLessThan(0.2);
-    // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza el software.
+    // Al final del zoom la pantalla queda oscura (la luna trasera tintada) y empieza el software.
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
     await expect.poll(dim).toBeGreaterThan(0.95);
-    // Media vuelta: solo se descargan los fotogramas 000–036.
-    expect(new Set(frames).size).toBeGreaterThan(20);
-    expect(Math.max(...frames.map(f => Number(/giro\/(\d+)\.webp/.exec(f)![1])))).toBe(36);
+    // Giro hacia atrás 000 → 072 → … → 051 (vista trasera en tres cuartos): solo se descargan esos 23 fotogramas.
+    const used = [...new Set(frames.map(f => Number(/giro\/(\d+)\.webp/.exec(f)![1])))].sort((a, b) => a - b);
+    expect(used).toEqual([0, ...Array.from({ length: 22 }, (_, i) => 51 + i)]);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

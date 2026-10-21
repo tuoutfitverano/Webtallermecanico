@@ -77,6 +77,13 @@ export const scrollFramesSchema = z.object({
    * con las secciones que pasan por encima).
    */
   turn: z.number().min(0.1).max(1).default(1),
+  /**
+   * Dónde acaba el giro: número del último fotograma (si está, manda sobre `turn`)
+   * y sentido. Hacia atrás: 000 → último → … → endFrame (el último fotograma de la
+   * secuencia debe ser casi igual al primero, como en una vuelta completa).
+   */
+  endFrame: z.number().int().min(1).max(239).nullable().default(null),
+  reverse: z.boolean().default(false),
   turnGap: z.number().min(0).max(2).default(1.3),
   zoomGap: z.number().min(0.6).max(2.5).default(1.7),
 });

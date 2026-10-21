@@ -43,13 +43,14 @@ values (
     "src": "/demo/autovalue/giro/{n}.webp",
     "count": 73,
     "poster": "/demo/autovalue/portada.webp",
-    "focusX": 0.575,
-    "focusY": 0.405,
+    "focusX": 0.36,
+    "focusY": 0.4,
     "backdrop": "/demo/autovalue/garaje.webp",
     "frameTop": 0.359375,
     "srcHd": "/demo/autovalue/giro-4k/{n}.webp",
     "backdropHd": "/demo/autovalue/garaje-4k.webp",
-    "turn": 0.5,
+    "endFrame": 51,
+    "reverse": true,
     "turnGap": 0.35,
     "zoomGap": 0.85
   }

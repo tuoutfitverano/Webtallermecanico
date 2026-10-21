@@ -5,7 +5,7 @@
  *  · Solo se activa con JavaScript, sin «reducir movimiento» y sin ahorro de
  *    datos. Si no, se queda la imagen fija (nada depende de esto).
  *  · Los fotogramas se cargan en orden; mientras falta alguno se dibuja el
- *    cargado más cercano. Solo se descargan los que se usan (data-turn).
+ *    cargado más cercano. Solo se descargan los que se usan (data-turn o data-end-frame).
  *  · Las transiciones se funden con las secciones: el giro empieza en cuanto se
  *    baja y acaba con la sección siguiente ya entrando; el zoom empieza mientras
  *    salen los servicios. Arranque y parada suaves, sin «número aparte».
@@ -43,9 +43,15 @@ function start(stage: HTMLElement) {
   const fx = Number(stage.dataset.focusX ?? 0.5);
   const fy = Number(stage.dataset.focusY ?? 0.5);
   const frameTop = Number(stage.dataset.frameTop ?? 0);
-  // Parte de la vuelta que se reproduce (1 = completa) y último fotograma usado.
+  // Pasos del giro: hasta endFrame si está; si no, la parte de la vuelta (turn, 1 = completa).
+  // Hacia atrás: 000 → último → … → endFrame (el último fotograma es casi el primero).
+  const reverse = stage.dataset.reverse === 'true';
+  const endFrame = Number(stage.dataset.endFrame);
   const turnPart = Math.min(1, Math.max(0.1, Number(stage.dataset.turn ?? 1) || 1));
-  const lastFrame = Math.max(1, Math.round(turnPart * (count - 1)));
+  const steps = Number.isInteger(endFrame) && endFrame >= 1 && endFrame < count
+    ? (reverse ? count - endFrame : endFrame)
+    : Math.max(1, Math.round(turnPart * (count - 1)));
+  const frameAt = (step: number) => (reverse && step > 0 ? count - step : step);
   if (!canvas || !ctx || !dim || !hero || !turnGap || !zoomGap || !src.includes('{n}') || !(count >= 2)) return;
   const second = turnGap.nextElementSibling as HTMLElement | null;
   // Color de fondo de la web (el diseño premium y el modo claro lo cambian): el fundido final acaba en él.
@@ -66,12 +72,12 @@ function start(stage: HTMLElement) {
     img.src = backdropUrl;
   }
 
-  // ---- Fotogramas (en orden: el primero, el que se ve al cargar)
-  const frames: Array<HTMLImageElement | null> = Array.from({ length: count }, () => null);
-  const url = (i: number) => src.replace('{n}', String(i).padStart(3, '0'));
+  // ---- Fotogramas, por paso del giro (en orden: el primero, el que se ve al cargar)
+  const frames: Array<HTMLImageElement | null> = Array.from({ length: steps + 1 }, () => null);
+  const url = (step: number) => src.replace('{n}', String(frameAt(step)).padStart(3, '0'));
   let next = 0;
   const loadNext = () => {
-    if (next > lastFrame) return;
+    if (next > steps) return;
     const i = next++;
     const img = new Image();
     img.decoding = 'async';
@@ -97,7 +103,7 @@ function start(stage: HTMLElement) {
     glass = [`rgb(${d[0]},${d[1]},${d[2]})`, `rgb(${d[4]},${d[5]},${d[6]})`];
   };
   const nearest = (i: number) => {
-    for (let d = 0; d < count; d++) {
+    for (let d = 0; d < frames.length; d++) {
       const a = frames[i - d] ?? frames[i + d];
       if (a) return a;
     }
@@ -154,7 +160,7 @@ function start(stage: HTMLElement) {
       shade = Math.max(down, up);
     }
 
-    const index = Math.round(turn * lastFrame);
+    const index = Math.round(turn * steps);
     const img = nearest(index);
     // El fotograma dibujado forma parte de la clave: al terminar de cargarse, se redibuja.
     const key = `${img ? frames.indexOf(img) : -1}|${backdrop ? 1 : 0}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;
