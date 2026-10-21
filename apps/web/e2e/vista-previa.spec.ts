@@ -54,6 +54,9 @@ async function login(page: Page, email: string, next: string, password = PASSWOR
   await page.waitForURL(u => u.pathname === next);
 }
 
+/** Combinaciones de filtros de la planificación (semanas, mecánicos, prioridades): solo se guardan las dos vistas. */
+const SKIP = /^\/panel\/planificacion\?(?!vista=(semana|tablero)$)/;
+
 /** Recorre las páginas enlazadas desde `start` (solo bajo `prefixes`) y guarda su HTML. */
 async function crawl(page: Page, role: string, start: string[], prefixes: string[], limit: number) {
   const out = `${DIR}/${role}`;
@@ -77,7 +80,7 @@ async function crawl(page: Page, role: string, start: string[], prefixes: string
     index[path] = file;
     for (const m of html.matchAll(/href="(\/[^"#]*)/g)) {
       const link = m[1]!.replace(/&amp;/g, '&');
-      if (prefixes.some(p => link === p || link.startsWith(`${p}/`) || link.startsWith(`${p}?`)) && !link.includes('taller=') && !seen.has(link)) queue.push(link);
+      if (prefixes.some(p => link === p || link.startsWith(`${p}/`) || link.startsWith(`${p}?`)) && !link.includes('taller=') && !SKIP.test(link) && !seen.has(link)) queue.push(link);
     }
   }
   writeFileSync(`${out}/index.json`, JSON.stringify(index, null, 1));
@@ -174,7 +177,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     for (const l of lines) await rest('POST', '/repair_order_items', owner.tok, { workshop_id: DEMO, order_id: orders[o]!.id, position: ++position, ...l });
   }
   async function quote(o: number, title: string, lines: ReturnType<typeof line>[]) {
-    const [q] = await rest('POST', '/quotes', owner.tok, { workshop_id: DEMO, customer_id: customers[jobs[o]!.c]!.id, vehicle_id: vehicles[jobs[o]!.v]!.id, order_id: orders[o]!.id, title });
+    const [q] = await rest('POST', '/quotes?select=id', owner.tok, { workshop_id: DEMO, customer_id: customers[jobs[o]!.c]!.id, vehicle_id: vehicles[jobs[o]!.v]!.id, order_id: orders[o]!.id, title });
     let position = 0;
     for (const l of lines) await rest('POST', '/quote_items', owner.tok, { workshop_id: DEMO, quote_id: q!.id, position: ++position, ...l });
     await rest('POST', '/rpc/send_quote', owner.tok, { p_quote_id: q!.id });
