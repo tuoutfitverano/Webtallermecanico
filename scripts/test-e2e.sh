@@ -187,13 +187,21 @@ fi
 # reinicie el entorno de Workers; si eso pasa en mitad de una prueba, la petición falla
 # ("fetch failed"). Se visitan las páginas principales hasta que todas respondan bien
 # dos rondas seguidas.
-WARM=(/ /privacidad /cookies /acceso /registro /recuperar /cuenta /panel /panel/ordenes /panel/vehiculos/nuevo /panel/avisos /portal /portal/avisos /mi-area /invitacion /condiciones)
+# Todas las páginas (las de parámetro, con un identificador cualquiera): cada una
+# importa sus propios módulos y Vite los descubre la primera vez que se piden.
+WARM=()
+while IFS= read -r f; do
+  route="${f#"$ROOT/apps/web/src/pages"}"; route="${route%.astro}"; route="${route%.ts}"; route="${route%/index}"
+  route="$(sed -E 's/\[[^]]+\]/00000000-0000-0000-0000-000000000000/g' <<<"$route")"
+  case "$route" in */api/*) continue ;; esac
+  WARM+=("${route:-/}")
+done < <(find "$ROOT/apps/web/src/pages" \( -name '*.astro' -o -name '*.ts' \) ! -name '*.test.ts' | sort)
 stable=0
 for round in $(seq 1 15); do
   ok=1
   for path in "${WARM[@]}"; do
     code=$(curl -s -o /dev/null -w '%{http_code}' -H "host: demo.localhost:$WEB_PORT" "http://127.0.0.1:$WEB_PORT$path" || echo 000)
-    case "$code" in 2*|3*) ;; *) ok=0 ;; esac
+    case "$code" in 2*|3*|404) ;; *) ok=0 ;; esac
   done
   if [ "$ok" = 1 ]; then stable=$((stable + 1)); else stable=0; fi
   [ "$stable" -ge 2 ] && break

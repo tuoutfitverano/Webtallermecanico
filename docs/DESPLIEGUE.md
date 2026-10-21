@@ -48,11 +48,12 @@ Si algo falla, no se despliega. El CI de GitHub ejecuta lo mismo en cada `push`.
 5. **Copias de seguridad:** dependen del plan contratado. Compruébalo en **Database → Backups** antes del piloto.
    - Recomendado: plan con copias diarias (y PITR si se puede), más una copia propia periódica con `npx supabase db dump`, guardada cifrada fuera de Supabase.
    - **Prueba a restaurar una copia en preproducción al menos una vez.**
-6. **Mantenimiento y avisos programados:** Supabase Cron, ver `docs/NOTIFICACIONES.md` §6.3. Llama cada minuto a `/api/notificaciones/procesar`, que envía los emails pendientes y hace el mantenimiento: borrar huellas antispam caducadas y cerrar consultas a medias.
+6. **Mantenimiento y avisos programados:** los lanza el propio Worker cada 5 minutos (Cron Trigger en `apps/web/wrangler.jsonc`, código en `src/worker.ts`). Llama a `/api/notificaciones/procesar`, que envía los avisos pendientes y hace el mantenimiento: borrar huellas antispam caducadas, caducar presupuestos, generar recordatorios. Necesita `APP_URL` y `NOTIFICATIONS_CRON_SECRET`; sin ellos no hace nada y lo registra (`cron_sin_configurar`). Alternativa o refuerzo: Supabase Cron, ver `docs/NOTIFICACIONES.md` §6.3.
+7. **Copias de seguridad:** ver `docs/COPIAS_SEGURIDAD.md` (copia diaria cifrada fuera de Supabase y procedimiento de restauración).
 
 ## 5. Cloudflare Workers
 
-1. Crea el Worker. El nombre por defecto está en `apps/web/dist/server/wrangler.json` (`talleres-web`).
+1. La configuración del Worker está en `apps/web/wrangler.jsonc` (nombre `autovalue-web`, entrada `src/worker.ts`, tarea programada cada 5 minutos, registros activados). No lleva secretos. El servicio de imágenes de Cloudflare está desactivado (`imageService: 'passthrough'`): la web no lo usa y es de pago por uso.
 2. **Variables:** Workers → Settings → Variables and Secrets. Las marcadas como secreto, siempre como **Secret**.
 
 | Variable | Obligatoria | Secreto |
@@ -70,7 +71,8 @@ Si algo falla, no se despliega. El CI de GitHub ejecuta lo mismo en cada `push`.
 | `OPENAPI_AUTOMOTIVE_TOKEN` | Para matrículas | **Sí** |
 
 3. ⚠ **Desplegar:** `npm run build`, después `cd apps/web && npx wrangler login && npx wrangler deploy`.
-   - El adaptador de Astro deja la configuración en `dist/server/wrangler.json`, y `wrangler` la encuentra sola.
+   - El adaptador de Astro deja la configuración final en `dist/server/wrangler.json` (a partir de `wrangler.jsonc`), y `wrangler` la encuentra sola.
+   - Comprueba después en Workers → Settings → Triggers que aparece el cron `*/5 * * * *`.
    - **Pendiente de verificar en el primer despliegue:** esa configuración declara un espacio KV `SESSION` (sesiones de Astro, que esta aplicación no usa). Comprueba si `wrangler` lo crea solo o si hay que crearlo o desactivarlo.
 4. **Dominios** (Workers → Settings → Domains & Routes): `APP_URL` y el de cada taller. Cloudflare gestiona el HTTPS. La aplicación añade HSTS en HTTPS.
 5. **Registros:** la configuración generada activa `observability` (Workers Logs). Los registros solo llevan códigos de evento. No hay servicio de alertas de errores: pendiente de decidir (p. ej. alertas de Cloudflare o un servicio externo).

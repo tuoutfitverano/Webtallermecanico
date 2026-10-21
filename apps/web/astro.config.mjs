@@ -7,7 +7,9 @@ import tailwindcss from '@tailwindcss/vite';
 // visita el usuario (una sola aplicación sirve a todos los talleres).
 // Cloudflare Workers ejecuta ese código cerca del visitante.
 export default defineConfig({
-  adapter: cloudflare(),
+  // Sin el servicio de imágenes de Cloudflare (de pago por transformación): la web
+  // ya sirve imágenes optimizadas (WebP) y no usa <Image> de Astro.
+  adapter: cloudflare({ imageService: 'passthrough' }),
   // La barra de desarrollo de Astro tapa la barra de pestañas del panel en las
   // pruebas de navegador; en producción no existe.
   devToolbar: { enabled: process.env.E2E !== '1' },

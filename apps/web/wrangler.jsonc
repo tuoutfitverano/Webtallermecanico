@@ -1,0 +1,15 @@
+// Configuración del Worker de Cloudflare (producción y preproducción).
+// NO lleva secretos: se guardan con `wrangler secret put <NOMBRE>` (ver
+// docs/DESPLIEGUE.md). Nada de esto se publica hasta que se ejecute un
+// despliegue con autorización expresa.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "autovalue-web",
+  // Entrada propia: la web de Astro + la tarea programada (src/worker.ts).
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-10-12",
+  // Avisos pendientes y mantenimiento (huellas antispam, presupuestos
+  // caducados, recordatorios): cada 5 minutos.
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "observability": { "enabled": true }
+}

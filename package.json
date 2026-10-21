@@ -16,6 +16,7 @@
     "check": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:db": "bash scripts/test-db.sh",
+    "test:backup": "bash scripts/backup/test-restore.sh",
     "test:mcp": "node scripts/check-playwright-mcp.mjs",
     "mcp:playwright": "node scripts/playwright-mcp.mjs",
     "test:e2e": "bash scripts/test-e2e.sh",

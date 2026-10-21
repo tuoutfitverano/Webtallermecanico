@@ -186,9 +186,9 @@ No se guardan contraseñas, tokens ni claves en los avisos. El código de error 
 Cloudflare Workers no mantiene procesos en marcha, así que la cola se procesa:
 
 1. **al guardar la orden:** en Cloudflare, después de responder (`waitUntil`);
-2. **cada minuto**, con un aviso programado que llama a `POST /api/notificaciones/procesar`.
+2. **cada 5 minutos**, con la tarea programada del propio Worker (Cron Trigger de Cloudflare: `apps/web/wrangler.jsonc` y `src/worker.ts`), que llama a `POST /api/notificaciones/procesar` con el secreto. Probado en el entorno local de Cloudflare (`wrangler dev`): registra `cron_ok`; sin `APP_URL` o sin secreto no hace nada y registra `cron_sin_configurar`.
 
-Recomendado: **Supabase Cron**. En Database → Extensions, activar `pg_cron` y `pg_net`, y después ejecutar en el SQL Editor (con tus valores):
+Alternativa o refuerzo (por ejemplo, para cada minuto): **Supabase Cron**. En Database → Extensions, activar `pg_cron` y `pg_net`, y después ejecutar en el SQL Editor (con tus valores):
 
 ```sql
 select vault.create_secret('PEGA_AQUI_NOTIFICATIONS_CRON_SECRET', 'notifications_cron_secret');

@@ -1,0 +1,90 @@
+# Copia de seguridad diaria de la base de datos de producción.
+#
+# NO hace nada hasta que configures (Settings → Secrets and variables → Actions):
+#   secreto  BACKUP_DATABASE_URL     cadena de conexión del «Session pooler» de Supabase
+#                                    (los ejecutores de GitHub no tienen IPv6: la conexión directa no sirve)
+#   variable BACKUP_AGE_RECIPIENT    clave PÚBLICA de age (la privada, fuera de GitHub y de Supabase)
+# Opcional, almacenamiento externo compatible con S3 (p. ej. Cloudflare R2, en la UE):
+#   variable BACKUP_S3_BUCKET, BACKUP_S3_ENDPOINT
+#   secreto  BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY (credencial que solo puede ESCRIBIR)
+# Sin almacenamiento externo, la copia cifrada se guarda 30 días como artefacto de GitHub.
+# Guía completa: docs/COPIAS_SEGURIDAD.md
+name: Copia de seguridad
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: copia-de-seguridad
+  cancel-in-progress: false
+
+jobs:
+  copia:
+    name: Copia cifrada de la base de datos
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      S3_BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+      S3_ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # Versión del cliente de PostgreSQL: igual o mayor que la del servidor de Supabase.
+      PG_MAJOR: ${{ vars.BACKUP_PG_MAJOR || '17' }}
+    steps:
+      - name: ¿Está configurada?
+        id: cfg
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_AGE_RECIPIENT" ]; then
+            echo "::notice::Copias sin configurar (faltan BACKUP_DATABASE_URL o BACKUP_AGE_RECIPIENT). No se ha copiado nada."
+            echo "on=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "on=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.on == 'true'
+        with:
+          fetch-depth: 0  # historial completo: el día 1 de cada mes también se copia el código
+      - name: Cliente de PostgreSQL y age
+        if: steps.cfg.outputs.on == 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-$PG_MAJOR" age
+          echo "/usr/lib/postgresql/$PG_MAJOR/bin" >> "$GITHUB_PATH"
+      - name: Copia cifrada
+        if: steps.cfg.outputs.on == 'true'
+        run: bash scripts/backup/dump.sh copias
+      - name: Código fuente con todo su historial (día 1 de cada mes)
+        if: steps.cfg.outputs.on == 'true'
+        run: |
+          if [ "$(date -u +%d)" = "01" ]; then
+            dir="$(ls -d copias/*/ | head -1)"
+            git bundle create codigo.bundle --all
+            age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" --output "$dir/codigo.bundle.age" codigo.bundle
+            rm codigo.bundle
+          fi
+      - name: Subir al almacenamiento externo
+        if: steps.cfg.outputs.on == 'true' && env.S3_BUCKET != ''
+        # diaria/ (borrado automático a los 35 días) y, el día 1, también mensual/ (más tiempo).
+        # Las reglas de borrado se configuran en el propio almacenamiento: ver docs/COPIAS_SEGURIDAD.md.
+        run: |
+          aws s3 cp copias "s3://$S3_BUCKET/diaria/" --recursive --endpoint-url "$S3_ENDPOINT" --only-show-errors
+          if [ "$(date -u +%d)" = "01" ]; then
+            aws s3 cp copias "s3://$S3_BUCKET/mensual/" --recursive --endpoint-url "$S3_ENDPOINT" --only-show-errors
+          fi
+      - name: Guardar como artefacto (sin almacenamiento externo)
+        if: steps.cfg.outputs.on == 'true' && env.S3_BUCKET == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: copia-${{ github.run_id }}
+          path: copias
+          retention-days: 30
