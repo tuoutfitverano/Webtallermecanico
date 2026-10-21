@@ -1,0 +1,123 @@
+---
+/**
+ * El cliente añade un vehículo a su ficha (matrícula, marca, modelo y año
+ * obligatorios). Las reglas se comprueban aquí (@talleres/core) y otra vez en
+ * la base de datos (portal_add_vehicle). Queda como dato «del cliente»,
+ * pendiente de verificar por el taller.
+ */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { field } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { FUEL_LABELS, FUEL_TYPES, validateVehicle, YEAR_KIND_LABELS, YEAR_KINDS } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+const values: Record<string, string> = { customer_id: portal.records[0]?.customer_id ?? '', plate: '', make: '', model: '', year: '', year_kind: '', fuel: '' };
+let errors: Partial<Record<string, string>> = {};
+let error = '';
+let askPlate = false;
+
+if (portal.form && portal.records.length > 0) {
+  for (const k of Object.keys(values)) values[k] = field(portal.form, k).trim();
+  const record = portal.records.find(r => r.customer_id === values.customer_id);
+  const yearText = values.year!;
+  const r = validateVehicle({
+    plate: values.plate, confirmNonStandardPlate: field(portal.form, 'confirm_plate') === 'on', make: values.make, model: values.model,
+    year: yearText === '' ? null : /^\d{4}$/.test(yearText) ? Number(yearText) : Number.NaN,
+    yearKind: values.year_kind || null, fuel: values.fuel || null,
+  });
+  if (!record) {
+    error = 'Elige el taller.';
+    Astro.response.status = 422;
+  } else if (!r.ok) {
+    errors = r.errors;
+    askPlate = Boolean(r.errors.plate?.includes('confirma'));
+    error = 'Revisa los campos marcados.';
+    Astro.response.status = 422;
+  } else {
+    const { data, error: e } = await portal.supabase.rpc('portal_add_vehicle', {
+      p_customer_id: record.customer_id, p_plate: r.data.plate, p_make: r.data.make, p_model: r.data.model,
+      p_year: r.data.year, p_year_kind: r.data.yearKind, p_fuel: r.data.fuel,
+    });
+    if (e || !data) {
+      logAuth('portal_vehicle_add_error', e?.code);
+      // Los mensajes de la base de datos (22023) están pensados para el cliente.
+      error = e?.code === '22023' && e.message ? e.message : 'No se ha podido añadir el vehículo. Inténtalo de nuevo.';
+      Astro.response.status = 400;
+    } else {
+      return Astro.redirect(`/portal/vehiculos/${data}?anadido=1`, 303);
+    }
+  }
+}
+const err = (k: string) => errors[k];
+const many = portal.records.length > 1;
+---
+<PortalLayout portal={portal} title="Añadir vehículo" section="vehiculos">
+  <a class="pnl-back" href="/portal/vehiculos"><Icon name="arrow" />Mis vehículos</a>
+  <header class="pnl-head"><div><h1 class="pnl-title">Añadir vehículo</h1><p class="pnl-sub">Regístralo para que el taller lo tenga listo cuando lo lleves.</p></div></header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <section class="card" aria-labelledby="nuevo-t">
+      <h2 id="nuevo-t" class="card-title"><Icon name="car" />Datos del vehículo</h2>
+      <Flash kind="bad" text={error} />
+      <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+        <p class="hint">Matrícula, marca, modelo y año son obligatorios. El taller revisará los datos.</p>
+        {many ? (
+          <div class="field">
+            <label for="customer_id">Taller</label>
+            <select class="select" id="customer_id" name="customer_id">
+              {portal.records.map(r => <option value={r.customer_id} selected={r.customer_id === values.customer_id}>{r.workshop_name}</option>)}
+            </select>
+          </div>
+        ) : <input type="hidden" name="customer_id" value={values.customer_id} />}
+        <div class={`field ${err('plate') ? 'has-error' : ''}`}>
+          <label for="plate">Matrícula</label>
+          <input class="input input-plate" id="plate" name="plate" required maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="1234 ABC" value={values.plate} aria-invalid={err('plate') ? 'true' : undefined} />
+          {err('plate') && <p class="field-error">{err('plate')}</p>}
+          {askPlate && <label class="check"><input type="checkbox" name="confirm_plate" /><span>La matrícula es correcta aunque no tenga formato español (extranjera, histórica…).</span></label>}
+        </div>
+        <div class="form-row">
+          <div class={`field ${err('make') ? 'has-error' : ''}`}>
+            <label for="make">Marca</label>
+            <input class="input" id="make" name="make" required maxlength="60" autocomplete="off" placeholder="Ej.: Volkswagen" value={values.make} aria-invalid={err('make') ? 'true' : undefined} />
+            {err('make') && <p class="field-error">{err('make')}</p>}
+          </div>
+          <div class={`field ${err('model') ? 'has-error' : ''}`}>
+            <label for="model">Modelo</label>
+            <input class="input" id="model" name="model" required maxlength="80" autocomplete="off" placeholder="Ej.: Golf" value={values.model} aria-invalid={err('model') ? 'true' : undefined} />
+            {err('model') && <p class="field-error">{err('model')}</p>}
+          </div>
+        </div>
+        <div class="form-row">
+          <div class={`field ${err('year') ? 'has-error' : ''}`}>
+            <label for="year">Año</label>
+            <input class="input" id="year" name="year" required inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Ej.: 2019" value={values.year} aria-invalid={err('year') ? 'true' : undefined} />
+            {err('year') && <p class="field-error">{err('year')}</p>}
+          </div>
+          <div class={`field ${err('yearKind') ? 'has-error' : ''}`}>
+            <label for="year_kind">Ese año es de…</label>
+            <select class="select" id="year_kind" name="year_kind" required>
+              <option value="">Elige…</option>
+              {YEAR_KINDS.map(k => <option value={k} selected={k === values.year_kind}>{YEAR_KIND_LABELS[k]}</option>)}
+            </select>
+            {err('yearKind') && <p class="field-error">{err('yearKind')}</p>}
+          </div>
+        </div>
+        <div class="field">
+          <label for="fuel">Combustible <span class="muted">(opcional)</span></label>
+          <select class="select" id="fuel" name="fuel">
+            <option value="">Sin indicar</option>
+            {FUEL_TYPES.map(f => <option value={f} selected={f === values.fuel}>{FUEL_LABELS[f]}</option>)}
+          </select>
+        </div>
+        <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Añadir vehículo</span></button>
+      </form>
+    </section>
+  )}
+</PortalLayout>

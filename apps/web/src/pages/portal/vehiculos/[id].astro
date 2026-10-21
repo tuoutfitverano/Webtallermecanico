@@ -1,11 +1,16 @@
 ---
-/** Un vehículo del cliente y sus reparaciones. Si no es suyo, como si no existiera. */
+/**
+ * Un vehículo del cliente y sus reparaciones. Si no es suyo, como si no existiera.
+ * «Quitar de mi portal» (en dos pasos): va a la papelera 30 días; el taller lo conserva siempre.
+ */
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import Icon from '../../../components/Icon.astro';
 import StatusBadge from '../../../components/panel/StatusBadge.astro';
 import NotLinked from '../../../components/portal/NotLinked.astro';
+import Flash from '../../../components/panel/Flash.astro';
 import { portalPage } from '../../../lib/server/portal.ts';
-import { isUuid } from '../../../lib/server/panel.ts';
+import { field, isUuid } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
 import { formatDate, formatDateTime, formatDay } from '../../../lib/panel/format.ts';
 import { formatPlate, FUEL_LABELS, orderLabel, YEAR_KIND_LABELS, type FuelType, type RepairStatus, type YearKind } from '@talleres/core';
 
@@ -18,6 +23,20 @@ const id = Astro.params.id ?? '';
 interface Vehicle { id: string; workshop_name: string; plate: string; make: string; model: string; year: number | null; year_kind: YearKind | null; fuel: FuelType | null;
   version: string | null; mileage: number | null; next_service_date: string | null; next_service_km: number | null; next_service_notes: string | null }
 interface Order { id: string; number: number; status: RepairStatus; received_at: string; last_update: string; problem_description: string }
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('anadido') === '1' ? 'Vehículo añadido. El taller revisará los datos.' : Astro.url.searchParams.get('recuperado') === '1' ? 'Vehículo recuperado.' : '' };
+let askRemove = false;
+if (portal.form && portal.records.length > 0 && isUuid(id)) {
+  const action = field(portal.form, 'action');
+  if (action === 'pedir-quitar') askRemove = true;
+  else if (action === 'quitar') {
+    const { error } = await portal.supabase.rpc('portal_remove_vehicle', { p_vehicle_id: id });
+    if (!error) return Astro.redirect('/portal/vehiculos/papelera?quitado=1', 303);
+    logAuth('portal_vehicle_remove_error', error.code);
+    flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : 'No se ha podido quitar el vehículo.' };
+    Astro.response.status = 400;
+  }
+}
+
 let vehicle: Vehicle | null = null;
 let orders: Order[] = [];
 if (portal.records.length > 0 && isUuid(id)) {
@@ -44,6 +63,7 @@ const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next
           <p class="pnl-sub"><span class="plate">{formatPlate(vehicle.plate)}</span> · {vehicle.workshop_name}</p>
         </div>
       </header>
+      <Flash kind={flash.kind} text={flash.text} />
       <div class="grid-2">
         <section class="card" aria-labelledby="rep">
           <h2 id="rep" class="card-title"><Icon name="history" />Reparaciones</h2>
@@ -82,6 +102,26 @@ const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next
             </dl>
           ) : <p class="hint">Tu taller todavía no ha anotado la próxima revisión.</p>}
           <p class="hint" style="margin-top:12px">Si quieres que te lo recordemos, actívalo en <a href="/portal/datos">Mis datos</a>.</p>
+        </section>
+        <section class="card" aria-labelledby="quitar-t">
+          <h2 id="quitar-t" class="card-title">¿Ya no tienes este vehículo?</h2>
+          {askRemove ? (
+            <form method="post" class="confirm" data-busy="Quitando…">
+              <input type="hidden" name="action" value="quitar" />
+              <strong>¿Quitar {formatPlate(vehicle.plate)} de tu portal?</strong>
+              <span class="hint">Irá a tu papelera y podrás recuperarlo durante 30 días. El taller conserva siempre sus revisiones y reparaciones.</span>
+              <div class="pnl-actions">
+                <button class="btn btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, quitarlo</span></button>
+                <a class="btn" href={`/portal/vehiculos/${vehicle.id}`}>Cancelar</a>
+              </div>
+            </form>
+          ) : (
+            <form method="post">
+              <input type="hidden" name="action" value="pedir-quitar" />
+              <button class="btn btn-sm btn-danger" type="submit">Quitar de mi portal…</button>
+              <p class="hint" style="margin-top:8px">No se borra: va a la papelera durante 30 días.</p>
+            </form>
+          )}
         </section>
       </div>
     </>

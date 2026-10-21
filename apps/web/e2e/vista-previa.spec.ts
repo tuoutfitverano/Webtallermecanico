@@ -221,6 +221,9 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   await rest('POST', '/rpc/stop_work', worker.tok, { p_order_id: orders[7]!.id });
   // Ficha del Golf: versión, kilómetros y próxima revisión (la ve la clienta en su portal).
   await rest('PATCH', `/vehicles?id=eq.${vehicles[6]!.id}`, owner.tok, { version: '2.0 TSI', mileage: 87400, next_service_date: day(10), next_service_km: 90000, next_service_notes: 'Cambio de aceite y filtros (demostración).' });
+  // La clienta añade un coche desde su portal y lo quita después: queda en su papelera (30 días) y el taller lo conserva.
+  const added = (await rest('POST', '/rpc/portal_add_vehicle', client.tok, { p_customer_id: customers[5]!.id, p_plate: '3390XNB', p_make: 'Seat', p_model: 'Ibiza', p_year: 2012, p_year_kind: 'primera_matriculacion' })) as unknown as string;
+  await rest('POST', '/rpc/portal_remove_vehicle', client.tok, { p_vehicle_id: added });
   // La clienta pide recordatorios de mantenimiento; el taller activa las reglas y se generan.
   await rest('POST', '/rpc/set_service_reminders', client.tok, { p_customer_id: customers[5]!.id, p_enabled: true });
   await rest('PATCH', `/reminder_settings?workshop_id=eq.${DEMO}`, owner.tok, { revision_enabled: true, quote_enabled: true, pickup_enabled: true });

@@ -18,6 +18,7 @@ Los permisos los decide la base de datos (RLS y disparadores), no la interfaz: o
 - Obligatorios: matrícula, marca, modelo y año (con su tipo). Opcionales: versión, bastidor (VIN, 17 caracteres sin I, O ni Q), kilómetros, próxima revisión (fecha y/o km) y recomendación.
 - Los kilómetros se actualizan solos cuando una orden entra con más kilómetros que los anotados.
 - La próxima revisión y su recomendación las ve el cliente en su portal; el bastidor y las notas internas, no.
+- El cliente puede **añadir** vehículos desde su portal (quedan como «aportados por el cliente», pendientes de verificar) y **quitarlos**: van a su papelera 30 días y puede recuperarlos. Nunca se borran: el taller conserva siempre el vehículo, sus órdenes, revisiones, presupuestos y facturas, y la ficha avisa de que el cliente lo quitó.
 - Historial en la ficha: órdenes con kilómetros y trabajos; la oficina ve también presupuestos y facturas.
 
 ## Órdenes de reparación

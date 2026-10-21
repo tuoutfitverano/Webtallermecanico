@@ -411,7 +411,7 @@ test.describe('color del panel sin JavaScript', () => {
 test('portal del cliente: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
   const f = await fixtures();
   await login(page, f.email, '/portal');
-  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas'], isMobile);
+  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/portal/vehiculos/nuevo', '/portal/vehiculos/papelera'], isMobile);
 });
 
 test('cabeceras de seguridad en la web pública y en el área privada', async () => {

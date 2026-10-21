@@ -157,6 +157,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - El cliente **no lee tablas**: solo funciones `portal_*` (`security definer`, columnas elegidas a mano, filtradas con `private.portal_customer_ids()`). Si añades un dato al portal, añádelo a esas funciones y a `09_portal_clientes.test.sql`; nunca des `select` en tablas a clientes.
 - Nunca al cliente: `internal_notes`, personal asignado, autores de cambios, otros clientes. Diagnosis y trabajo solo con `show_details_to_customer`. Sin fechas prometidas.
 - Solo gestores cambian `customer_notes` y `show_details_to_customer` (lo impone `repair_orders_guard`).
+- El cliente añade vehículos a SU ficha (`portal_add_vehicle`: dato «cliente», pendiente de verificar; 10/día) y los quita a una **papelera de 30 días** (`portal_remove_vehicle` / `portal_restore_vehicle` / `portal_vehicle_trash`). Quitar NUNCA borra: `vehicles.portal_hidden_at` solo lo oculta en el portal; el taller conserva siempre el vehículo y su historial. No se quita con una reparación en curso; una orden nueva lo devuelve al portal. Solo esas funciones cambian `portal_hidden_at`/`added_by_customer` (`vehicles_portal_guard`).
 - Tras iniciar sesión se va a `/mi-area` (personal → `/panel`, cliente → `/portal`, resto → `/cuenta`). Un cliente en `/panel` ve `acceso-denegado` (403).
 - Los valores nuevos de un enum no se pueden usar en la misma transacción que los crea: compara `kind::text`.
 

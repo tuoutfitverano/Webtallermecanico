@@ -1,6 +1,7 @@
 ---
-/** Mis vehículos: solo los vinculados a las fichas del cliente. */
+/** Mis vehículos: los de las fichas del cliente (sin los quitados), con alta y papelera. */
 import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
 import StatusBadge from '../../../components/panel/StatusBadge.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import NotLinked from '../../../components/portal/NotLinked.astro';
@@ -16,19 +17,29 @@ if (portal instanceof Response) return portal;
 interface Vehicle { id: string; workshop_name: string; plate: string; make: string; model: string; year: number | null; fuel: FuelType | null; active_status: RepairStatus | null }
 let vehicles: Vehicle[] = [];
 let error = false;
+let trash = 0;
 if (portal.records.length > 0) {
-  const { data, error: e } = await portal.supabase.rpc('portal_vehicles');
+  const [{ data, error: e }, t] = await Promise.all([portal.supabase.rpc('portal_vehicles'), portal.supabase.rpc('portal_vehicle_trash')]);
   if (e) { logAuth('portal_vehicles_error', e.code); error = true; }
   vehicles = (data ?? []) as Vehicle[];
+  trash = (t.data ?? []).length;
 }
 ---
 <PortalLayout portal={portal} title="Mis vehículos" section="vehiculos">
-  <header class="pnl-head"><div><h1 class="pnl-title">Mis vehículos</h1><p class="pnl-sub">Los vehículos que el taller tiene registrados a tu nombre.</p></div></header>
+  <header class="pnl-head">
+    <div><h1 class="pnl-title">Mis vehículos</h1><p class="pnl-sub">Los vehículos registrados a tu nombre en el taller.</p></div>
+    {portal.records.length > 0 && (
+      <div class="pnl-actions">
+        <a class="btn btn-primary" href="/portal/vehiculos/nuevo"><Icon name="plus" />Añadir vehículo</a>
+        {trash > 0 && <a class="btn" href="/portal/vehiculos/papelera">Papelera ({trash})</a>}
+      </div>
+    )}
+  </header>
   {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
     <>
       {error && <Flash kind="bad" text="No hemos podido cargar tus vehículos. Recarga la página." />}
       {vehicles.length === 0 ? (
-        <div class="empty"><strong>Todavía no tienes vehículos registrados.</strong><span>Si crees que falta alguno, díselo a tu taller.</span></div>
+        <div class="empty"><strong>Todavía no tienes vehículos registrados.</strong><span>Puedes añadir el tuyo con «Añadir vehículo».</span></div>
       ) : (
         <div class="cards">
           {vehicles.map(v => (

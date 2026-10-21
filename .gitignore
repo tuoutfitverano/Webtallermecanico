@@ -34,3 +34,4 @@ playwright/.auth/
 
 # Descargas de herramientas para pruebas (PostgREST)
 .cache/
+graphify-out/

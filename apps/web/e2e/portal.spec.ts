@@ -343,6 +343,70 @@ test.describe('Portal · permisos en la base de datos', () => {
 });
 
 // ---------------------------------------------------------------- acceso
+test.describe('Portal · el cliente añade y quita vehículos', () => {
+  test('añade uno, lo quita a la papelera, lo recupera; el taller lo conserva siempre', async ({ page, browser }) => {
+    const s = await setupCustomer({ link: true });
+    const other = await setupCustomer();
+    const plate = newPlate();
+    await login(page, s.email, '/portal');
+    await page.waitForURL(/\/portal$/);
+    await page.goto('/portal/vehiculos');
+    await page.getByRole('link', { name: 'Añadir vehículo' }).click();
+    await page.getByLabel('Matrícula').fill(plate.typed);
+    await page.getByLabel('Marca').fill('Kia');
+    await page.getByRole('button', { name: 'Añadir vehículo' }).click();
+    await expect(page.getByRole('alert')).toContainText('Revisa los campos');
+    await page.getByLabel('Modelo').fill('Ceed');
+    await page.getByLabel(/^Año/).fill('2020');
+    await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
+    await page.getByRole('button', { name: 'Añadir vehículo' }).click();
+    await expect(page.getByRole('status')).toContainText('Vehículo añadido');
+    const url = page.url().replace(/\?.*$/, '');
+    const vehicleId = url.split('/').pop()!;
+
+    // Una matrícula de otro cliente del taller no se le asocia.
+    await page.goto('/portal/vehiculos/nuevo');
+    await page.getByLabel('Matrícula').fill(other.plate.normalized);
+    await page.getByLabel('Marca').fill('Kia');
+    await page.getByLabel('Modelo').fill('Ceed');
+    await page.getByLabel(/^Año/).fill('2020');
+    await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
+    await page.getByRole('button', { name: 'Añadir vehículo' }).click();
+    await expect(page.getByRole('alert')).toContainText('Pídele al taller');
+
+    // Quitar (dos pasos) → papelera → recuperar.
+    await page.goto(url);
+    await page.getByRole('button', { name: 'Quitar de mi portal…' }).click();
+    await page.getByRole('button', { name: 'Sí, quitarlo' }).click();
+    await expect(page).toHaveURL(/\/portal\/vehiculos\/papelera/);
+    await expect(page.getByRole('status')).toContainText('30 días');
+    await expect(page.locator('.list')).toContainText('Kia Ceed');
+    await page.goto('/portal/vehiculos');
+    await expect(page.locator('.vcard', { hasText: 'Kia Ceed' })).toHaveCount(0);
+    await page.getByRole('link', { name: /Papelera/ }).click();
+    await page.getByRole('button', { name: /^Recuperar/ }).click();
+    await expect(page.getByRole('status')).toContainText('Vehículo recuperado.');
+
+    // Un vehículo con una reparación en curso no se puede quitar.
+    await page.goto(`/portal/vehiculos/${s.vehicleId}`);
+    await page.getByRole('button', { name: 'Quitar de mi portal…' }).click();
+    await page.getByRole('button', { name: 'Sí, quitarlo' }).click();
+    await expect(page.getByRole('alert')).toContainText('reparación en curso');
+
+    // El taller ve el vehículo añadido por el cliente, también si lo quita.
+    await rpc('portal_remove_vehicle', s.client!.token, { p_vehicle_id: vehicleId });
+    const v = await api(`/vehicles?id=eq.${vehicleId}&select=id,portal_hidden_at,added_by_customer,data_source`, s.owner.token);
+    expect(rows(v)[0]).toMatchObject({ added_by_customer: true, data_source: 'cliente' });
+    expect(rows(v)[0]!.portal_hidden_at).not.toBeNull();
+    const staff = await newPage(browser);
+    await login(staff, 'propietaria@e2e.test', '/panel');
+    await staff.waitForURL(/\/panel$/);
+    await staff.goto(`/panel/vehiculos/${vehicleId}`);
+    await expect(staff.getByText(/El cliente quitó este vehículo de su portal/)).toBeVisible();
+    await expect(staff.getByRole('heading', { name: 'Historial de reparaciones' })).toBeVisible();
+  });
+});
+
 test.describe('Portal · acceso, revocación y móvil', () => {
   test('sin sesión, el portal manda a iniciar sesión', async ({ page }) => {
     await page.goto('/portal/reparaciones');

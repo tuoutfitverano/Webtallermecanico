@@ -1,0 +1,78 @@
+---
+/**
+ * Papelera del cliente: los vehículos que ha quitado de su portal en los
+ * últimos 30 días, para recuperarlos. Nada se borra: el taller conserva
+ * siempre el vehículo y su historial.
+ */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import NotLinked from '../../../components/portal/NotLinked.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { field, isUuid } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDate } from '../../../lib/panel/format.ts';
+import { formatPlate } from '@talleres/core';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('quitado') === '1' ? 'Vehículo quitado de tu portal. Puedes recuperarlo aquí durante 30 días.' : '' };
+if (portal.form && portal.records.length > 0 && field(portal.form, 'action') === 'recuperar') {
+  const id = field(portal.form, 'id');
+  const { error } = isUuid(id) ? await portal.supabase.rpc('portal_restore_vehicle', { p_vehicle_id: id }) : { error: { code: '22023' } };
+  if (error) {
+    logAuth('portal_vehicle_restore_error', error.code);
+    flash = { kind: 'bad', text: 'No se ha podido recuperar: puede que ya hayan pasado los 30 días.' };
+    Astro.response.status = 400;
+  } else {
+    return Astro.redirect(`/portal/vehiculos/${id}?recuperado=1`, 303);
+  }
+}
+
+interface Item { id: string; workshop_name: string; plate: string; make: string; model: string; removed_at: string; restorable_until: string }
+let items: Item[] = [];
+let loadError = false;
+if (portal.records.length > 0) {
+  const { data, error } = await portal.supabase.rpc('portal_vehicle_trash');
+  if (error) { logAuth('portal_vehicle_trash_error', error.code); loadError = true; }
+  items = (data ?? []) as Item[];
+}
+const many = portal.records.length > 1;
+const daysLeft = (until: string) => Math.max(0, Math.ceil((new Date(until).getTime() - Date.now()) / 86_400_000));
+---
+<PortalLayout portal={portal} title="Papelera" section="vehiculos">
+  <a class="pnl-back" href="/portal/vehiculos"><Icon name="arrow" />Mis vehículos</a>
+  <header class="pnl-head"><div><h1 class="pnl-title">Papelera</h1><p class="pnl-sub">Los vehículos que has quitado. Puedes recuperarlos durante 30 días.</p></div></header>
+  {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No hemos podido cargar la papelera. Recarga la página." />}
+      {items.length === 0 ? (
+        <div class="empty"><strong>La papelera está vacía.</strong><a class="btn" href="/portal/vehiculos">Ver mis vehículos</a></div>
+      ) : (
+        <section class="card" aria-label="Vehículos en la papelera">
+          <ul class="list">
+            {items.map(v => (
+              <li class="row">
+                <span class="row-main">
+                  <span class="row-title"><span class="plate">{formatPlate(v.plate)}</span>{v.make} {v.model}</span>
+                  <span class="row-meta">Quitado el {formatDate(v.removed_at)} · {daysLeft(v.restorable_until) === 1 ? 'queda 1 día' : `quedan ${daysLeft(v.restorable_until)} días`} para recuperarlo{many && ` · ${v.workshop_name}`}</span>
+                </span>
+                <span class="row-side">
+                  <form method="post" data-busy="Recuperando…">
+                    <input type="hidden" name="action" value="recuperar" /><input type="hidden" name="id" value={v.id} />
+                    <button class="btn btn-sm" type="submit" aria-label={`Recuperar ${formatPlate(v.plate)}`}><span class="spinner" aria-hidden="true"></span><span data-label>Recuperar</span></button>
+                  </form>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <p class="hint" style="margin-top:12px">Pasados 30 días el vehículo deja de aparecer aquí. El taller conserva siempre sus revisiones y reparaciones; si vuelves a añadirlo con la misma matrícula, recuperarás su historial.</p>
+    </>
+  )}
+</PortalLayout>

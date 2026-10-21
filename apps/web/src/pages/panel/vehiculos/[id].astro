@@ -37,6 +37,7 @@ interface Vehicle {
   customer_id: string | null; internal_notes: string | null; data_source: DataSource; verification_status: VerificationStatus; created_at: string;
   version: string | null; vin: string | null; mileage: number | null; mileage_at: string | null;
   next_service_date: string | null; next_service_km: number | null; next_service_notes: string | null;
+  portal_hidden_at: string | null; added_by_customer: boolean;
   customers: { id: string; full_name: string } | null;
   lookup_fields: Record<string, { value: string | number; state: 'confirmado' | 'modificado' | 'no_usado' }> | null;
   vehicle_lookups: { provider: string; completed_at: string; result: VehicleData } | null;
@@ -93,7 +94,7 @@ if (panel.workshop && isUuid(id)) {
   const office = panel.isOffice;
   const [v, o, c, q, f] = await Promise.all([
     panel.supabase.from('vehicles')
-      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, version, vin, mileage, mileage_at, next_service_date, next_service_km, next_service_notes, customers(id, full_name), lookup_fields, vehicle_lookups(provider, completed_at, result)')
+      .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, version, vin, mileage, mileage_at, next_service_date, next_service_km, next_service_notes, portal_hidden_at, added_by_customer, customers(id, full_name), lookup_fields, vehicle_lookups(provider, completed_at, result)')
       .eq('id', id).eq('workshop_id', ws).maybeSingle(),
     panel.supabase.from('repair_orders').select('id, number, status, received_at, problem_description, mileage_in, work_done, repair_order_items(description)')
       .eq('vehicle_id', id).eq('workshop_id', ws).order('received_at', { ascending: false }).limit(50),
@@ -130,6 +131,8 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
         {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href={`/panel/ordenes/nueva?vehiculo=${vehicle.id}`}><Icon name="plus" />Nueva orden</a></div>}
       </header>
       <Flash kind={flash.kind} text={flash.text} />
+      {vehicle.portal_hidden_at && <div class="alert alert-warn" role="note"><Icon name="alert" /><span>El cliente quitó este vehículo de su portal el {formatDate(vehicle.portal_hidden_at)}. Aquí se conserva siempre con todo su historial; si abres una orden nueva, vuelve a su portal.</span></div>}
+      {vehicle.added_by_customer && !vehicle.portal_hidden_at && <div class="alert alert-ok" role="note"><Icon name="user" /><span>Lo añadió el cliente desde su portal: revisa los datos.</span></div>}
       <div class="grid-2">
         <div class="stack">
           <section class="card" aria-labelledby="ficha">
