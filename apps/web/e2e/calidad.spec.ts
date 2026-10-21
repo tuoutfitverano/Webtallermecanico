@@ -105,6 +105,7 @@ test('web pública: accesibilidad, consola, enlaces y móvil', async ({ page, is
 });
 
 test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
+  test.setTimeout(150_000); // 20 pantallas
   const f = await fixtures();
   await login(page, 'propietaria@e2e.test', '/panel');
   await audit(page, [
