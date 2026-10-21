@@ -16,10 +16,14 @@ import { field, isUuid, loadTeam, memberName, panelPage } from '../../../lib/ser
 import { logAuth } from '../../../lib/server/auth.ts';
 import { dispatchOrderEmails } from '../../../lib/server/notify.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
-import { FIELD_LABELS, formatDateTime } from '../../../lib/panel/format.ts';
+import { FIELD_LABELS, formatDateTime, formatDay, formatMinutes, localInputToDb, toLocalInput } from '../../../lib/panel/format.ts';
+import LinesEditor from '../../../components/panel/LinesEditor.astro';
+import { LINE_SELECT, lineColumns, readLine, type LineRow } from '../../../lib/panel/lines.ts';
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
 import {
-  fieldErrors, formatPlate, isRepairStatus, orderLabel, orderUpdateSchema, REPAIR_STATUS_LABELS, REPAIR_STATUSES, type RepairStatus,
+  fieldErrors, formatCents, formatPlate, INVOICE_STATUS_LABELS, isOrderPriority, isRepairStatus, ORDER_PRIORITIES, ORDER_PRIORITY_LABELS, orderLabel,
+  orderUpdateSchema, QUOTE_STATUS_LABELS, quoteLabel, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES, whatsappLink,
+  type OrderPriority, type QuoteStatus, type RepairStatus,
 } from '@talleres/core';
 
 export const prerender = false;
@@ -32,6 +36,8 @@ interface Order {
   id: string; number: number; status: RepairStatus; received_at: string; problem_description: string; diagnosis: string | null;
   work_done: string | null; internal_notes: string | null; assigned_to: string | null; created_at: string; updated_at: string;
   delivered_at: string | null; created_by: string | null; customer_notes: string | null; show_details_to_customer: boolean;
+  mileage_in: number | null; priority: OrderPriority; scheduled_on: string | null; due_at: string | null; estimated_minutes: number | null;
+  approved_quote_id: string | null; approved_at: string | null;
   vehicles: { id: string; plate: string; make: string; model: string } | null;
   customers: { id: string; full_name: string; phone: string | null; email: string | null; user_id: string | null } | null;
 }
@@ -44,7 +50,7 @@ let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.
 let errors: Partial<Record<string, string>> = {};
 let draft: Record<string, string> | null = null;
 
-const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
+const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, mileage_in, priority, scheduled_on, due_at, estimated_minutes, approved_quote_id, approved_at, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
 const ctx = panel;
 async function loadOrder() {
   if (!ctx.workshop || !isUuid(id)) return null;
@@ -53,6 +59,19 @@ async function loadOrder() {
 }
 
 let order = await loadOrder();
+async function loadLines() {
+  if (!order) return [] as LineRow[];
+  const { data } = await ctx.supabase.from('repair_order_items').select(LINE_SELECT).eq('order_id', order.id).order('position').order('created_at');
+  return (data ?? []) as LineRow[];
+}
+let lines: LineRow[] = await loadLines();
+let lineErrors: Record<string, string> = {};
+let lineValues: Record<string, string> = {};
+let settings = { default_tax_rate: 21, labour_rate_cents: null as number | null };
+if (order && panel.workshop) {
+  const { data } = await panel.supabase.from('workshop_billing_settings').select('default_tax_rate, labour_rate_cents').eq('workshop_id', panel.workshop.id).maybeSingle();
+  if (data) settings = { default_tax_rate: Number(data.default_tax_rate), labour_rate_cents: data.labour_rate_cents === null ? null : Number(data.labour_rate_cents) };
+}
 
 if (panel.form && panel.workshop && order) {
   const action = field(panel.form, 'action');
@@ -94,6 +113,43 @@ if (panel.form && panel.workshop && order) {
       }
     }
   }
+  else if (action === 'planificar' && panel.isOffice) {
+    const priority = field(panel.form, 'priority');
+    const scheduled = field(panel.form, 'scheduled_on');
+    const due = field(panel.form, 'due_at');
+    const est = field(panel.form, 'estimated_hours').trim().replace(',', '.');
+    const minutes = est === '' ? null : Math.round(Number(est) * 60);
+    if (!isOrderPriority(priority)) flash = { kind: 'bad', text: 'Prioridad no válida.' };
+    else if (scheduled && !/^\d{4}-\d{2}-\d{2}$/.test(scheduled)) flash = { kind: 'bad', text: 'Día planificado no válido.' };
+    else if (due && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(due)) flash = { kind: 'bad', text: 'Fecha de entrega prevista no válida.' };
+    else if (minutes !== null && (!Number.isFinite(minutes) || minutes < 1 || minutes > 100000)) flash = { kind: 'bad', text: 'Tiempo estimado no válido (en horas, p. ej. 1,5).' };
+    else update = { priority, scheduled_on: scheduled || null, due_at: due ? localInputToDb(due) : null, estimated_minutes: minutes };
+  } else if (action === 'km') {
+    const km = field(panel.form, 'mileage_in').trim().replace(/\D/g, '');
+    if (km && Number(km) > 3000000) flash = { kind: 'bad', text: 'Kilómetros no válidos.' };
+    else update = { mileage_in: km ? Number(km) : null };
+  } else if (action === 'linea-anadir' || action === 'linea-quitar') {
+    if (action === 'linea-anadir') {
+      const r = readLine(panel.form, { taxRate: settings.default_tax_rate, labourRateCents: settings.labour_rate_cents });
+      if (!r.ok) { lineErrors = r.errors; lineValues = r.values; flash = { kind: 'bad', text: 'Revisa la línea.' }; Astro.response.status = 422; }
+      else {
+        const position = lines.reduce((m, l) => Math.max(m, l.position), 0) + 1;
+        const { error } = await panel.supabase.from('repair_order_items').insert({ workshop_id: panel.workshop.id, order_id: order.id, position, ...lineColumns(r.data) });
+        if (error) { logAuth('panel_order_line_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
+        else flash = { kind: 'ok', text: 'Línea añadida.' };
+      }
+    } else {
+      const lineId = field(panel.form, 'line_id');
+      const { error } = isUuid(lineId) ? await panel.supabase.from('repair_order_items').delete().eq('id', lineId).eq('order_id', order.id) : { error: null };
+      if (error) { logAuth('panel_order_line_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
+      else flash = { kind: 'ok', text: 'Línea quitada.' };
+    }
+    lines = await loadLines();
+  } else if (action === 'empezar' || action === 'parar') {
+    const { error } = await panel.supabase.rpc(action === 'empezar' ? 'start_work' : 'stop_work', { p_order_id: order.id });
+    if (error) { logAuth('panel_work_log_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
+    else flash = { kind: 'ok', text: action === 'empezar' ? 'Tiempo en marcha.' : 'Tiempo parado.' };
+  }
   if (update) {
     const { data, error } = await panel.supabase.from('repair_orders').update(update).eq('id', order.id).eq('workshop_id', panel.workshop.id).select('id');
     if (error || !data?.length) {
@@ -106,7 +162,7 @@ if (panel.form && panel.workshop && order) {
       };
       Astro.response.status = 400;
     } else {
-      flash = { kind: 'ok', text: action === 'estado' ? 'Estado actualizado.' : 'Cambios guardados.' };
+      flash = { kind: 'ok', text: action === 'estado' ? 'Estado actualizado.' : action === 'planificar' ? 'Planificación guardada.' : action === 'km' ? 'Kilómetros guardados.' : 'Cambios guardados.' };
       draft = null;
       await dispatchOrderEmails(Astro, order.id);
       order = await loadOrder();
@@ -116,14 +172,29 @@ if (panel.form && panel.workshop && order) {
 
 let events: Event[] = [];
 let team: Awaited<ReturnType<typeof loadTeam>> = [];
+let logs: Array<{ id: number; user_id: string | null; started_at: string; ended_at: string | null }> = [];
+let quotes: Array<{ id: string; number: number; version: number; status: QuoteStatus; total_cents: number | null }> = [];
+let invoices: Array<{ id: string; full_number: string | null; status: 'borrador' | 'emitida'; total_cents: number | null; kind: string }> = [];
 if (order) {
-  const [e, t] = await Promise.all([
+  const [e, t, l, q, i] = await Promise.all([
     panel.supabase.from('repair_order_events').select('id, kind, customer_message, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
     loadTeam(panel),
+    panel.supabase.from('repair_order_work_logs').select('id, user_id, started_at, ended_at').eq('order_id', order.id).order('started_at', { ascending: false }),
+    panel.isOffice ? panel.supabase.from('quotes').select('id, number, version, status, total_cents').eq('order_id', order.id).neq('status', 'sustituido').order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
+    panel.isOffice ? panel.supabase.from('invoices').select('id, full_number, status, total_cents, kind').eq('order_id', order.id).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
   ]);
   events = (e.data ?? []) as Event[];
   team = t;
+  logs = (l.data ?? []) as typeof logs;
+  quotes = (q.data ?? []) as typeof quotes;
+  invoices = (i.data ?? []) as typeof invoices;
 }
+const now = Date.now();
+const loggedMinutes = logs.reduce((sum, x) => sum + ((x.ended_at ? new Date(x.ended_at).getTime() : now) - new Date(x.started_at).getTime()) / 60000, 0);
+const myOpen = logs.find(x => x.user_id === panel.user.id && !x.ended_at);
+const late = Boolean(order?.due_at && order.status !== 'entregado' && new Date(order.due_at).getTime() < now);
+const waText = order && order.customers ? `Hola, ${order.customers.full_name}. ${order.vehicles ? `Tu ${order.vehicles.make} ${order.vehicles.model}: ` : ''}${REPAIR_STATUS_CUSTOMER_TEXT[order.status]}${order.customer_notes ? ` ${order.customer_notes}` : ''}` : '';
+const wa = order && panel.isOffice ? whatsappLink(order.customers?.phone, waText) : null;
 if (panel.workshop && !order) Astro.response.status = 404;
 
 const v: Record<string, string> = draft ?? (order ? {
@@ -161,6 +232,8 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
         </div>
       </header>
       <Flash kind={flash.kind} text={flash.text} />
+      {late && <div class="alert alert-warn" role="note"><Icon name="alert" /><span>La fecha prevista de entrega ({formatDateTime(order.due_at)}) ya ha pasado. Replanifica o avisa al cliente.</span></div>}
+      {order.approved_quote_id && <div class="alert alert-ok" role="note"><Icon name="check" /><span>Presupuesto aprobado por el cliente el {formatDateTime(order.approved_at)}. <a href={`/panel/presupuestos/${order.approved_quote_id}`}>Ver presupuesto</a></span></div>}
 
       <section class="card" aria-labelledby="estado-t">
         <h2 id="estado-t" class="card-title">Estado</h2>
@@ -177,7 +250,17 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
           ))}
         </form>
         {!panel.isOffice && <p class="hint" style="margin-top:10px">Marcar como entregado lo hace la oficina del taller (propietario, administrador o recepción).</p>}
+        {wa && (
+          <p style="margin-top:12px"><a class="btn btn-sm" href={wa} target="_blank" rel="noopener noreferrer"><Icon name="chat" />Avisar por WhatsApp (mensaje preparado)</a>
+          <span class="hint" style="display:block;margin-top:6px">Abre WhatsApp con el estado actual. Enviarlo lo haces tú; aquí no queda como enviado.</span></p>
+        )}
       </section>
+
+      <div style="margin-top:16px">
+        <LinesEditor lines={lines} editable={order.status !== 'entregado'} title="Trabajo realizado y piezas" taxRate={settings.default_tax_rate}
+          errors={lineErrors} values={lineValues} labourRateCents={settings.labour_rate_cents}
+          emptyText="Anota aquí la mano de obra y las piezas montadas: forman el historial del vehículo y la base de la factura." />
+      </div>
 
       <div class="grid-2" style="margin-top:16px">
         <form method="post" class="stack" data-busy="Guardando…" novalidate>
@@ -249,6 +332,75 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
         </form>
 
         <div class="stack">
+          <section class="card" aria-labelledby="plan-t">
+            <h2 id="plan-t" class="card-title"><Icon name="calendar" />Planificación</h2>
+            {panel.isOffice ? (
+              <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+                <input type="hidden" name="action" value="planificar" />
+                <div class="form-row">
+                  <div class="field"><label for="priority">Prioridad</label>
+                    <select class="select" id="priority" name="priority">{ORDER_PRIORITIES.map(p => <option value={p} selected={p === order!.priority}>{ORDER_PRIORITY_LABELS[p]}</option>)}</select></div>
+                  <div class="field"><label for="scheduled_on">Día de trabajo</label><input class="input" id="scheduled_on" name="scheduled_on" type="date" value={order.scheduled_on ?? ''} /></div>
+                </div>
+                <div class="form-row">
+                  <div class="field"><label for="due_at">Entrega prevista <span class="muted">(interna)</span></label><input class="input" id="due_at" name="due_at" type="datetime-local" value={order.due_at ? toLocalInput(order.due_at) : ''} /></div>
+                  <div class="field"><label for="estimated_hours">Tiempo estimado (horas)</label><input class="input" id="estimated_hours" name="estimated_hours" inputmode="decimal" placeholder="Ej.: 1,5" value={order.estimated_minutes ? String(Math.round(order.estimated_minutes / 6) / 10).replace('.', ',') : ''} /></div>
+                </div>
+                <p class="hint">La entrega prevista es para organizar el taller: el cliente no la ve (no es una fecha prometida).</p>
+                <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar planificación</span></button>
+              </form>
+            ) : (
+              <dl class="facts">
+                <dt>Prioridad</dt><dd>{ORDER_PRIORITY_LABELS[order.priority]}</dd>
+                <dt>Día de trabajo</dt><dd>{formatDay(order.scheduled_on)}</dd>
+                <dt>Entrega prevista</dt><dd>{formatDateTime(order.due_at)}</dd>
+                <dt>Estimado</dt><dd>{formatMinutes(order.estimated_minutes)}</dd>
+              </dl>
+            )}
+          </section>
+          <section class="card" aria-labelledby="tiempo-t">
+            <h2 id="tiempo-t" class="card-title"><Icon name="clock" />Tiempo real</h2>
+            <dl class="facts">
+              <dt>Trabajado</dt><dd>{formatMinutes(loggedMinutes)}</dd>
+              <dt>Estimado</dt><dd>{formatMinutes(order.estimated_minutes)}</dd>
+            </dl>
+            {order.status !== 'entregado' && (
+              <form method="post" style="margin-top:12px" data-busy="Guardando…">
+                <input type="hidden" name="action" value={myOpen ? 'parar' : 'empezar'} />
+                <button class={`btn ${myOpen ? 'btn-danger' : 'btn-primary'}`} type="submit"><Icon name={myOpen ? 'stop' : 'play'} /><span data-label>{myOpen ? 'Parar mi tiempo' : 'Empezar a trabajar'}</span></button>
+              </form>
+            )}
+            {logs.length > 0 && (
+              <ul class="plain-list small" style="margin-top:12px">
+                {logs.slice(0, 8).map(l => <li>{who(l.user_id)} · {formatDateTime(l.started_at)} → {l.ended_at ? formatDateTime(l.ended_at) : 'en marcha'}</li>)}
+              </ul>
+            )}
+            <p class="hint" style="margin-top:8px">Las horas las pone el servidor al pulsar; no se pueden escribir a mano.</p>
+          </section>
+          <section class="card" aria-labelledby="km-t">
+            <h2 id="km-t" class="card-title"><Icon name="gauge" />Kilómetros a la entrada</h2>
+            <form method="post" class="copy-row" data-busy="Guardando…">
+              <input type="hidden" name="action" value="km" />
+              <label class="sr-only" for="mileage_in">Kilómetros a la entrada</label>
+              <input class="input" id="mileage_in" name="mileage_in" inputmode="numeric" placeholder="Ej.: 120500" value={order.mileage_in ?? ''} />
+              <button class="btn btn-sm" type="submit">Guardar</button>
+            </form>
+            <p class="hint" style="margin-top:6px">Actualizan el kilometraje del vehículo y quedan en su historial.</p>
+          </section>
+          {panel.isOffice && (
+            <section class="card" aria-labelledby="docs-t">
+              <h2 id="docs-t" class="card-title"><Icon name="euro" />Presupuestos y facturas</h2>
+              {quotes.length === 0 && invoices.length === 0 && <p class="hint">Todavía no hay presupuestos ni facturas de esta orden.</p>}
+              <ul class="plain-list">
+                {quotes.map(q => <li><a href={`/panel/presupuestos/${q.id}`}>{quoteLabel(q.number, q.version)}</a> · {QUOTE_STATUS_LABELS[q.status]}{q.total_cents !== null && ` · ${formatCents(Number(q.total_cents))}`}</li>)}
+                {invoices.map(i => <li><a href={`/panel/facturas/${i.id}`}>{i.full_number ?? 'Factura (borrador)'}</a> · {INVOICE_STATUS_LABELS[i.status]}{i.total_cents !== null && ` · ${formatCents(Number(i.total_cents))}`}</li>)}
+              </ul>
+              <div class="doc-actions" style="margin-top:12px">
+                <a class="btn btn-sm" href={`/panel/presupuestos/nuevo?orden=${order.id}`}><Icon name="file" />Crear presupuesto</a>
+                <a class="btn btn-sm" href={`/panel/facturas/nueva?orden=${order.id}`}><Icon name="euro" />Crear factura</a>
+              </div>
+            </section>
+          )}
           <section class="card" aria-labelledby="fechas-t">
             <h2 id="fechas-t" class="card-title"><Icon name="clock" />Fechas</h2>
             <dl class="facts">

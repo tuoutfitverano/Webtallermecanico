@@ -1,0 +1,251 @@
+---
+/**
+ * Planificación del taller, conectada a las órdenes reales.
+ *
+ *  · Tablero: una columna por estado (sin «entregado»). Desde cada tarjeta se
+ *    cambia el estado y, la oficina, el mecánico asignado (se guarda en la
+ *    base de datos, con su historial y sus avisos al cliente).
+ *  · Semana: órdenes por día de trabajo planificado, y las que no tienen día.
+ *  · Filtros por mecánico (oficina), prioridad y estado; avisos de retrasos,
+ *    órdenes sin asignar y sin planificar.
+ * El mecánico ve solo sus órdenes (RLS) y no planifica (lo impide la base de datos).
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, isUuid, loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { dispatchOrderEmails } from '../../lib/server/notify.ts';
+import { dbErrorMessage } from '../../lib/auth/messages.ts';
+import { formatDateTime, formatDay, formatMinutes, todayMadrid } from '../../lib/panel/format.ts';
+import {
+  formatPlate, isOrderPriority, isRepairStatus, ORDER_PRIORITIES, ORDER_PRIORITY_LABELS, orderLabel, REPAIR_STATUS_LABELS, REPAIR_STATUSES,
+  type OrderPriority, type RepairStatus,
+} from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const params = Astro.url.searchParams;
+const view = params.get('vista') === 'semana' ? 'semana' : 'tablero';
+const mech = isUuid(params.get('mecanico')) ? params.get('mecanico')! : '';
+const prio = isOrderPriority(params.get('prioridad')) ? (params.get('prioridad') as OrderPriority) : '';
+const today = todayMadrid();
+const monday = (() => {
+  const asked = params.get('semana');
+  const base = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? new Date(`${asked}T12:00:00Z`) : new Date(`${today}T12:00:00Z`);
+  const d = (base.getUTCDay() + 6) % 7;
+  base.setUTCDate(base.getUTCDate() - d);
+  return base.toISOString().slice(0, 10);
+})();
+const addDays = (day: string, n: number) => { const d = new Date(`${day}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const days = Array.from({ length: 6 }, (_, i) => addDays(monday, i));
+const qs = (over: Record<string, string>) => {
+  const p = new URLSearchParams({ vista: view, ...(mech ? { mecanico: mech } : {}), ...(prio ? { prioridad: prio } : {}), ...(view === 'semana' ? { semana: monday } : {}), ...over });
+  for (const [k, v] of [...p.entries()]) if (!v) p.delete(k);
+  return `/panel/planificacion?${p}`;
+};
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+if (panel.form && panel.workshop) {
+  const orderId = field(panel.form, 'order_id');
+  const action = field(panel.form, 'action');
+  let update: Record<string, unknown> | null = null;
+  if (!isUuid(orderId)) flash = { kind: 'bad', text: 'Orden no válida.' };
+  else if (action === 'estado') {
+    const status = field(panel.form, 'status');
+    if (!isRepairStatus(status)) flash = { kind: 'bad', text: 'Estado no válido.' };
+    else update = { status };
+  } else if (action === 'asignar' && panel.isOffice) {
+    const to = field(panel.form, 'assigned_to');
+    update = { assigned_to: isUuid(to) ? to : null };
+  } else if (action === 'dia' && panel.isOffice) {
+    const day = field(panel.form, 'scheduled_on');
+    update = { scheduled_on: /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null };
+  }
+  if (update) {
+    const { data, error } = await panel.supabase.from('repair_orders').update(update).eq('id', orderId).eq('workshop_id', panel.workshop.id).select('id');
+    if (error || !data?.length) {
+      logAuth('panel_planning_update_error', error?.code);
+      flash = { kind: 'bad', text: error ? dbErrorMessage(error) : 'No se ha guardado: no tienes permiso sobre esa orden.' };
+      Astro.response.status = 400;
+    } else {
+      flash = { kind: 'ok', text: 'Cambio guardado.' };
+      if ('status' in update) await dispatchOrderEmails(Astro, orderId);
+    }
+  }
+}
+
+interface Row {
+  id: string; number: number; status: RepairStatus; priority: OrderPriority; scheduled_on: string | null; due_at: string | null;
+  estimated_minutes: number | null; assigned_to: string | null; problem_description: string;
+  vehicles: { plate: string; make: string; model: string } | null; customers: { full_name: string } | null;
+}
+let rows: Row[] = [];
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+let loadError = false;
+if (panel.workshop) {
+  let q = panel.supabase.from('repair_orders')
+    .select('id, number, status, priority, scheduled_on, due_at, estimated_minutes, assigned_to, problem_description, vehicles(plate, make, model), customers(full_name)')
+    .eq('workshop_id', panel.workshop.id).neq('status', 'entregado').order('due_at', { ascending: true, nullsFirst: false }).limit(300);
+  if (mech) q = q.eq('assigned_to', mech);
+  if (prio) q = q.eq('priority', prio);
+  const [r, t] = await Promise.all([q, loadTeam(panel)]);
+  if (r.error) { logAuth('panel_planning_error', r.error.code); loadError = true; }
+  rows = (r.data ?? []) as unknown as Row[];
+  team = t;
+}
+const PRIO_ORDER: Record<OrderPriority, number> = { urgente: 0, alta: 1, normal: 2, baja: 3 };
+rows.sort((a, b) => PRIO_ORDER[a.priority] - PRIO_ORDER[b.priority]);
+const now = Date.now();
+const isLate = (r: Row) => Boolean(r.due_at && new Date(r.due_at).getTime() < now);
+const late = rows.filter(isLate);
+const unassigned = rows.filter(r => !r.assigned_to);
+const unplanned = rows.filter(r => !r.scheduled_on);
+const columns = REPAIR_STATUSES.filter(s => s !== 'entregado');
+const activeTeam = team.filter(m => m.active);
+const who = (u: string | null) => memberName(team, u, panel.user.id);
+const prioTone: Record<OrderPriority, string> = { urgente: 'pill-bad', alta: 'pill-warn', normal: '', baja: '' };
+const loadOf = (day: string) => rows.filter(r => r.scheduled_on === day).reduce((m, r) => m + (r.estimated_minutes ?? 0), 0);
+---
+<PanelLayout panel={panel} title="Planificación" section="planificacion">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Planificación</h1>
+      <p class="pnl-sub">{panel.isOffice ? 'Organiza el trabajo del taller: estados, mecánicos y días.' : 'Tus trabajos pendientes, por estado y por día.'}</p>
+    </div>
+    <nav class="filter-tabs" aria-label="Vista">
+      <a href={qs({ vista: 'tablero', semana: '' })} aria-current={view === 'tablero' ? 'page' : undefined}>Tablero</a>
+      <a href={qs({ vista: 'semana' })} aria-current={view === 'semana' ? 'page' : undefined}>Semana</a>
+    </nav>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No se ha podido cargar la planificación. Recarga la página." />}
+
+      <section class="kpis" aria-label="Atención">
+        <a class="kpi" href="#tablero"><span class="kpi-value">{rows.length}</span><span class="kpi-label">Trabajos abiertos</span></a>
+        <a class="kpi" href="#retrasos"><span class="kpi-value">{late.length}</span><span class="kpi-label">Con la entrega prevista superada</span></a>
+        <a class="kpi" href="#tablero"><span class="kpi-value">{unassigned.length}</span><span class="kpi-label">Sin mecánico asignado</span></a>
+        <a class="kpi" href="#sin-dia"><span class="kpi-value">{unplanned.length}</span><span class="kpi-label">Sin día de trabajo</span></a>
+      </section>
+
+      <form method="get" class="filters" action="/panel/planificacion">
+        <input type="hidden" name="vista" value={view} />
+        {view === 'semana' && <input type="hidden" name="semana" value={monday} />}
+        {panel.isOffice && (
+          <div class="field"><label for="mecanico">Mecánico</label>
+            <select class="select" id="mecanico" name="mecanico"><option value="">Todos</option>{activeTeam.map(m => <option value={m.user_id} selected={m.user_id === mech}>{m.full_name ?? m.email ?? 'Sin nombre'}</option>)}</select></div>
+        )}
+        <div class="field"><label for="prioridad">Prioridad</label>
+          <select class="select" id="prioridad" name="prioridad"><option value="">Todas</option>{ORDER_PRIORITIES.map(p => <option value={p} selected={p === prio}>{ORDER_PRIORITY_LABELS[p]}</option>)}</select></div>
+        <button class="btn" type="submit">Filtrar</button>
+      </form>
+
+      {late.length > 0 && (
+        <section class="card" id="retrasos" aria-labelledby="retrasos-t">
+          <h2 id="retrasos-t" class="card-title"><Icon name="alert" />Entrega prevista superada</h2>
+          <ul class="plain-list">{late.map(r => <li><a href={`/panel/ordenes/${r.id}`}>{orderLabel(r.number)}</a> · {r.vehicles && formatPlate(r.vehicles.plate)} · prevista {formatDateTime(r.due_at)} · {who(r.assigned_to)}</li>)}</ul>
+        </section>
+      )}
+
+      {rows.length === 0 ? (
+        <div class="empty" id="tablero"><strong>No hay trabajos abiertos{mech || prio ? ' con estos filtros' : ''}.</strong>{panel.isOffice && <a class="btn" href="/panel/ordenes/nueva">Crear orden</a>}</div>
+      ) : view === 'tablero' ? (
+        <div class="board" id="tablero">
+          {columns.map(col => {
+            const items = rows.filter(r => r.status === col);
+            return (
+              <section class="board-col" aria-labelledby={`col-${col}`}>
+                <h2 id={`col-${col}`} class="card-title">{REPAIR_STATUS_LABELS[col]} <span class="muted">({items.length})</span></h2>
+                {items.length === 0 ? <p class="hint">Ninguna.</p> : items.map(r => (
+                  <article class={`board-card ${isLate(r) ? 'is-late' : ''}`} aria-label={orderLabel(r.number)}>
+                    <p class="row-title"><a href={`/panel/ordenes/${r.id}`}>{orderLabel(r.number)}</a>{r.vehicles && <span class="plate">{formatPlate(r.vehicles.plate)}</span>}</p>
+                    <p class="row-meta">{r.vehicles && `${r.vehicles.make} ${r.vehicles.model} · `}{r.customers?.full_name}</p>
+                    <p class="row-meta">{r.problem_description.slice(0, 90)}{r.problem_description.length > 90 ? '…' : ''}</p>
+                    <p class="board-tags">
+                      <span class={`pill ${prioTone[r.priority]}`}>{ORDER_PRIORITY_LABELS[r.priority]}</span>
+                      {r.scheduled_on && <span class="pill">Día {formatDay(r.scheduled_on)}</span>}
+                      {r.due_at && <span class={`pill ${isLate(r) ? 'pill-bad' : ''}`}>Entrega {formatDateTime(r.due_at)}</span>}
+                      {r.estimated_minutes && <span class="pill">{formatMinutes(r.estimated_minutes)}</span>}
+                      <span class="pill">{who(r.assigned_to)}</span>
+                    </p>
+                    <form method="post" class="board-form" data-busy="Guardando…">
+                      <input type="hidden" name="action" value="estado" /><input type="hidden" name="order_id" value={r.id} />
+                      <label class="sr-only" for={`st-${r.id}`}>Estado de {orderLabel(r.number)}</label>
+                      <select class="select" id={`st-${r.id}`} name="status">
+                        {REPAIR_STATUSES.filter(s => panel.isOffice || s !== 'entregado').map(s => <option value={s} selected={s === r.status}>{REPAIR_STATUS_LABELS[s]}</option>)}
+                      </select>
+                      <button class="btn btn-sm" type="submit">Mover</button>
+                    </form>
+                    {panel.isOffice && (
+                      <form method="post" class="board-form" data-busy="Guardando…">
+                        <input type="hidden" name="action" value="asignar" /><input type="hidden" name="order_id" value={r.id} />
+                        <label class="sr-only" for={`as-${r.id}`}>Mecánico de {orderLabel(r.number)}</label>
+                        <select class="select" id={`as-${r.id}`} name="assigned_to">
+                          <option value="">Sin asignar</option>
+                          {activeTeam.map(m => <option value={m.user_id} selected={m.user_id === r.assigned_to}>{m.full_name ?? m.email ?? 'Sin nombre'}</option>)}
+                        </select>
+                        <button class="btn btn-sm" type="submit">Asignar</button>
+                      </form>
+                    )}
+                  </article>
+                ))}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <nav class="pnl-actions" aria-label="Semanas" style="margin-bottom:12px">
+            <a class="btn btn-sm" href={qs({ semana: addDays(monday, -7) })}>← Semana anterior</a>
+            <a class="btn btn-sm" href={qs({ semana: '' })}>Esta semana</a>
+            <a class="btn btn-sm" href={qs({ semana: addDays(monday, 7) })}>Semana siguiente →</a>
+          </nav>
+          <div class="week" id="tablero">
+            {days.map(day => {
+              const items = rows.filter(r => r.scheduled_on === day);
+              return (
+                <section class={`board-col ${day === today ? 'is-today' : ''}`} aria-labelledby={`d-${day}`}>
+                  <h2 id={`d-${day}`} class="card-title">{new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`))}</h2>
+                  <p class="hint">{items.length} {items.length === 1 ? 'trabajo' : 'trabajos'}{loadOf(day) ? ` · ${formatMinutes(loadOf(day))} estimados` : ''}</p>
+                  {items.map(r => (
+                    <article class={`board-card ${isLate(r) ? 'is-late' : ''}`}>
+                      <p class="row-title"><a href={`/panel/ordenes/${r.id}`}>{orderLabel(r.number)}</a>{r.vehicles && <span class="plate">{formatPlate(r.vehicles.plate)}</span>}</p>
+                      <p class="row-meta">{REPAIR_STATUS_LABELS[r.status]} · {who(r.assigned_to)}{r.estimated_minutes ? ` · ${formatMinutes(r.estimated_minutes)}` : ''}</p>
+                      <p class="board-tags"><span class={`pill ${prioTone[r.priority]}`}>{ORDER_PRIORITY_LABELS[r.priority]}</span>{r.due_at && <span class={`pill ${isLate(r) ? 'pill-bad' : ''}`}>Entrega {formatDateTime(r.due_at)}</span>}</p>
+                    </article>
+                  ))}
+                </section>
+              );
+            })}
+          </div>
+          <section class="card" id="sin-dia" aria-labelledby="sin-dia-t" style="margin-top:16px">
+            <h2 id="sin-dia-t" class="card-title">Sin día de trabajo ({unplanned.length})</h2>
+            {unplanned.length === 0 ? <p class="hint">Todo tiene día.</p> : (
+              <ul class="list">
+                {unplanned.map(r => (
+                  <li class="row">
+                    <span class="row-main"><span class="row-title"><a href={`/panel/ordenes/${r.id}`}>{orderLabel(r.number)}</a>{r.vehicles && <span class="plate">{formatPlate(r.vehicles.plate)}</span>}</span><span class="row-meta">{REPAIR_STATUS_LABELS[r.status]} · {ORDER_PRIORITY_LABELS[r.priority]} · {who(r.assigned_to)}</span></span>
+                    {panel.isOffice && (
+                      <form method="post" class="board-form" data-busy="Guardando…">
+                        <input type="hidden" name="action" value="dia" /><input type="hidden" name="order_id" value={r.id} />
+                        <label class="sr-only" for={`dia-${r.id}`}>Día para {orderLabel(r.number)}</label>
+                        <input class="input" type="date" id={`dia-${r.id}`} name="scheduled_on" value={today} />
+                        <button class="btn btn-sm" type="submit">Planificar</button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
+    </>
+  )}
+</PanelLayout>

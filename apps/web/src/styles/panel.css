@@ -70,16 +70,16 @@
   --tone-bad: #9f1239;
   --tone-bad-soft: #991b1b;
 }
-:root[data-theme='claro']:is([data-color='grafito'], [data-color='verde']) :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
+:root[data-theme='claro']:is([data-color='grafito'], [data-color='verde']) :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu, .board-col) {
   --p-surface: #FFFDF8;
   --p-surface-2: #F1ECE1;
   --p-on-muted: #4F5358;
 }
-:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) { --p-on-muted: #4A5C52; }
+:root[data-theme='claro'][data-color='verde'] :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu, .board-col) { --p-on-muted: #4A5C52; }
 
 /* Tonos pastel (y tarjetas claras): superficies claras, texto oscuro y estados en versión oscura. */
 :root[data-color]:not([data-color='verde']):not([data-color='grafito']),
-:root[data-theme='claro']:is([data-color='grafito'], [data-color='verde']) :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu) {
+:root[data-theme='claro']:is([data-color='grafito'], [data-color='verde']) :is(.card, .kpi, .vcard, .explain, .pnl-back, .pnl-more-menu, .color-pick-menu, .board-col) {
   --p-on-rgb: 28 30 29;
   --p-on-ink: var(--p-surface);
   --p-tone-slate: #334155;
@@ -101,7 +101,7 @@
 :root[data-color='arena'] { --p-surface: #EFE7D4; --p-surface-2: #E2D6BC; --p-on-muted: #57503F; }
 
 /* Dentro de cada superficie, los colores que dependen del fondo se recalculan con su tono. */
-.pnl-side, .pnl-back, .card, .kpi, .vcard, .explain, .pnl-more-menu, .color-pick-menu {
+.pnl-side, .pnl-back, .card, .kpi, .vcard, .explain, .pnl-more-menu, .color-pick-menu, .board-col {
   --fg-rgb: var(--p-on-rgb);
   --fg: rgb(var(--p-on-rgb));
   --fg-90: rgb(var(--p-on-rgb) / .9);
@@ -449,3 +449,15 @@ a.vcard:hover { border-color: var(--p-line-2); }
 .pill-warn { color: var(--tone-warn); border-color: color-mix(in srgb, var(--tone-warn) 45%, transparent); }
 .pill-bad { color: var(--tone-bad); border-color: color-mix(in srgb, var(--tone-bad) 45%, transparent); }
 .pill-info { color: var(--tone-info); border-color: color-mix(in srgb, var(--tone-info) 45%, transparent); }
+
+/* ---------- Planificación (tablero y semana) ---------- */
+.board, .week { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); align-items: start; }
+.board-col { background: var(--p-surface); border: 1px solid var(--p-line); border-radius: 16px; padding: 14px; min-width: 0; display: grid; gap: 10px; }
+.board-col.is-today { border-color: var(--accent); }
+.board-card { border: 1px solid var(--p-line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; background: color-mix(in srgb, var(--p-surface) 92%, var(--p-text)); min-width: 0; }
+.board-card.is-late { border-color: color-mix(in srgb, var(--tone-bad) 55%, transparent); }
+.board-card p { margin: 0; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.board-form { display: flex; gap: 6px; align-items: center; }
+.board-form .select, .board-form .input { min-height: 36px; padding-block: 4px; flex: 1; min-width: 0; }
+@media (pointer: coarse) { .board-form .select, .board-form .input { min-height: 44px; } }
