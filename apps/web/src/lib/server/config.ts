@@ -17,6 +17,7 @@ import { createResendSender } from '../notifications/resend.ts';
 import { dispatchEmails, type DispatchDeps, type DispatchSummary } from '../notifications/dispatcher.ts';
 import type { ClaimedNotification } from '../notifications/templates.ts';
 import type { ChannelSender } from '../notifications/types.ts';
+import { createMetaWhatsappSender, dispatchWhatsapp, type ClaimedWhatsapp, type WhatsappSender } from '../notifications/whatsapp.ts';
 
 export const isDev = import.meta.env.DEV;
 
@@ -231,6 +232,71 @@ export async function recordEmailDelivery(provider: string, messageId: string, o
   const { error } = await service.rpc('record_email_delivery', { p_provider: provider, p_message_id: messageId, p_outcome: outcome });
   if (error) log('email_delivery_error', { code: error.code ?? 'desconocido' });
   return !error;
+}
+
+/**
+ * Canal WhatsApp (API oficial de WhatsApp Business), o null si no está
+ * configurado. Sin él, los avisos por WhatsApp se quedan "pendientes".
+ */
+function whatsappSender(): WhatsappSender | null {
+  const kind = env('WHATSAPP_PROVIDER').trim().toLowerCase();
+  if (!kind || !getServiceClient()) return null;
+  if (kind === 'meta') {
+    const token = env('WHATSAPP_TOKEN');
+    const phoneNumberId = env('WHATSAPP_PHONE_NUMBER_ID').trim();
+    const baseUrl = providerUrl(env('WHATSAPP_API_URL'));
+    if (!token || !/^[0-9]{5,30}$/.test(phoneNumberId) || baseUrl === null) return null;
+    const path = baseUrl ? new URL(env('WHATSAPP_API_URL')).pathname.replace(/\/+$/, '') : '';
+    return createMetaWhatsappSender({
+      token,
+      phoneNumberId,
+      template: env('WHATSAPP_TEMPLATE').trim() || undefined,
+      baseUrl: baseUrl ? baseUrl + path : undefined,
+    });
+  }
+  log('whatsapp_unknown_provider');
+  return null;
+}
+
+/** ¿Hay WhatsApp configurado en la plataforma? */
+export function whatsappAvailable(): boolean {
+  return whatsappSender() !== null;
+}
+
+/** Envía los WhatsApp pendientes (de una orden o de todos). Solo con la clave secreta, desde el servidor. */
+export async function dispatchPendingWhatsapp(opts: { orderId?: string | null; limit?: number } = {}): Promise<DispatchSummary> {
+  const service = getServiceClient();
+  return dispatchWhatsapp({
+    sender: service ? whatsappSender() : null,
+    async claim({ limit, orderId }) {
+      const { data, error } = await service!.rpc('claim_whatsapp_notifications', { p_limit: limit, p_order_id: orderId });
+      return { data: (data ?? null) as ClaimedWhatsapp[] | null, error };
+    },
+    async record(id, outcome, provider) {
+      const { error } = await service!.rpc('record_whatsapp_result', {
+        p_id: id,
+        p_result: outcome.kind,
+        p_provider: provider,
+        p_message_id: outcome.kind === 'aceptado' ? outcome.messageId || null : null,
+        p_error_code: outcome.kind === 'aceptado' ? null : outcome.code,
+      });
+      return { error };
+    },
+    log,
+  }, { orderId: opts.orderId ?? null, limit: opts.limit });
+}
+
+/** Anota una confirmación de WhatsApp (webhook ya verificado). */
+export async function recordWhatsappDelivery(messageId: string, outcome: string): Promise<boolean> {
+  const service = getServiceClient();
+  if (!service) return false;
+  const { error } = await service.rpc('record_whatsapp_delivery', { p_provider: 'meta', p_message_id: messageId, p_outcome: outcome });
+  if (error) log('whatsapp_delivery_error', { code: error.code ?? 'desconocido' });
+  return !error;
+}
+
+export function whatsappWebhookSecrets(): { appSecret: string; verifyToken: string } {
+  return { appSecret: env('WHATSAPP_APP_SECRET'), verifyToken: env('WHATSAPP_VERIFY_TOKEN') };
 }
 
 export function resendWebhookSecret(): string {

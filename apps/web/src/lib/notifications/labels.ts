@@ -22,25 +22,26 @@ export const STATUS_LABELS: Readonly<Record<NotificationStatus, string>> = {
   cancelado: 'Cancelado',
 };
 
-export const CHANNEL_LABELS: Readonly<Record<string, string>> = { app: 'Portal', email: 'Email' };
+export const CHANNEL_LABELS: Readonly<Record<string, string>> = { app: 'Portal', email: 'Email', whatsapp: 'WhatsApp' };
 
 /** Motivo general (sin detalles técnicos ni datos personales). */
 export const ERROR_LABELS: Readonly<Record<string, string>> = {
-  no_disponible: 'El proveedor de email no respondía',
+  no_disponible: 'El proveedor no respondía',
   limite_proveedor: 'Límite de envíos del proveedor',
   credenciales: 'Configuración del proveedor incorrecta',
-  rechazado: 'El proveedor rechazó el email (dirección no válida)',
+  rechazado: 'El proveedor lo rechazó (dirección o número no válido)',
   conflicto: 'Envío duplicado detectado',
   error: 'Error inesperado',
   reintentos_agotados: 'Se agotaron los reintentos',
   rebotado: 'La dirección rechazó el email (rebote)',
   queja: 'El cliente lo marcó como spam: se han desactivado sus emails',
   fallido: 'El proveedor no pudo entregarlo',
+  destinatario_cambiado: 'Cambió el email o el teléfono de la ficha',
   sustituida: 'Sustituido por un aviso más reciente',
   estado_corregido: 'El estado se corrigió antes de enviarlo',
   caducada: 'No se envió a tiempo (más de 2 días)',
-  preferencia: 'El cliente no quiere avisos por email',
+  preferencia: 'El cliente no quiere avisos por este canal',
   sin_consentimiento: 'Sin consentimiento comercial',
-  desactivado: 'Email desactivado en el taller',
+  desactivado: 'Canal desactivado en el taller',
   taller_suspendido: 'Taller suspendido',
 };

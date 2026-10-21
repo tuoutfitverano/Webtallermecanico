@@ -24,7 +24,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
                           panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web), panel/taller (datos y servicios)
-                          api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend)
+                          api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend; whatsapp = Meta)
                           cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
   src/middleware.ts       Cabeceras de seguridad en todo (CSP frame-ancestors, nosniff, HSTS…); área privada: APP_URL y anti-caché
@@ -42,7 +42,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/layouts/PortalLayout, src/components/portal/  Plantilla y piezas del portal del cliente
   src/lib/panel/          Formatos de fecha (Europe/Madrid) y lectura del formulario de vehículos
   src/lib/vehicle-lookup/ Consulta por matrícula: tipos, cliente de Openapi, lógica (service) y revisión — solo servidor
-  src/lib/notifications/  Avisos: canal email (Resend), plantilla, despachador, webhook firmado — solo servidor
+  src/lib/notifications/  Avisos: canales email (Resend) y WhatsApp (Meta), plantilla, despachador, webhooks firmados — solo servidor
   src/components/panel/   Piezas del panel (estado, avisos, campos de cliente y vehículo)
   src/styles/panel.css    Estilos del panel (más denso y opaco que la web pública)
   src/styles/site.css     Diseño "cristal líquido" de la web pública (CSS propio, sin Tailwind)
@@ -171,6 +171,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Avisos operativos ≠ comerciales. Lo comercial exige consentimiento del PROPIO cliente (`set_contact_preferences` desde el portal); el taller solo puede retirarlo. Lo impone `notifications_guard`.
 - El contenido del aviso solo lleva lo que el cliente ya ve en su portal. Los textos de estado de `private.status_customer_text` deben coincidir con `REPAIR_STATUS_CUSTOMER_TEXT` (lo comprueba una prueba).
 - En e2e el email es SIMULADO (`scripts/e2e/email-provider-mock.mjs`): no lo presentes como envío real.
+- WhatsApp (`lib/notifications/whatsapp.ts`, API oficial de Meta, plantilla aprobada `reparacion_estado_v1`): el cliente elige en «Mis datos» portal (siempre) + email y/o WhatsApp. WhatsApp solo lo PIDE el propio cliente (`set_contact_preferences` de 4 argumentos desde el portal) y necesita móvil (`private.whatsapp_number`); el taller solo lo retira. Nunca comercial por WhatsApp. En e2e es SIMULADO (`scripts/e2e/whatsapp-provider-mock.mjs`).
 
 ## Auditoría y producción (Fase 8)
 

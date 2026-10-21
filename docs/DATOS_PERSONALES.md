@@ -13,20 +13,20 @@ Documento técnico para preparar la política de privacidad y el registro de act
 | **Clientes del taller**: nombre, teléfono, correo, notas internas, cuenta del portal | Gestionar reparaciones | Personal del taller. El cliente ve sus datos en el portal, **nunca** las notas internas | Supabase |
 | **Vehículos y órdenes**: matrícula, marca, modelo, año, combustible, estado, diagnosis, trabajo, mensajes al cliente, historial | Gestionar reparaciones | Gestores: todo. Mecánicos: solo las órdenes asignadas. Cliente: lo autorizado | Supabase |
 | **Consultas de matrícula** (si se activan): matrícula y datos devueltos | Rellenar la ficha del vehículo | Personal del taller | **Openapi** (recibe la matrícula) |
-| **Avisos**: título, texto, correo destinatario y estado de envío | Informar al cliente | Gestores (registro) y el cliente (sus avisos del portal) | **Resend** (si se activa; recibe correo, asunto y texto) |
-| **Preferencias y consentimientos**: avisos por email, comerciales e historial de cambios | Respetar lo que quiere el cliente y poder demostrar el consentimiento | Personal; el registro, solo gestores | Supabase |
+| **Avisos**: título, texto, correo destinatario y estado de envío | Informar al cliente | Gestores (registro) y el cliente (sus avisos del portal) | **Resend** (si se activa; recibe correo, asunto y texto) y **Meta / WhatsApp** (si se activa; recibe el móvil y el texto del aviso) |
+| **Preferencias y consentimientos**: avisos por email y por WhatsApp, comerciales e historial de cambios | Respetar lo que quiere el cliente y poder demostrar el consentimiento | Personal; el registro, solo gestores | Supabase |
 | Cookies | Ver `/cookies`: técnicas (sesión, seguridad, taller abierto, respuesta al aviso) y de preferencias (modo claro u oscuro, color del panel), estas solo si se aceptan en el aviso | — | Navegador de la persona |
 
 **Registros técnicos** (`console`): solo códigos de evento y recuentos. Nunca correos, nombres, matrículas, contenidos ni claves. Se comprueba en las pruebas unitarias de matrículas y avisos.
 
-**Contenido de los emails**: nombre del taller, título del aviso, vehículo, número de orden, estado y mensaje del taller. Nunca notas internas, diagnosis no autorizada ni enlaces con códigos de acceso.
+**Contenido de los emails y WhatsApp**: nombre del taller, título del aviso, vehículo, número de orden, estado y mensaje del taller. Nunca notas internas, diagnosis no autorizada ni enlaces con códigos de acceso.
 
 ## 2. Conservación (pendiente de decidir con el asesor)
 
 Hoy **no hay borrado automático**, salvo:
 
 - las huellas antispam (2 días);
-- los avisos por email no enviados (se cancelan a los 2 días).
+- los avisos por email o WhatsApp no enviados (se cancelan a los 2 días).
 
 Hay que decidir y documentar plazos para:
 
@@ -47,7 +47,7 @@ Todo se hace en Supabase → **SQL Editor**, con una persona autorizada. Las fun
 | **Acceso / portabilidad** (cliente de un taller) | `select private.export_customer_data('<id de la ficha>');` devuelve un JSON con ficha, vehículos, reparaciones, avisos, preferencias y consentimientos |
 | **Rectificación** | El taller corrige la ficha en el panel. El cliente puede pedirlo; en el portal sus datos son de solo lectura |
 | **Supresión** con historial que conservar | `select private.anonymize_customer('<id>');` borra o sustituye nombre, teléfono, correo, notas, acceso al portal, avisos del portal y mensajes. Conserva las reparaciones sin datos personales. Si la ficha no tiene órdenes, se puede borrar entera desde el panel |
-| **Oposición a comunicaciones** | El cliente desde «Mis datos», o el taller en la ficha («Desactivar avisos por email» / «Retirar consentimiento de promociones») |
+| **Oposición a comunicaciones** | El cliente desde «Mis datos», o el taller en la ficha («Desactivar avisos por email» / «Retirar avisos por WhatsApp» / «Retirar consentimiento de promociones») |
 | **Solicitudes web** | Un gestor las borra desde **Panel → Solicitudes web → Borrar…** (dos pasos; permiso de borrado por RLS) |
 | **Cuentas de usuario** | Supabase → Authentication → Users → borrar. Las fichas de cliente se quedan sin cuenta (`on delete set null`) y el historial se mantiene |
 
@@ -56,7 +56,7 @@ Antes de responder, compruebe la identidad de quien lo pide. Hay plazo de un mes
 ## 4. Pendiente de validación legal
 
 - **Responsables y encargados:** el taller es responsable de los datos de sus clientes y la plataforma es su encargada. Hace falta un contrato de encargado (art. 28) con cada taller.
-- **Subencargados:** Supabase, Cloudflare y, si se activan, Resend y Openapi. Hay que revisar sus DPA, la región de los datos y las transferencias internacionales.
+- **Subencargados:** Supabase, Cloudflare y, si se activan, Resend, Meta (WhatsApp Business) y Openapi. Hay que revisar sus DPA, la región de los datos y las transferencias internacionales.
 - **Textos:** las páginas `/privacidad`, `/aviso-legal`, `/cookies`, `/privacidad-cuenta` y `/condiciones` muestran hoy «Texto pendiente».
 - **Bases jurídicas:**
   - avisos operativos: ejecución del servicio;

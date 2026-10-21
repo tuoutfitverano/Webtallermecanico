@@ -103,6 +103,20 @@ if (panel.form && panel.workshop && isUuid(id)) {
       flash = { kind: 'bad', text: dbErrorMessage(error) };
       Astro.response.status = 400;
     } else flash = { kind: 'ok', text: 'Preferencias de comunicación actualizadas.' };
+  } else if (action === 'retirar-whatsapp') {
+    // El taller solo puede RETIRAR los avisos por WhatsApp (a petición del cliente); pedirlos es cosa del cliente.
+    const { data: cur } = await panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email').eq('customer_id', id).maybeSingle();
+    const { error } = await panel.supabase.rpc('set_contact_preferences', {
+      p_customer_id: id,
+      p_operational_email: cur?.operational_email ?? true,
+      p_marketing_email: cur?.marketing_email ?? false,
+      p_operational_whatsapp: false,
+    });
+    if (error) {
+      logAuth('panel_customer_prefs_error', error.code);
+      flash = { kind: 'bad', text: dbErrorMessage(error) };
+      Astro.response.status = 400;
+    } else flash = { kind: 'ok', text: 'Avisos por WhatsApp retirados. Solo el cliente puede volver a pedirlos desde su portal.' };
   } else if (action === 'pedir-borrar') {
     askDelete = true;
   } else if (action === 'borrar') {
@@ -123,8 +137,8 @@ let customer: Customer | null = null;
 let vehicles: Array<{ id: string; plate: string; make: string; model: string }> = [];
 let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
 let invitations: Invitation[] = [];
-let prefs = { operational_email: true, marketing_email: false, updated_at: null as string | null };
-let consentLog: Array<{ id: number; purpose: string; granted: boolean; source: string; created_at: string }> = [];
+let prefs = { operational_email: true, marketing_email: false, operational_whatsapp: false, updated_at: null as string | null };
+let consentLog: Array<{ id: number; channel: string; purpose: string; granted: boolean; source: string; created_at: string }> = [];
 if (panel.workshop && isUuid(id)) {
   const [c, v, o, i, pr, cl] = await Promise.all([
     panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
@@ -135,10 +149,10 @@ if (panel.workshop && isUuid(id)) {
       ? panel.supabase.from('customer_invitations').select('id, email, expires_at, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
         .eq('status', 'pendiente').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
-    panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email, updated_at').eq('customer_id', id).maybeSingle(),
+    panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email, operational_whatsapp, updated_at').eq('customer_id', id).maybeSingle(),
     // Registro de consentimientos: solo gestores (RLS «consent log: lectura gestores»).
     panel.isManager
-      ? panel.supabase.from('communication_consent_log').select('id, purpose, granted, source, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
+      ? panel.supabase.from('communication_consent_log').select('id, channel, purpose, granted, source, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
         .order('created_at', { ascending: false }).limit(20)
       : Promise.resolve({ data: [] }),
   ]);
@@ -256,6 +270,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
             <h2 id="comunicaciones" class="card-title"><Icon name="bell" />Comunicaciones</h2>
             <dl class="facts">
               <dt>Avisos de reparaciones por email</dt><dd>{!customer.email ? 'Sin correo en la ficha' : prefs.operational_email ? 'Sí' : 'No (desactivados)'}</dd>
+              <dt>Avisos de reparaciones por WhatsApp</dt><dd>{prefs.operational_whatsapp ? 'Sí, pedido por el cliente desde su portal' : 'No'}</dd>
               <dt>Promociones por email</dt><dd>{prefs.marketing_email ? `Sí, consentimiento dado por el cliente${prefs.updated_at ? ` (${formatDate(prefs.updated_at)})` : ''}` : 'No'}</dd>
             </dl>
             {panel.isManager && (
@@ -266,6 +281,12 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
                   <input type="hidden" name="marketing_email" value={prefs.marketing_email ? '1' : '0'} />
                   <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>{prefs.operational_email ? 'Desactivar avisos por email' : 'Reactivar avisos por email'}</span></button>
                 </form>
+                {prefs.operational_whatsapp && (
+                  <form method="post" data-busy="Guardando…">
+                    <input type="hidden" name="action" value="retirar-whatsapp" />
+                    <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Retirar avisos por WhatsApp</span></button>
+                  </form>
+                )}
                 {prefs.marketing_email && (
                   <form method="post" data-busy="Guardando…">
                     <input type="hidden" name="action" value="comunicaciones" />
@@ -276,7 +297,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
                 )}
               </div>
             )}
-            <p class="hint" style="margin-top:10px">Cámbialo solo si el cliente te lo pide. El consentimiento para promociones solo puede darlo el propio cliente desde su portal.</p>
+            <p class="hint" style="margin-top:10px">Cámbialo solo si el cliente te lo pide. Los avisos por WhatsApp y el consentimiento para promociones solo puede pedirlos el propio cliente desde su portal.</p>
             {panel.isManager && consentLog.length > 0 && (
               <details style="margin-top:12px">
                 <summary class="small">Historial de cambios de comunicaciones ({consentLog.length})</summary>
@@ -285,7 +306,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
                     <li>
                       <span class="dot" aria-hidden="true"></span>
                       <div>
-                        <span>{e.purpose === 'comercial' ? 'Promociones' : 'Avisos de reparaciones'} por email: <strong>{e.granted ? 'activado' : 'desactivado'}</strong> · {CONSENT_SOURCE[e.source] ?? e.source}</span>
+                        <span>{e.purpose === 'comercial' ? 'Promociones' : 'Avisos de reparaciones'} por {e.channel === 'whatsapp' ? 'WhatsApp' : 'email'}: <strong>{e.granted ? 'activado' : 'desactivado'}</strong> · {CONSENT_SOURCE[e.source] ?? e.source}</span>
                         <span class="when" style="display:block">{formatDateTime(e.created_at)}</span>
                       </div>
                     </li>

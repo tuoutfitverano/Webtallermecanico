@@ -15,7 +15,7 @@ import Flash from '../../components/panel/Flash.astro';
 import { field, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../lib/auth/messages.ts';
-import { emailAvailable, turnstileSiteKey, vehicleLookupAvailable } from '../../lib/server/config.ts';
+import { emailAvailable, turnstileSiteKey, vehicleLookupAvailable, whatsappAvailable } from '../../lib/server/config.ts';
 import { formatDate } from '../../lib/panel/format.ts';
 import { fieldErrors, workshopProfileSchema } from '@talleres/core';
 
@@ -94,6 +94,7 @@ const err = (k: string) => errors[k];
 const integrations = [
   { name: 'Formularios de la web (antispam)', on: Boolean(turnstileSiteKey()), off: 'Sin antispam configurado: la web no acepta solicitudes (responde «no disponible»), nunca finge que se han enviado.' },
   { name: 'Emails a clientes', on: emailAvailable(), off: 'Sin proveedor de email: los avisos aparecen en el portal del cliente y los emails quedan pendientes.' },
+  { name: 'WhatsApp a clientes', on: whatsappAvailable(), off: 'Sin la API de WhatsApp Business: los clientes pueden pedirlo, pero esos avisos quedan pendientes (nunca se dan por enviados).' },
   { name: 'Consulta de datos por matrícula', on: vehicleLookupAvailable(), off: 'Sin proveedor contratado: los vehículos se dan de alta a mano.' },
 ];
 ---

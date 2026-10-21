@@ -1,9 +1,12 @@
 ---
 /**
  * Mis datos: lo que cada taller tiene registrado del cliente (solo lectura), la
- * cuenta y las preferencias de comunicación. Los avisos de las reparaciones
- * (operativos) y las comunicaciones comerciales van por separado: aceptar unos
- * nunca activa los otros, y lo comercial nace desactivado.
+ * cuenta y las preferencias de comunicación.
+ *
+ *  · Avisos de las reparaciones: siempre en el portal y, si el cliente quiere,
+ *    también por email, por WhatsApp o por los dos. WhatsApp solo lo puede
+ *    pedir el propio cliente (aquí) y necesita un móvil en su ficha.
+ *  · Comunicaciones comerciales: por separado y desactivadas de entrada.
  */
 import PortalLayout from '../../layouts/PortalLayout.astro';
 import Icon from '../../components/Icon.astro';
@@ -28,16 +31,23 @@ if (portal.form && field(portal.form, 'action') === 'preferencias') {
         p_customer_id: customerId,
         p_operational_email: portal.form.get('operational_email') === 'on',
         p_marketing_email: portal.form.get('marketing_email') === 'on',
+        p_operational_whatsapp: portal.form.get('operational_whatsapp') === 'on',
       })
-    : { error: { code: '22023' } };
+    : { error: { code: '22023', message: '' } };
   if (error) {
     logAuth('portal_preferences_error', error.code);
-    flash = { kind: 'bad', text: 'No se han guardado tus preferencias. Inténtalo de nuevo.' };
+    const noMobile = error.code === '22023' && /móvil/.test(error.message ?? '');
+    flash = { kind: 'bad', text: noMobile
+      ? 'Para recibir avisos por WhatsApp hace falta un móvil en tu ficha. Pídele al taller que lo añada.'
+      : 'No se han guardado tus preferencias. Inténtalo de nuevo.' };
     Astro.response.status = 400;
   } else flash = { kind: 'ok', text: 'Preferencias guardadas.' };
 }
 
-interface Prefs { customer_id: string; workshop_name: string; has_email: boolean; operational_email: boolean; marketing_email: boolean }
+interface Prefs {
+  customer_id: string; workshop_name: string; has_email: boolean; operational_email: boolean; marketing_email: boolean;
+  has_whatsapp_number: boolean; whatsapp_hint: string | null; operational_whatsapp: boolean; workshop_email: boolean; workshop_whatsapp: boolean;
+}
 let prefs: Prefs[] = [];
 if (portal.records.length > 0) {
   const { data, error } = await portal.supabase.rpc('portal_contact_preferences');
@@ -71,11 +81,28 @@ const prefsOf = (customerId: string) => prefs.find(p => p.customer_id === custom
             <input type="hidden" name="action" value="preferencias" />
             <input type="hidden" name="customer_id" value={r.customer_id} />
             <h3 class="card-title" style="margin:0"><Icon name="bell" />Comunicaciones</h3>
-            <label class="check">
-              <input type="checkbox" name="operational_email" checked={p.operational_email} />
-              <span><strong>Avisos de mis reparaciones por email</strong> (vehículo recibido, listo para recoger…).
-                {p.has_email ? ' Los avisos dentro de este portal se mantienen siempre.' : ' El taller no tiene tu correo: de momento solo recibirás avisos en este portal.'}</span>
-            </label>
+            <fieldset class="channels">
+              <legend>¿Dónde quieres recibir los avisos de tus reparaciones?</legend>
+              <p class="hint">Vehículo recibido, esperando recambios, listo para recoger… Puedes elegir uno, dos o los tres.</p>
+              <label class="check">
+                <input type="checkbox" checked disabled aria-describedby={`portal-${r.customer_id}`} />
+                <span><strong>En este portal</strong> <span id={`portal-${r.customer_id}`}>(siempre: aquí tienes el historial completo).</span></span>
+              </label>
+              <label class="check">
+                <input type="checkbox" name="operational_email" checked={p.operational_email} />
+                <span><strong>Por email</strong>
+                  {!p.has_email ? ' · El taller no tiene tu correo: hasta que lo añada, no te llegarán emails.'
+                    : !p.workshop_email ? ' · Tu taller todavía no envía emails: te llegarán cuando los active.' : ''}</span>
+              </label>
+              <label class="check">
+                <input type="checkbox" name="operational_whatsapp" checked={p.operational_whatsapp}
+                  disabled={!p.has_whatsapp_number && !p.operational_whatsapp} />
+                <span><strong>Por WhatsApp</strong>
+                  {p.has_whatsapp_number ? ` al móvil acabado en ${p.whatsapp_hint}.` : ' · Hace falta un móvil en tu ficha: pídele al taller que lo añada.'}
+                  {p.has_whatsapp_number && !p.workshop_whatsapp && ' Tu taller todavía no envía WhatsApp: te llegarán cuando los active.'}
+                  {' '}Solo avisos de tus reparaciones, nunca publicidad.</span>
+              </label>
+            </fieldset>
             <label class="check">
               <input type="checkbox" name="marketing_email" checked={p.marketing_email} />
               <span><strong>Ofertas y promociones de {r.workshop_name} por email.</strong> Opcional y separado de los avisos de tus reparaciones. Puedes retirarlo cuando quieras.</span>
@@ -87,3 +114,9 @@ const prefsOf = (customerId: string) => prefs.find(p => p.customer_id === custom
     );
   })}
 </PortalLayout>
+
+<style>
+  .channels { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+  .channels legend { padding: 0; font-weight: 600; margin-bottom: 2px; }
+  .channels .hint { margin: 0 0 4px; }
+</style>

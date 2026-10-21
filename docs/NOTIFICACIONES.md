@@ -4,7 +4,10 @@ Estado:
 
 - **Avisos dentro del portal:** funcionan.
 - **Email:** implementado y probado con un proveedor **simulado**. Hacen falta cuenta y credenciales de Resend para enviar correos reales.
-- **SMS y WhatsApp:** no están implementados (ver §8).
+- **WhatsApp:** implementado y probado con un proveedor **simulado** (API oficial de WhatsApp Business de Meta). Hacen falta cuenta de empresa verificada, número dedicado y plantilla aprobada para enviar mensajes reales (ver §8).
+- **SMS:** no implementado.
+
+**Qué elige el cliente** (portal → «Mis datos»): los avisos de sus reparaciones le llegan **siempre en el portal** y, si quiere, **también por email, por WhatsApp o por los dos**. Cada canal externo es una casilla independiente.
 
 ## 1. Cómo funciona
 
@@ -105,7 +108,8 @@ No se guardan contraseñas, tokens ni claves en los avisos. El código de error 
 | --- | --- |
 | **Portal** (`/portal/avisos`) | Implementado: lista, indicador de no leídos, marcar como leído (uno o todos) y enlace a la reparación |
 | **Email (Resend)** | Implementado: plantilla HTML sencilla + texto plano, asunto «Taller X: …», nombre del taller como remitente, `reply_to` del taller, idempotencia y webhook firmado. **Pendiente de credenciales** |
-| SMS / WhatsApp | No implementados (ver §8). La interfaz `ChannelSender` (`src/lib/notifications/types.ts`) ya sirve para añadirlos |
+| **WhatsApp (API oficial de Meta)** | Implementado (`src/lib/notifications/whatsapp.ts`): mensaje de **plantilla aprobada** `reparacion_estado_v1` con 3 huecos (taller, título, detalle), webhook firmado (`/api/notificaciones/whatsapp`). Solo a clientes que lo han pedido desde su portal y con móvil en la ficha. **Pendiente de cuenta y credenciales** |
+| SMS | No implementado (ver §8) |
 
 ## 5. Reintentos
 
@@ -134,6 +138,18 @@ No se guardan contraseñas, tokens ni claves en los avisos. El código de error 
 | `RESEND_API_URL` | Opcional (solo pruebas locales) |
 | `RESEND_WEBHOOK_SECRET` | Secreto de firma del webhook (`whsec_…`) |
 | `NOTIFICATIONS_CRON_SECRET` | Secreto largo (mínimo 24 caracteres) del proceso programado. Vacío = el endpoint responde 404 |
+
+**WhatsApp** (todas opcionales; sin ellas, los WhatsApp se quedan `pendiente` y caducan, nunca se dan por enviados):
+
+| Variable | Para qué |
+| --- | --- |
+| `WHATSAPP_PROVIDER` | `meta` para activar |
+| `WHATSAPP_TOKEN` | Token de acceso permanente (usuario del sistema de Meta Business). **Secreto** |
+| `WHATSAPP_PHONE_NUMBER_ID` | Identificador del número de empresa (solo cifras, lo da Meta) |
+| `WHATSAPP_TEMPLATE` | Nombre de la plantilla aprobada. Vacía = `reparacion_estado_v1` |
+| `WHATSAPP_API_URL` | Opcional (solo pruebas locales). Vacía = `https://graph.facebook.com/v21.0` (**comprobar la versión vigente de la API antes de lanzar**) |
+| `WHATSAPP_APP_SECRET` | Secreto de la app de Meta: firma del webhook (`X-Hub-Signature-256`). **Secreto** |
+| `WHATSAPP_VERIFY_TOKEN` | Texto que eliges tú para dar de alta el webhook en Meta. **Secreto** |
 
 `APP_URL` sirve para los enlaces al portal en los emails; sin ella, el email no lleva enlace. También hace falta `SUPABASE_SECRET_KEY`.
 
@@ -173,7 +189,9 @@ $$);
 
 ### 6.4 Activarlo en un taller
 
-**Panel → Avisos → Qué se avisa → «Enviar avisos por email»**. Hasta que la plataforma tenga proveedor, la casilla no se puede activar.
+**Panel → Avisos → Qué se avisa → «Enviar avisos por email»** y/o **«Enviar avisos por WhatsApp»**. Hasta que la plataforma tenga el proveedor de ese canal, la casilla no se puede activar. Cada canal tiene su lista de momentos que se avisan (por defecto, en email y WhatsApp: vehículo recibido, esperando recambios, listo y entregado).
+
+Aunque el taller no lo tenga activado, el cliente ya puede pedir WhatsApp desde su portal: su elección se guarda y los mensajes empiezan a salir cuando el taller lo active.
 
 ## 7. Preferencias y consentimiento (España)
 
@@ -185,32 +203,40 @@ $$);
   - Aceptar avisos operativos **no** cuenta como consentimiento comercial.
 - **Registro:** cada cambio queda en `communication_consent_log`, para poder demostrar el consentimiento (RGPD art. 7.1).
 - **Quejas:** si un cliente marca un email como spam, se le desactivan los emails automáticamente.
+- **WhatsApp:**
+  - Nace **desactivado** y solo lo puede pedir **el propio cliente** desde su portal (WhatsApp exige el consentimiento expreso del destinatario). El taller solo puede **retirarlo** (ficha del cliente → «Retirar avisos por WhatsApp»).
+  - Hace falta un **móvil** en la ficha: España 6xx/7xx (con o sin +34); otros países solo escritos con `+` o `00`. Con un fijo, la casilla no se puede marcar.
+  - Solo avisos **operativos**: la base de datos bloquea cualquier mensaje comercial por WhatsApp, también con la clave secreta.
+  - Si cambia el teléfono de la ficha antes de enviarse, el aviso se cancela (`destinatario_cambiado`). Retirarlo cancela los pendientes.
+  - Al cliente solo se le enseñan las 3 últimas cifras del número en su portal.
 
 **Debe validarlo un asesor antes de lanzar:**
 
-- Textos de la política de privacidad de cada taller: finalidad de los avisos, base jurídica, Resend como encargado del tratamiento y transferencias internacionales.
-- Contrato de encargado del tratamiento (DPA) con Resend.
+- Textos de la política de privacidad de cada taller: finalidad de los avisos, base jurídica, Resend y Meta (WhatsApp) como encargados del tratamiento y transferencias internacionales.
+- Contrato de encargado del tratamiento (DPA) con Resend y las condiciones de WhatsApp Business de Meta.
 - Si se usa la excepción de la LSSI (art. 21.2) para clientes con productos similares. Hoy **no** se usa: se exige consentimiento expreso.
 - Cuánto tiempo se conservan los avisos y el registro de consentimientos (todavía no hay borrado automático).
 - Identificación del remitente: hoy, nombre del taller y respuesta al taller.
 
-## 8. WhatsApp y SMS: no implementados
+## 8. WhatsApp (implementado, pendiente de cuenta) y SMS (no implementado)
 
-- **WhatsApp:** solo mediante **WhatsApp Business Platform (API oficial de Meta)** o un proveedor autorizado (BSP). Hace falta:
-  - empresa verificada en Meta;
-  - número dedicado;
-  - **plantillas aprobadas** para los mensajes que inicia el taller;
-  - opt-in del cliente para ese canal.
+**WhatsApp** solo mediante la **API oficial de WhatsApp Business (Cloud API de Meta)**. Nunca sesiones personales ni automatizaciones no oficiales: pueden bloquear la cuenta del taller.
 
-  Nunca sesiones personales ni automatizaciones no oficiales: pueden bloquear la cuenta del taller.
-- **SMS:** proveedor con remitente alfanumérico registrado (en España, según la normativa vigente de identificación de remitentes) y coste por mensaje.
-- **Para añadirlos:**
-  1. un adaptador `ChannelSender`;
-  2. un valor nuevo en `notification_channel` (migración);
-  3. preferencias por canal;
-  4. sus pruebas.
+Cómo funciona:
 
-  No se ha contratado nada.
+1. La base de datos crea el aviso `whatsapp` (`pendiente`) en la misma transacción que el cambio de estado, solo si el taller lo tiene activado, el cliente lo pidió y hay móvil válido. El destinatario se guarda en formato internacional sin `+` (`34600000000`).
+2. El servidor lo reclama (`claim_whatsapp_notifications`), envía la plantilla y anota el resultado (`record_whatsapp_result`, mismos reintentos que el email: 5 automáticos y 3 manuales).
+3. Meta confirma por webhook firmado (`record_whatsapp_delivery`): entregado o leído → «Entregado»; fallido → «Fallido».
+
+Lo que falta para enviar mensajes reales (**no se ha contratado nada**):
+
+- Cuenta de **Meta Business verificada** y una app con el producto WhatsApp.
+- Un **número de teléfono dedicado** (no puede estar usándose en la app normal de WhatsApp).
+- Crear y que Meta **apruebe la plantilla** `reparacion_estado_v1` (categoría «utilidad», idioma español), con tres variables en el cuerpo: `{{1}}` nombre del taller, `{{2}}` título del aviso, `{{3}}` detalle (vehículo, orden, estado y mensaje del taller). Texto propuesto, **pendiente de revisión**: «{{1}}: {{2}}. {{3}}. Puedes ver el estado en tu portal de cliente.»
+- **Coste por mensaje** según las tarifas vigentes de Meta para España (pendiente de comprobar antes de activar; los mensajes de utilidad tienen precio propio).
+- Dar de alta el webhook en Meta: URL `https://<dominio de la app>/api/notificaciones/whatsapp`, token de verificación = `WHATSAPP_VERIFY_TOKEN`, suscripción a «messages».
+
+**SMS:** no implementado. Haría falta un proveedor con remitente alfanumérico registrado (en España, según la normativa vigente de identificación de remitentes), coste por mensaje, un adaptador como el de WhatsApp, un valor nuevo en `notification_channel` (migración), preferencias y pruebas.
 
 ## 9. Citas
 
@@ -223,6 +249,9 @@ No hay sistema de citas confirmadas: la web pública solo recoge **solicitudes**
 | **SQL** (81 comprobaciones) | `supabase/tests/11_notificaciones.test.sql` | Ver lista debajo |
 | **Unitarias**, simuladas | `apps/web/src/lib/notifications/notifications.test.ts` | Ver lista debajo |
 | **Navegador**, email **simulado** | `apps/web/e2e/avisos.spec.ts` + `scripts/e2e/email-provider-mock.mjs` | Ver lista debajo |
+| **SQL** WhatsApp (46 comprobaciones) | `supabase/tests/14_avisos_whatsapp.test.sql` | Números, quién puede activarlo, generación, nada comercial, envío y entrega, cambio de teléfono, reintentos, aislamiento y supresión |
+| **Unitarias** WhatsApp, simuladas | `apps/web/src/lib/notifications/whatsapp.test.ts` | Plantilla y parámetros, respuestas de Meta, despachador, firma del webhook y alta |
+| **Navegador**, WhatsApp **simulado** | `apps/web/e2e/avisos.spec.ts` + `scripts/e2e/whatsapp-provider-mock.mjs` | El cliente elige los tres canales, el taller lo activa, el aviso sale por los tres, webhook firmado y el taller solo puede retirarlo |
 
 Las pruebas SQL comprueban:
 

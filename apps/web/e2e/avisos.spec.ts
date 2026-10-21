@@ -5,6 +5,9 @@
  * que imita la API de Resend. Estas pruebas comprueban NUESTRO código (avisos,
  * cola, envío, reintentos, webhook firmado y permisos), pero NINGÚN email sale
  * a internet ni demuestran que el proveedor real los entregue.
+ *
+ * ⚠ WHATSAPP SIMULADO: scripts/e2e/whatsapp-provider-mock.mjs imita la API de
+ * WhatsApp Business de Meta. Ningún mensaje sale de este ordenador.
  */
 import { createHmac } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
@@ -20,6 +23,9 @@ const EMAIL_MOCK = process.env.E2E_EMAIL_MOCK_URL ?? '';
 const WEBHOOK_SECRET = process.env.E2E_WEBHOOK_SECRET ?? '';
 const CRON_SECRET = process.env.E2E_CRON_SECRET ?? '';
 const WEB = process.env.E2E_API_URL ?? '';
+const WHATSAPP_MOCK = process.env.E2E_WHATSAPP_MOCK_URL ?? '';
+const WHATSAPP_SECRET = process.env.E2E_WHATSAPP_APP_SECRET ?? '';
+const WHATSAPP_VERIFY = process.env.E2E_WHATSAPP_VERIFY_TOKEN ?? '';
 const HOST = new URL(process.env.E2E_BASE_URL ?? 'http://demo.localhost:4329').host;
 const DEMO = 'd0000000-0000-0000-0000-000000000001';
 const SECRET_NOTE = 'NOTA-INTERNA-QUE-NO-SALE';
@@ -55,14 +61,16 @@ async function api(path: string, token: string, method = 'GET', body?: unknown) 
 }
 const rows = (r: { json: unknown }) => (Array.isArray(r.json) ? r.json : []) as Array<Record<string, unknown>>;
 interface SentEmail { id: string; to: string; from: string; subject: string; text: string; html: string; reply_to: string | null; idempotencyKey: string }
+interface SentWhatsapp { id: string; to: string; template: string; language: string; params: string[]; ref: string }
+const whatsappTo = async (to: string) => (await (await fetch(`${WHATSAPP_MOCK}/__whatsapp?to=${encodeURIComponent(to)}`)).json()) as SentWhatsapp[];
 const emailsTo = async (to: string) => (await (await fetch(`${EMAIL_MOCK}/__emails?to=${encodeURIComponent(to)}`)).json()) as SentEmail[];
 
 /** Cliente con cuenta vinculada + vehículo + orden, creados por la propietaria con su token (RLS). */
-async function setup(opts: { email?: string; link?: boolean } = {}) {
+async function setup(opts: { email?: string; link?: boolean; phone?: string } = {}) {
   const owner = await tokenFor('propietaria@e2e.test');
   const email = opts.email ?? `cliente-${stamp()}@e2e.test`;
   const name = `Elena Avisos ${stamp()}`;
-  const [c] = rows(await api('/customers', owner.token, 'POST', { workshop_id: DEMO, full_name: name, email }));
+  const [c] = rows(await api('/customers', owner.token, 'POST', { workshop_id: DEMO, full_name: name, email, ...(opts.phone ? { phone: opts.phone } : {}) }));
   let client: { token: string; userId: string } | null = null;
   if (opts.link !== false) {
     await fetch(`${AUTH}/admin/users`, {
@@ -178,9 +186,12 @@ test.describe('Avisos · de un cambio de estado al cliente', () => {
     const client = await newPage(browser);
     await login(client, job.email, '/portal/datos');
     const form = client.getByRole('form', { name: 'Comunicaciones de AutoValue' });
-    await expect(form.getByLabel(/Avisos de mis reparaciones por email/)).toBeChecked();
+    await expect(form.getByLabel(/Por email/)).toBeChecked();
     await expect(form.getByLabel(/Ofertas y promociones/)).not.toBeChecked();
-    await form.getByLabel(/Avisos de mis reparaciones por email/).uncheck();
+    // Sin móvil en la ficha, WhatsApp no se puede pedir (y se explica por qué).
+    await expect(form.getByLabel(/Por WhatsApp/)).toBeDisabled();
+    await expect(form).toContainText('Hace falta un móvil en tu ficha');
+    await form.getByLabel(/Por email/).uncheck();
     await form.getByRole('button', { name: 'Guardar preferencias' }).click();
     await expect(client.getByRole('status')).toContainText('Preferencias guardadas.');
 
@@ -213,7 +224,7 @@ test.describe('Avisos · de un cambio de estado al cliente', () => {
 
     await page.goto('/panel/avisos?estado=fallidos&canal=email');
     const row = page.getByRole('row', { name: new RegExp(rechazo.name) }).filter({ hasText: 'Tu vehículo está listo para recoger' });
-    await expect(row).toContainText('El proveedor rechazó el email');
+    await expect(row).toContainText('El proveedor lo rechazó');
     await row.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('status')).toContainText('Reintento enviado.');
     await expect.poll(async () => (await notificationsOf(rechazo.owner.token, rechazo.orderId)).find(n => n.event === 'listo'))
@@ -225,6 +236,92 @@ test.describe('Avisos · de un cambio de estado al cliente', () => {
     const ok = await cron(`Bearer ${CRON_SECRET}`);
     expect(ok.status).toBe(200);
     expect(await ok.json()).toMatchObject({ ok: true, configured: true });
+  });
+});
+
+test.describe('Avisos · WhatsApp (simulado)', () => {
+  test.skip(!WHATSAPP_MOCK || !WHATSAPP_SECRET, 'Lanza estas pruebas con scripts/test-e2e.sh');
+
+  test('el cliente elige portal, email y WhatsApp; el taller lo activa y el aviso sale por los tres', async ({ page, browser }) => {
+    const phone = `6${Math.floor(10_000_000 + Math.random() * 89_999_999)}`;
+    const to = `34${phone}`;
+    const job = await setup({ phone });
+
+    // El propio cliente lo pide desde su portal.
+    const client = await newPage(browser);
+    await login(client, job.email, '/portal/datos');
+    const form = client.getByRole('form', { name: 'Comunicaciones de AutoValue' });
+    await expect(form.getByLabel(/En este portal/)).toBeChecked();
+    await expect(form.getByLabel(/En este portal/)).toBeDisabled();
+    await expect(form.getByLabel(/Por WhatsApp/)).not.toBeChecked();
+    await expect(form).toContainText(`acabado en ${phone.slice(-3)}`);
+    await form.getByLabel(/Por WhatsApp/).check();
+    await form.getByRole('button', { name: 'Guardar preferencias' }).click();
+    await expect(client.getByRole('status')).toContainText('Preferencias guardadas.');
+    await expect(form.getByLabel(/Por WhatsApp/)).toBeChecked();
+    await expect(form.getByLabel(/Por email/)).toBeChecked();
+
+    // El taller activa WhatsApp.
+    await login(page, 'propietaria@e2e.test', '/panel/avisos');
+    const settings = page.getByRole('region', { name: 'Qué se avisa' });
+    await settings.getByLabel(/Enviar avisos por WhatsApp/).check();
+    await settings.getByRole('button', { name: 'Guardar ajustes' }).click();
+    await expect(page.getByRole('status')).toContainText('Ajustes de avisos guardados.');
+
+    // Cambio real → portal + email + WhatsApp (plantilla aprobada, sin nada interno).
+    await changeStatus(page, job.orderId, 'Listo para recoger', 'Puedes pasar a partir de las 17:00.');
+    await expect.poll(async () => (await whatsappTo(to)).length).toBe(1);
+    const [msg] = await whatsappTo(to);
+    expect(msg!.template).toBe('reparacion_estado_v1');
+    expect(msg!.language).toBe('es');
+    expect(msg!.params[0]).toBe('AutoValue');
+    expect(msg!.params[1]).toBe('Tu vehículo está listo para recoger');
+    expect(msg!.params[2]).toContain('Puedes pasar a partir de las 17:00.');
+    expect(msg!.params.join(' ')).not.toContain(SECRET_NOTE);
+    await expect.poll(async () => (await notificationsOf(job.owner.token, job.orderId)).filter(n => n.event === 'listo').map(n => `${n.channel}:${n.status}`).sort())
+      .toEqual(['app:entregado', 'email:enviado', 'whatsapp:enviado']);
+    await expect.poll(async () => (await emailsTo(job.email)).some(m => m.subject.includes('listo para recoger'))).toBe(true);
+
+    // Alta del webhook en Meta: solo con el token de verificación.
+    const hook = `${WEB}/api/notificaciones/whatsapp`;
+    const challenge = await fetch(`${hook}?hub.mode=subscribe&hub.verify_token=${WHATSAPP_VERIFY}&hub.challenge=4242`, { headers: { host: HOST } });
+    expect(challenge.status).toBe(200);
+    expect(await challenge.text()).toBe('4242');
+    expect((await fetch(`${hook}?hub.mode=subscribe&hub.verify_token=otro&hub.challenge=4242`, { headers: { host: HOST } })).status).toBe(403);
+
+    // Meta confirma la entrega por webhook firmado → "Entregado".
+    const wa = (await notificationsOf(job.owner.token, job.orderId)).find(n => n.channel === 'whatsapp')!;
+    const body = JSON.stringify({ object: 'whatsapp_business_account', entry: [{ id: '1', changes: [{ field: 'messages', value: { statuses: [
+      { id: wa.provider_message_id, status: 'delivered', timestamp: String(Math.floor(Date.now() / 1000)), recipient_id: to },
+    ] } }] }] });
+    const sig = `sha256=${createHmac('sha256', WHATSAPP_SECRET).update(body).digest('hex')}`;
+    const post = (signature: string, b = body) => fetch(hook, { method: 'POST', headers: { host: HOST, 'content-type': 'application/json', 'x-hub-signature-256': signature }, body: b });
+    expect((await post('sha256=firma-falsa')).status).toBe(401);
+    expect((await post(sig, body.replace('delivered', 'failed'))).status).toBe(401);
+    expect((await post(sig)).status).toBe(200);
+    expect((await notificationsOf(job.owner.token, job.orderId)).find(n => n.channel === 'whatsapp')!.status).toBe('entregado');
+    await page.goto('/panel/avisos?estado=enviados&canal=whatsapp');
+    await expect(page.getByRole('row', { name: new RegExp(job.name) }).filter({ hasText: 'Tu vehículo está listo para recoger' })).toContainText('Entregado');
+
+    // El taller no puede pedirlo por el cliente; solo retirarlo (a petición suya).
+    const grant = await api('/rpc/set_contact_preferences', job.owner.token, 'POST', {
+      p_customer_id: job.customerId, p_operational_email: true, p_marketing_email: false, p_operational_whatsapp: true,
+    });
+    expect(grant.status).toBeLessThan(300);
+    await page.goto(`/panel/clientes/${job.customerId}`);
+    const comms = page.getByRole('region', { name: 'Comunicaciones' });
+    await expect(comms).toContainText('Sí, pedido por el cliente desde su portal');
+    await comms.getByRole('button', { name: 'Retirar avisos por WhatsApp' }).click();
+    await expect(page.getByRole('status')).toContainText('Avisos por WhatsApp retirados.');
+    await expect(page.getByRole('region', { name: 'Comunicaciones' })).toContainText('Avisos de reparaciones por WhatsApp');
+    const again = await api('/rpc/set_contact_preferences', job.owner.token, 'POST', {
+      p_customer_id: job.customerId, p_operational_email: true, p_marketing_email: false, p_operational_whatsapp: true,
+    });
+    expect(again.status).toBeGreaterThanOrEqual(400);
+
+    // Se deja como estaba para el resto de pruebas.
+    await api(`/workshop_notification_settings?workshop_id=eq.${DEMO}`, job.owner.token, 'PATCH', { whatsapp_enabled: false });
+    await client.context().close();
   });
 });
 

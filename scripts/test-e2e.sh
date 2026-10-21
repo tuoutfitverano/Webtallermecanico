@@ -26,6 +26,10 @@ PLATE_PORT=4998
 PLATE_TOKEN="token-simulado-solo-para-pruebas"
 EMAIL_PORT=4997
 EMAIL_KEY="re_simulada_solo_para_pruebas"
+WHATSAPP_PORT=4996
+WHATSAPP_TOKEN="token-whatsapp-simulado-solo-para-pruebas"
+WHATSAPP_APP_SECRET="secreto-app-whatsapp-de-pruebas-e2e"
+WHATSAPP_VERIFY_TOKEN="verificacion-whatsapp-de-pruebas"
 # Secretos de PRUEBA (solo valen aquí).
 WEBHOOK_SECRET="whsec_$(printf 'secreto-de-webhook-de-pruebas-e2e' | base64)"
 CRON_SECRET="cron-secreto-de-pruebas-e2e-0123456789"
@@ -80,7 +84,7 @@ SQL
 
 # --- Buzón de correo de pruebas + Supabase Auth ---
 # Si quedó un servidor de una ejecución anterior, las pruebas hablarían con él.
-for port in $AUTH_PORT $SMTP_PORT $MAIL_PORT $PROXY_PORT $PGRST_PORT $PLATE_PORT $EMAIL_PORT; do
+for port in $AUTH_PORT $SMTP_PORT $MAIL_PORT $PROXY_PORT $PGRST_PORT $PLATE_PORT $EMAIL_PORT $WHATSAPP_PORT; do
   if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
     echo "✘ El puerto $port ya está en uso (¿quedó una prueba anterior abierta?). Ciérrala y repite." >&2; exit 1
   fi
@@ -90,6 +94,8 @@ node "$ROOT/scripts/e2e/mail-sink.mjs" $SMTP_PORT $MAIL_PORT "$ROOT/supabase/tem
 node "$ROOT/scripts/e2e/plate-provider-mock.mjs" $PLATE_PORT "$PLATE_TOKEN" & pids+=($!)
 # Proveedor de email SIMULADO (ningún correo sale de este ordenador).
 node "$ROOT/scripts/e2e/email-provider-mock.mjs" $EMAIL_PORT "$EMAIL_KEY" & pids+=($!)
+# WhatsApp SIMULADO (ningún mensaje sale de este ordenador).
+node "$ROOT/scripts/e2e/whatsapp-provider-mock.mjs" $WHATSAPP_PORT "$WHATSAPP_TOKEN" & pids+=($!)
 SITE="http://demo.localhost:$WEB_PORT"
 (cd "$ROOT/.cache/auth" && \
   GOTRUE_DB_DRIVER=postgres DATABASE_URL="$(auth_db_url "$DB")" GOTRUE_DB_MIGRATIONS_PATH=./migrations \
@@ -161,6 +167,8 @@ echo "▸ Arrancando la web"
   VEHICLE_LOOKUP_TIMEOUT_MS=2000 \
   EMAIL_PROVIDER=resend EMAIL_FROM=avisos@talleres.test RESEND_API_KEY="$EMAIL_KEY" RESEND_API_URL="http://127.0.0.1:$EMAIL_PORT" \
   RESEND_WEBHOOK_SECRET="$WEBHOOK_SECRET" NOTIFICATIONS_CRON_SECRET="$CRON_SECRET" \
+  WHATSAPP_PROVIDER=meta WHATSAPP_TOKEN="$WHATSAPP_TOKEN" WHATSAPP_PHONE_NUMBER_ID=100000000000001 \
+  WHATSAPP_API_URL="http://127.0.0.1:$WHATSAPP_PORT/v21.0" WHATSAPP_APP_SECRET="$WHATSAPP_APP_SECRET" WHATSAPP_VERIFY_TOKEN="$WHATSAPP_VERIFY_TOKEN" \
   npx astro dev --port $WEB_PORT --host 127.0.0.1 --background >/dev/null 2>&1)
 ready=0
 for i in $(seq 1 60); do
@@ -203,5 +211,6 @@ cd "$ROOT/apps/web"
 E2E_BASE_URL="http://demo.localhost:$WEB_PORT" E2E_API_URL="http://127.0.0.1:$WEB_PORT" E2E_REST_URL="http://127.0.0.1:$PROXY_PORT/rest/v1" \
 E2E_PROXY_URL="http://127.0.0.1:$PROXY_PORT" E2E_ANON_KEY="$ANON_KEY" E2E_SERVICE_KEY="$SERVICE_KEY" \
 E2E_PLATE_MOCK_URL="http://127.0.0.1:$PLATE_PORT" E2E_EMAIL_MOCK_URL="http://127.0.0.1:$EMAIL_PORT" \
-E2E_WEBHOOK_SECRET="$WEBHOOK_SECRET" E2E_CRON_SECRET="$CRON_SECRET" E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" E2E_VIDEO="$TEST_VIDEO" \
+E2E_WEBHOOK_SECRET="$WEBHOOK_SECRET" E2E_CRON_SECRET="$CRON_SECRET" \
+E2E_WHATSAPP_MOCK_URL="http://127.0.0.1:$WHATSAPP_PORT" E2E_WHATSAPP_APP_SECRET="$WHATSAPP_APP_SECRET" E2E_WHATSAPP_VERIFY_TOKEN="$WHATSAPP_VERIFY_TOKEN" E2E_MAIL_URL="http://127.0.0.1:$MAIL_PORT" E2E_PASSWORD="$TEST_PASSWORD" E2E_VIDEO="$TEST_VIDEO" \
   npx playwright test "$@"

@@ -11,7 +11,7 @@ import NoWorkshop from '../../components/panel/NoWorkshop.astro';
 import Flash from '../../components/panel/Flash.astro';
 import { field, isUuid, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
-import { emailAvailable } from '../../lib/server/config.ts';
+import { emailAvailable, whatsappAvailable } from '../../lib/server/config.ts';
 import { dispatchOrderEmails } from '../../lib/server/notify.ts';
 import { dbErrorMessage } from '../../lib/auth/messages.ts';
 import { formatDateTime } from '../../lib/panel/format.ts';
@@ -25,6 +25,7 @@ export const prerender = false;
 const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
 const canEmail = emailAvailable();
+const canWhatsapp = whatsappAvailable();
 
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
 if (panel.form && panel.workshop && panel.isManager) {
@@ -32,9 +33,13 @@ if (panel.form && panel.workshop && panel.isManager) {
   const action = field(form, 'action');
   if (action === 'ajustes') {
     const wantsEmail = form.get('email_enabled') === 'on';
+    const wantsWhatsapp = form.get('whatsapp_enabled') === 'on';
     const replyTo = field(form, 'reply_to').trim().toLowerCase();
     if (wantsEmail && !canEmail) {
       flash = { kind: 'bad', text: 'No se puede activar el email: la plataforma todavía no tiene un proveedor de email configurado.' };
+      Astro.response.status = 400;
+    } else if (wantsWhatsapp && !canWhatsapp) {
+      flash = { kind: 'bad', text: 'No se puede activar WhatsApp: la plataforma todavía no tiene la API de WhatsApp Business configurada.' };
       Astro.response.status = 400;
     } else if (replyTo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(replyTo)) {
       flash = { kind: 'bad', text: 'La dirección de respuesta no es un correo válido.' };
@@ -44,6 +49,8 @@ if (panel.form && panel.workshop && panel.isManager) {
         email_enabled: wantsEmail,
         app_events: NOTIFICATION_EVENTS.filter(e => form.get(`app_${e}`) === 'on'),
         email_events: NOTIFICATION_EVENTS.filter(e => form.get(`email_${e}`) === 'on'),
+        whatsapp_enabled: wantsWhatsapp,
+        whatsapp_events: NOTIFICATION_EVENTS.filter(e => form.get(`whatsapp_${e}`) === 'on'),
         reply_to: replyTo || null,
       }).eq('workshop_id', panel.workshop.id).select('workshop_id');
       if (error || !data?.length) {
@@ -62,7 +69,8 @@ if (panel.form && panel.workshop && panel.isManager) {
     } else {
       const order = field(form, 'order');
       if (isUuid(order)) await dispatchOrderEmails(Astro, order);
-      flash = { kind: 'ok', text: canEmail ? 'Reintento enviado. Revisa el estado en la lista.' : 'Reintento programado: saldrá cuando el email esté configurado.' };
+      const ready = field(form, 'canal') === 'whatsapp' ? canWhatsapp : canEmail;
+      flash = { kind: 'ok', text: ready ? 'Reintento enviado. Revisa el estado en la lista.' : 'Reintento programado: saldrá cuando el canal esté configurado.' };
     }
   }
 }
@@ -75,18 +83,22 @@ const FILTERS = [
   { id: 'cancelados', label: 'Cancelados', statuses: ['cancelado'] },
 ] as const;
 const filter = FILTERS.find(f => f.id === Astro.url.searchParams.get('estado')) ?? FILTERS[0];
-const channel = Astro.url.searchParams.get('canal') === 'app' ? 'app' : Astro.url.searchParams.get('canal') === 'todos' ? 'todos' : 'email';
+const CHANNELS = [['email', 'Email'], ['whatsapp', 'WhatsApp'], ['app', 'Portal'], ['todos', 'Todos los canales']] as const;
+const channel = CHANNELS.find(([id]) => id === Astro.url.searchParams.get('canal'))?.[0] ?? 'email';
 const qs = (estado: string, canal: string) => `/panel/avisos?estado=${estado}&canal=${canal}`;
 
-interface Settings { email_enabled: boolean; app_events: NotificationEvent[]; email_events: NotificationEvent[]; reply_to: string | null }
+interface Settings {
+  email_enabled: boolean; app_events: NotificationEvent[]; email_events: NotificationEvent[]; reply_to: string | null;
+  whatsapp_enabled: boolean; whatsapp_events: NotificationEvent[];
+}
 interface Row {
-  id: string; channel: 'app' | 'email'; event: NotificationEvent | null; status: NotificationStatus; title: string; attempts: number; manual_retries: number;
+  id: string; channel: 'app' | 'email' | 'whatsapp'; event: NotificationEvent | null; status: NotificationStatus; title: string; attempts: number; manual_retries: number;
   last_attempt_at: string | null; sent_at: string | null; delivered_at: string | null; read_at: string | null; error_code: string | null; created_at: string; order_id: string | null;
   customers: { id: string; full_name: string } | null; repair_orders: { number: number } | null;
 }
 let settings: Settings | null = null;
 let rows: Row[] = [];
-let counts = { pendientes: 0, fallidos: 0 };
+let counts = { pendientes: 0, fallidos: 0, waPendientes: 0, waFallidos: 0 };
 let loadError = false;
 if (panel.workshop && panel.isManager) {
   let q = panel.supabase.from('notifications')
@@ -94,16 +106,17 @@ if (panel.workshop && panel.isManager) {
     .eq('workshop_id', panel.workshop.id).order('created_at', { ascending: false }).limit(100);
   if (channel !== 'todos') q = q.eq('channel', channel);
   if (filter.statuses) q = q.in('status', [...filter.statuses]);
-  const count = (statuses: string[]) => panel.supabase.from('notifications').select('id', { count: 'exact', head: true })
-    .eq('workshop_id', panel.workshop!.id).eq('channel', 'email').in('status', statuses);
-  const [s, r, p, f] = await Promise.all([
-    panel.supabase.from('workshop_notification_settings').select('email_enabled, app_events, email_events, reply_to').eq('workshop_id', panel.workshop.id).maybeSingle(),
-    q, count(['pendiente', 'procesando']), count(['fallido']),
+  const count = (ch: 'email' | 'whatsapp', statuses: string[]) => panel.supabase.from('notifications').select('id', { count: 'exact', head: true })
+    .eq('workshop_id', panel.workshop!.id).eq('channel', ch).in('status', statuses);
+  const [s, r, p, f, wp, wf] = await Promise.all([
+    panel.supabase.from('workshop_notification_settings')
+      .select('email_enabled, app_events, email_events, reply_to, whatsapp_enabled, whatsapp_events').eq('workshop_id', panel.workshop.id).maybeSingle(),
+    q, count('email', ['pendiente', 'procesando']), count('email', ['fallido']), count('whatsapp', ['pendiente', 'procesando']), count('whatsapp', ['fallido']),
   ]);
   if (s.error || r.error) { logAuth('panel_notifications_error', s.error?.code ?? r.error?.code); loadError = true; }
   settings = (s.data as Settings | null) ?? null;
   rows = (r.data ?? []) as unknown as Row[];
-  counts = { pendientes: p.count ?? 0, fallidos: f.count ?? 0 };
+  counts = { pendientes: p.count ?? 0, fallidos: f.count ?? 0, waPendientes: wp.count ?? 0, waFallidos: wf.count ?? 0 };
 }
 ---
 <PanelLayout panel={panel} title="Avisos a clientes" section="avisos">
@@ -122,17 +135,22 @@ if (panel.workshop && panel.isManager) {
       {!canEmail && (
         <div class="alert alert-warn" role="note"><Icon name="alert" /><span>El envío de emails todavía no está configurado en la plataforma. Los avisos del portal funcionan; los emails no se envían (ni se dan por enviados).</span></div>
       )}
+      {!canWhatsapp && (
+        <div class="alert alert-warn" role="note"><Icon name="alert" /><span>El envío por WhatsApp todavía no está configurado en la plataforma (API oficial de WhatsApp Business). Los clientes ya pueden pedirlo desde su portal; mientras tanto, esos avisos quedan pendientes y no se dan por enviados.</span></div>
+      )}
 
-      <section class="kpis" aria-label="Resumen de emails">
+      <section class="kpis" aria-label="Resumen de emails y WhatsApp">
         <a class="kpi" href={qs('pendientes', 'email')}><span class="kpi-value">{counts.pendientes}</span><span class="kpi-label">Emails pendientes</span></a>
         <a class="kpi" href={qs('fallidos', 'email')}><span class="kpi-value">{counts.fallidos}</span><span class="kpi-label">Emails fallidos</span></a>
+        <a class="kpi" href={qs('pendientes', 'whatsapp')}><span class="kpi-value">{counts.waPendientes}</span><span class="kpi-label">WhatsApp pendientes</span></a>
+        <a class="kpi" href={qs('fallidos', 'whatsapp')}><span class="kpi-value">{counts.waFallidos}</span><span class="kpi-label">WhatsApp fallidos</span></a>
       </section>
 
       <section class="card" aria-labelledby="registro">
         <h2 id="registro" class="card-title"><Icon name="history" />Registro de avisos</h2>
         <nav class="filter-tabs" aria-label="Canal">
-          {[['email', 'Email'], ['app', 'Portal'], ['todos', 'Todos los canales']].map(([id, label]) => (
-            <a href={qs(filter.id, id!)} aria-current={channel === id ? 'page' : undefined}>{label}</a>
+          {CHANNELS.map(([id, label]) => (
+            <a href={qs(filter.id, id)} aria-current={channel === id ? 'page' : undefined}>{label}</a>
           ))}
         </nav>
         <nav class="filter-tabs" aria-label="Estado">
@@ -156,11 +174,12 @@ if (panel.workshop && panel.isManager) {
                       <span class={`nstatus nstatus-${n.status}`}>{n.channel === 'app' ? (n.read_at ? 'Leído' : 'Sin leer') : STATUS_LABELS[n.status]}</span>
                       {n.error_code && <><br /><span class="muted small">{ERROR_LABELS[n.error_code] ?? 'Error'}</span></>}
                     </td>
-                    <td>{n.channel === 'email' ? <>{n.last_attempt_at ? formatDateTime(n.last_attempt_at) : '—'}<br /><span class="muted small">{n.attempts} {n.attempts === 1 ? 'intento' : 'intentos'}</span></> : '—'}</td>
+                    <td>{n.channel !== 'app' ? <>{n.last_attempt_at ? formatDateTime(n.last_attempt_at) : '—'}<br /><span class="muted small">{n.attempts} {n.attempts === 1 ? 'intento' : 'intentos'}</span></> : '—'}</td>
                     <td>
-                      {n.channel === 'email' && n.status === 'fallido' && n.manual_retries < 3 && n.error_code !== 'rebotado' && n.error_code !== 'queja' && (
+                      {n.channel !== 'app' && n.status === 'fallido' && n.manual_retries < 3 && n.error_code !== 'rebotado' && n.error_code !== 'queja' && (
                         <form method="post" data-busy="Reintentando…">
                           <input type="hidden" name="action" value="reintentar" /><input type="hidden" name="id" value={n.id} />
+                          <input type="hidden" name="canal" value={n.channel} />
                           {n.order_id && <input type="hidden" name="order" value={n.order_id} />}
                           <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Reintentar</span></button>
                         </form>
@@ -172,7 +191,7 @@ if (panel.workshop && panel.isManager) {
             </table>
           </div>
         )}
-        <p class="hint" style="margin-top:12px">«Enviado al proveedor» significa que el proveedor lo aceptó; «Entregado», que confirmó la entrega. Los reintentos automáticos son 5 como máximo (con esperas de 1 min a 2 h); después, como mucho 3 reintentos manuales.</p>
+        <p class="hint" style="margin-top:12px">«Enviado al proveedor» significa que el proveedor lo aceptó; «Entregado», que confirmó la entrega (en WhatsApp, también cuando el cliente lo ha leído). Los reintentos automáticos son 5 como máximo (con esperas de 1 min a 2 h); después, como mucho 3 reintentos manuales.</p>
       </section>
 
       {settings && (
@@ -184,6 +203,10 @@ if (panel.workshop && panel.isManager) {
               <input type="checkbox" name="email_enabled" checked={settings.email_enabled} disabled={!canEmail && !settings.email_enabled} />
               <span><strong>Enviar avisos por email</strong> a los clientes con correo que no lo hayan desactivado.{!canEmail && ' (No disponible hasta que la plataforma configure el proveedor de email.)'}</span>
             </label>
+            <label class="check">
+              <input type="checkbox" name="whatsapp_enabled" checked={settings.whatsapp_enabled} disabled={!canWhatsapp && !settings.whatsapp_enabled} />
+              <span><strong>Enviar avisos por WhatsApp</strong> solo a los clientes que lo hayan pedido desde su portal (con un móvil en su ficha).{!canWhatsapp && ' (No disponible hasta que la plataforma configure la API de WhatsApp Business.)'}</span>
+            </label>
             <fieldset class="field">
               <legend>Avisos en el portal del cliente</legend>
               <div class="check-grid">
@@ -194,6 +217,12 @@ if (panel.workshop && panel.isManager) {
               <legend>Avisos por email</legend>
               <div class="check-grid">
                 {NOTIFICATION_EVENTS.map(e => <label class="check"><input type="checkbox" name={`email_${e}`} checked={settings!.email_events.includes(e)} /><span>{EVENT_LABELS[e]}</span></label>)}
+              </div>
+            </fieldset>
+            <fieldset class="field">
+              <legend>Avisos por WhatsApp</legend>
+              <div class="check-grid">
+                {NOTIFICATION_EVENTS.map(e => <label class="check"><input type="checkbox" name={`whatsapp_${e}`} checked={settings!.whatsapp_events.includes(e)} /><span>{EVENT_LABELS[e]}</span></label>)}
               </div>
             </fieldset>
             <div class="field">
