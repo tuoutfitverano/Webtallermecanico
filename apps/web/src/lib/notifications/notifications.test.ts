@@ -41,7 +41,17 @@ describe('Plantilla del email', () => {
   it('sin dirección del portal no se inventa un enlace', () => {
     const e = renderEmail(N, null);
     expect(e.html).not.toContain('href=');
-    expect(e.text).toContain('Puedes consultar el estado en tu portal');
+    expect(e.text).toContain('Puedes consultarlo en tu portal');
+  });
+
+  it('aviso_v1 lleva a la página indicada del portal, y solo a rutas del portal', () => {
+    const q = renderEmail({ ...N, template: 'aviso_v1', title: 'Tienes un presupuesto', link_path: '/portal/presupuestos/q1' }, 'https://app.ejemplo.test');
+    expect(q.html).toContain('https://app.ejemplo.test/portal/presupuestos/q1');
+    expect(q.html).toContain('Abrir mi portal');
+    for (const bad of ['https://otro.test/x', '/panel/ordenes', '/portal/../panel', '/portal/x?y=1']) {
+      const e = renderEmail({ ...N, template: 'aviso_v1', order_id: null, link_path: bad }, 'https://app.ejemplo.test');
+      expect(e.html).not.toContain('href=');
+    }
   });
 
   it('el asunto no admite saltos de línea (cabeceras)', () => {

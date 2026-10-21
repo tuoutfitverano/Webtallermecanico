@@ -167,6 +167,8 @@ select tests.login('00000000-0000-0000-0000-0000000000c2');
 set local role authenticated;
 select tests.eq((select count(*) from public.portal_quotes()), 1::bigint, 'el cliente ve solo la versión vigente (no borradores ni sustituidas)');
 select tests.eq((public.portal_quote(current_setting('tests.q2b')::uuid) ->> 'total_cents'), '10890', 'y su detalle');
+select tests.eq((select link_path from public.portal_notifications() where event::text = 'presupuesto_enviado' order by created_at desc limit 1),
+  '/portal/presupuestos/' || current_setting('tests.q2b'), 'el aviso del portal lleva a ese presupuesto');
 select tests.eq(public.portal_quote(current_setting('tests.q1')::uuid), null::jsonb, 'nunca el presupuesto de otro cliente');
 select tests.throws($$select public.respond_quote_portal(current_setting('tests.q1')::uuid, false)$$, 'ni responderlo', '%no encontrado%');
 select tests.eq(public.respond_quote_portal(current_setting('tests.q2b')::uuid, false, 'Muy caro')::text, 'rechazado', 'rechaza desde su portal');

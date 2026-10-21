@@ -11,7 +11,7 @@
  *    datos lo devuelve a la cola a los 10 minutos; el proveedor descarta el
  *    duplicado gracias a la clave de idempotencia.
  */
-import { renderEmail, type ClaimedNotification } from './templates.ts';
+import { isKnownTemplate, renderEmail, type ClaimedNotification } from './templates.ts';
 import type { ChannelSender, SendOutcome } from './types.ts';
 
 export interface DispatchDeps {
@@ -46,7 +46,7 @@ export async function dispatchEmails(deps: DispatchDeps, opts: { limit?: number;
 
   for (const n of batch) {
     let outcome: SendOutcome;
-    if (n.template !== 'reparacion_estado_v1') {
+    if (!isKnownTemplate(n.template)) {
       // Plantilla desconocida: mejor no enviar nada que enviar algo incorrecto.
       outcome = { kind: 'permanente', code: 'error' };
     } else {

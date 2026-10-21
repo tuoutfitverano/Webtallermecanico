@@ -1,0 +1,185 @@
+---
+/**
+ * Recordatorios (oficina): los genera la base de datos en el mantenimiento
+ * programado (revisiones, presupuestos sin respuesta, vehículos sin recoger y
+ * trabajos retrasados). Aquí se ven, se descartan y (gestores) se configuran.
+ *
+ *  · Revisión: solo llega al cliente si él lo pidió en su portal.
+ *  · Trabajo retrasado: solo interno, nunca al cliente.
+ *  · «Aviso creado» = aviso puesto en la cola (portal y, si el cliente lo
+ *    eligió y el taller lo tiene activo, email/WhatsApp). Sin proveedor, el
+ *    email o WhatsApp se queda pendiente: nunca se da por enviado.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, isUuid, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../lib/auth/messages.ts';
+import { formatDay, formatDateTime } from '../../lib/panel/format.ts';
+import { formatPlate, REMINDER_KIND_LABELS, REMINDER_STATUS_LABELS } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const FILTERS = [
+  { id: 'abiertos', label: 'Por revisar' },
+  { id: 'todos', label: 'Todos' },
+] as const;
+const filter = FILTERS.find(f => f.id === Astro.url.searchParams.get('ver'))?.id ?? 'abiertos';
+
+interface Settings {
+  revision_enabled: boolean; revision_days_before: number; revision_km_margin: number; quote_enabled: boolean; quote_after_days: number;
+  pickup_enabled: boolean; pickup_after_days: number; delay_enabled: boolean;
+}
+const SETTINGS_SELECT = 'revision_enabled, revision_days_before, revision_km_margin, quote_enabled, quote_after_days, pickup_enabled, pickup_after_days, delay_enabled';
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+if (panel.form && panel.workshop && panel.isOffice) {
+  const form = panel.form;
+  const action = field(form, 'action');
+  if (action === 'descartar') {
+    const id = field(form, 'id');
+    const { error } = isUuid(id) ? await panel.supabase.rpc('dismiss_reminder', { p_id: id }) : { error: { code: '22023', message: '' } };
+    if (error) { logAuth('panel_reminder_dismiss_error', error.code); flash = { kind: 'bad', text: 'No se ha podido descartar.' }; Astro.response.status = 400; }
+    else flash = { kind: 'ok', text: 'Recordatorio descartado.' };
+  } else if (action === 'ajustes' && panel.isManager) {
+    const int = (name: string, min: number, max: number) => {
+      const n = Number(field(form, name));
+      return Number.isInteger(n) && n >= min && n <= max ? n : null;
+    };
+    const values = {
+      revision_enabled: form.get('revision_enabled') === 'on', revision_days_before: int('revision_days_before', 1, 90),
+      revision_km_margin: int('revision_km_margin', 100, 20000), quote_enabled: form.get('quote_enabled') === 'on',
+      quote_after_days: int('quote_after_days', 1, 60), pickup_enabled: form.get('pickup_enabled') === 'on',
+      pickup_after_days: int('pickup_after_days', 1, 60), delay_enabled: form.get('delay_enabled') === 'on',
+    };
+    if (Object.values(values).some(v => v === null)) {
+      flash = { kind: 'bad', text: 'Revisa los números: días entre 1 y 90 (revisión) o 1 y 60, y kilómetros entre 100 y 20.000.' };
+      Astro.response.status = 422;
+    } else {
+      const { error } = await panel.supabase.from('reminder_settings').update(values).eq('workshop_id', panel.workshop.id);
+      if (error) { logAuth('panel_reminder_settings_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
+      else flash = { kind: 'ok', text: 'Reglas guardadas. Se aplican en la próxima revisión automática.' };
+    }
+  }
+}
+
+interface Row {
+  id: string; kind: string; due_on: string; title: string; status: string; notifications_count: number; created_at: string;
+  customer_id: string | null; vehicle_id: string | null; order_id: string | null; quote_id: string | null;
+  customers: { full_name: string } | null; vehicles: { plate: string } | null;
+}
+let rows: Row[] = [];
+let settings: Settings | null = null;
+let loadError = false;
+if (panel.workshop && panel.isOffice) {
+  let q = panel.supabase.from('reminders')
+    .select('id, kind, due_on, title, status, notifications_count, created_at, customer_id, vehicle_id, order_id, quote_id, customers(full_name), vehicles(plate)')
+    .eq('workshop_id', panel.workshop.id).order('created_at', { ascending: false }).limit(200);
+  if (filter === 'abiertos') q = q.in('status', ['pendiente', 'sin_canal']);
+  const [r, s] = await Promise.all([q, panel.supabase.from('reminder_settings').select(SETTINGS_SELECT).eq('workshop_id', panel.workshop.id).maybeSingle()]);
+  if (r.error || s.error) { logAuth('panel_reminders_error', r.error?.code ?? s.error?.code); loadError = true; }
+  rows = (r.data ?? []) as unknown as Row[];
+  settings = (s.data ?? null) as Settings | null;
+}
+const tone: Record<string, string> = { pendiente: 'pill-warn', enviado: 'pill-ok', sin_canal: '', descartado: '' };
+const link = (r: Row) => r.quote_id ? `/panel/presupuestos/${r.quote_id}` : r.order_id ? `/panel/ordenes/${r.order_id}` : r.vehicle_id ? `/panel/vehiculos/${r.vehicle_id}` : r.customer_id ? `/panel/clientes/${r.customer_id}` : null;
+---
+<PanelLayout panel={panel} title="Recordatorios" section="recordatorios">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Recordatorios</h1>
+      <p class="pnl-sub">Revisiones, presupuestos sin respuesta, vehículos sin recoger y trabajos retrasados.</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Los recordatorios los gestiona la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No se han podido cargar los recordatorios. Recarga la página." />}
+      <p class="hint">Se generan solos una vez al día (también si nadie tiene el panel abierto). Un recordatorio nunca se repite.</p>
+      <nav class="filter-tabs" aria-label="Qué ver">
+        {FILTERS.map(f => <a href={`/panel/recordatorios?ver=${f.id}`} aria-current={f.id === filter ? 'page' : undefined}>{f.label}</a>)}
+      </nav>
+      <section class="card" aria-label="Lista de recordatorios">
+        {rows.length === 0 ? (
+          <div class="empty"><strong>{filter === 'abiertos' ? 'No hay nada por revisar.' : 'Todavía no hay recordatorios.'}</strong><span>Activa abajo las reglas que quieras usar.</span></div>
+        ) : (
+          <ul class="list">
+            {rows.map(r => {
+              const href = link(r);
+              return (
+                <li class="row">
+                  <span class="row-main">
+                    <span class="row-title">{href ? <a href={href}>{r.title}</a> : r.title}</span>
+                    <span class="row-meta">{REMINDER_KIND_LABELS[r.kind] ?? r.kind} · {formatDay(r.due_on)}{r.customers && ` · ${r.customers.full_name}`}{r.vehicles && ` · ${formatPlate(r.vehicles.plate)}`} · creado {formatDateTime(r.created_at)}</span>
+                  </span>
+                  <span class="row-side">
+                    <span class={`pill ${tone[r.status] ?? ''}`}>{REMINDER_STATUS_LABELS[r.status] ?? r.status}</span>
+                    {r.status === 'pendiente' && (
+                      <form method="post" data-busy="Descartando…">
+                        <input type="hidden" name="action" value="descartar" /><input type="hidden" name="id" value={r.id} />
+                        <button class="btn btn-sm" type="submit" aria-label={`Descartar «${r.title}»`}><span class="spinner" aria-hidden="true"></span><span data-label>Descartar</span></button>
+                      </form>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {settings && (
+        <section class="card" aria-labelledby="reglas-t">
+          <h2 id="reglas-t" class="card-title"><Icon name="cog" />Reglas del taller</h2>
+          {!panel.isManager ? (
+            <dl class="facts">
+              <dt>Revisión</dt><dd>{settings.revision_enabled ? `${settings.revision_days_before} días antes o ${settings.revision_km_margin.toLocaleString('es-ES')} km antes` : 'Desactivado'}</dd>
+              <dt>Presupuesto sin respuesta</dt><dd>{settings.quote_enabled ? `a los ${settings.quote_after_days} días` : 'Desactivado'}</dd>
+              <dt>Vehículo sin recoger</dt><dd>{settings.pickup_enabled ? `a los ${settings.pickup_after_days} días` : 'Desactivado'}</dd>
+              <dt>Trabajo retrasado</dt><dd>{settings.delay_enabled ? 'Activado (interno)' : 'Desactivado'}</dd>
+            </dl>
+          ) : (
+            <form method="post" class="form-stack" data-busy="Guardando…">
+              <input type="hidden" name="action" value="ajustes" />
+              <fieldset class="rule">
+                <legend>Revisión del vehículo (al cliente)</legend>
+                <label class="check"><input type="checkbox" name="revision_enabled" checked={settings.revision_enabled} /><span>Avisar al cliente antes de la próxima revisión. <span class="muted">Solo a quien lo pidió en su portal; usa la fecha o los km de la próxima revisión de la ficha del vehículo.</span></span></label>
+                <div class="form-row">
+                  <div class="field"><label for="r-days">Días antes</label><input class="input" id="r-days" name="revision_days_before" type="number" min="1" max="90" value={settings.revision_days_before} /></div>
+                  <div class="field"><label for="r-km">Kilómetros antes</label><input class="input" id="r-km" name="revision_km_margin" type="number" min="100" max="20000" step="100" value={settings.revision_km_margin} /></div>
+                </div>
+              </fieldset>
+              <fieldset class="rule">
+                <legend>Presupuesto sin respuesta (al cliente)</legend>
+                <label class="check"><input type="checkbox" name="quote_enabled" checked={settings.quote_enabled} /><span>Recordar al cliente que tiene un presupuesto pendiente.</span></label>
+                <div class="field"><label for="q-days">Días después de enviarlo</label><input class="input" id="q-days" name="quote_after_days" type="number" min="1" max="60" value={settings.quote_after_days} /></div>
+              </fieldset>
+              <fieldset class="rule">
+                <legend>Vehículo listo sin recoger (al cliente)</legend>
+                <label class="check"><input type="checkbox" name="pickup_enabled" checked={settings.pickup_enabled} /><span>Recordar al cliente que su vehículo está listo.</span></label>
+                <div class="field"><label for="p-days">Días después de estar listo</label><input class="input" id="p-days" name="pickup_after_days" type="number" min="1" max="60" value={settings.pickup_after_days} /></div>
+              </fieldset>
+              <fieldset class="rule">
+                <legend>Trabajo retrasado (solo para el taller)</legend>
+                <label class="check"><input type="checkbox" name="delay_enabled" checked={settings.delay_enabled} /><span>Avisar aquí cuando pase la fecha prevista de entrega. Nunca se avisa al cliente.</span></label>
+              </fieldset>
+              <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar reglas</span></button>
+            </form>
+          )}
+        </section>
+      )}
+    </>
+  )}
+</PanelLayout>
+
+<style>
+  .rule { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+  .rule legend { padding: 0; font-weight: 600; margin-bottom: 4px; }
+</style>

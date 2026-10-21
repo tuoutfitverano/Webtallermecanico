@@ -6,6 +6,8 @@
  *  · Avisos de las reparaciones: siempre en el portal y, si el cliente quiere,
  *    también por email, por WhatsApp o por los dos. WhatsApp solo lo puede
  *    pedir el propio cliente (aquí) y necesita un móvil en su ficha.
+ *  · Recordatorios de mantenimiento (revisión por fecha o por km): solo si el
+ *    cliente los pide aquí; el taller solo puede retirarlos.
  *  · Comunicaciones comerciales: por separado y desactivadas de entrada.
  */
 import PortalLayout from '../../layouts/PortalLayout.astro';
@@ -34,7 +36,14 @@ if (portal.form && field(portal.form, 'action') === 'preferencias') {
         p_operational_whatsapp: portal.form.get('operational_whatsapp') === 'on',
       })
     : { error: { code: '22023', message: '' } };
-  if (error) {
+  const reminders = error ? null : await portal.supabase.rpc('set_service_reminders', {
+    p_customer_id: customerId, p_enabled: portal.form.get('service_reminders') === 'on',
+  });
+  if (reminders?.error) {
+    logAuth('portal_reminders_error', reminders.error.code);
+    flash = { kind: 'bad', text: 'No se han guardado tus preferencias. Inténtalo de nuevo.' };
+    Astro.response.status = 400;
+  } else if (error) {
     logAuth('portal_preferences_error', error.code);
     const noMobile = error.code === '22023' && /móvil/.test(error.message ?? '');
     flash = { kind: 'bad', text: noMobile
@@ -49,12 +58,19 @@ interface Prefs {
   has_whatsapp_number: boolean; whatsapp_hint: string | null; operational_whatsapp: boolean; workshop_email: boolean; workshop_whatsapp: boolean;
 }
 let prefs: Prefs[] = [];
+let reminderPrefs: Array<{ customer_id: string; enabled: boolean }> = [];
 if (portal.records.length > 0) {
-  const { data, error } = await portal.supabase.rpc('portal_contact_preferences');
+  const [{ data, error }, rem] = await Promise.all([
+    portal.supabase.rpc('portal_contact_preferences'),
+    portal.supabase.rpc('portal_service_reminders'),
+  ]);
   if (error) logAuth('portal_preferences_load_error', error.code);
+  if (rem.error) logAuth('portal_reminders_load_error', rem.error.code);
   prefs = (data ?? []) as Prefs[];
+  reminderPrefs = (rem.data ?? []) as typeof reminderPrefs;
 }
 const prefsOf = (customerId: string) => prefs.find(p => p.customer_id === customerId);
+const remindersOn = (customerId: string) => reminderPrefs.some(p => p.customer_id === customerId && p.enabled);
 ---
 <PortalLayout portal={portal} title="Mis datos" section="datos">
   <header class="pnl-head"><div><h1 class="pnl-title">Mis datos</h1><p class="pnl-sub">Los datos que tu taller tiene registrados. Si alguno no es correcto, díselo al taller.</p></div></header>
@@ -103,6 +119,10 @@ const prefsOf = (customerId: string) => prefs.find(p => p.customer_id === custom
                   {' '}Solo avisos de tus reparaciones, nunca publicidad.</span>
               </label>
             </fieldset>
+            <label class="check">
+              <input type="checkbox" name="service_reminders" checked={remindersOn(r.customer_id)} />
+              <span><strong>Recordatorios de mantenimiento.</strong> Te avisamos cuando se acerque la próxima revisión de tu vehículo (por fecha o por kilómetros), por los mismos canales que elijas arriba. Opcional.</span>
+            </label>
             <label class="check">
               <input type="checkbox" name="marketing_email" checked={p.marketing_email} />
               <span><strong>Ofertas y promociones de {r.workshop_name} por email.</strong> Opcional y separado de los avisos de tus reparaciones. Puedes retirarlo cuando quieras.</span>

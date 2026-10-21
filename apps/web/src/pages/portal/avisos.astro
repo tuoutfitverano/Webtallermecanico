@@ -25,6 +25,9 @@ if (portal.form && portal.records.length > 0) {
   if (action === 'abrir' && isUuid(id)) {
     // Se marca como leído y se abre la reparación (si la puede ver: el portal lo vuelve a comprobar).
     await portal.supabase.rpc('portal_mark_notifications_read', { p_id: id });
+    // Solo rutas del portal (la base de datos ya solo admite esas).
+    const link = field(portal.form, 'link');
+    if (/^\/portal\/[a-z0-9/_-]{1,120}$/.test(link)) return Astro.redirect(link, 303);
     const order = field(portal.form, 'order');
     return Astro.redirect(isUuid(order) ? `/portal/reparaciones/${order}` : '/portal/avisos', 303);
   }
@@ -35,13 +38,21 @@ if (portal.form && portal.records.length > 0) {
   }
 }
 
-interface Notice { id: string; created_at: string; title: string; body: string; read_at: string | null; order_id: string | null; workshop_name: string }
+interface Notice { id: string; created_at: string; title: string; body: string; read_at: string | null; order_id: string | null; workshop_name: string; link_path: string | null }
 let notices: Notice[] = [];
 if (portal.records.length > 0) {
   const { data, error: e } = await portal.supabase.rpc('portal_notifications', { p_limit: 100 });
   if (e) { logAuth('portal_notifications_error', e.code); error = true; }
   notices = (data ?? []) as Notice[];
 }
+const linkLabel = (n: Notice) => {
+  const p = n.link_path ?? '';
+  if (p.startsWith('/portal/presupuestos')) return 'Ver el presupuesto';
+  if (p.startsWith('/portal/facturas')) return 'Ver la factura';
+  if (p.startsWith('/portal/vehiculos')) return 'Ver el vehículo';
+  if (p.startsWith('/portal/datos')) return 'Ir a Mis datos';
+  return 'Ver la reparación';
+};
 const unread = notices.filter(n => !n.read_at).length;
 const many = portal.records.length > 1;
 ---
@@ -49,7 +60,7 @@ const many = portal.records.length > 1;
   <header class="pnl-head">
     <div>
       <h1 class="pnl-title">Avisos</h1>
-      <p class="pnl-sub">Te avisamos aquí cada vez que cambia el estado de una reparación.</p>
+      <p class="pnl-sub">Te avisamos aquí de tus reparaciones, presupuestos y revisiones.</p>
     </div>
     {unread > 0 && (
       <form method="post" class="pnl-actions" data-busy="Marcando…">
@@ -62,7 +73,7 @@ const many = portal.records.length > 1;
     <>
       {error && <Flash kind="bad" text="No hemos podido cargar o actualizar tus avisos. Recarga la página." />}
       {notices.length === 0 ? (
-        <div class="empty"><strong>Todavía no tienes avisos.</strong><span>Cuando el taller cambie el estado de una reparación, lo verás aquí.</span></div>
+        <div class="empty"><strong>Todavía no tienes avisos.</strong><span>Cuando el taller cambie el estado de una reparación o te envíe un presupuesto, lo verás aquí.</span></div>
       ) : (
         <ul class="notice-list" aria-label={`${notices.length} avisos, ${unread} sin leer`}>
           {notices.map(n => (
@@ -73,10 +84,11 @@ const many = portal.records.length > 1;
                 <span class="when">{formatDateTime(n.created_at)}{many && <> · {n.workshop_name}</>}</span>
                 <p class="notice-body">{n.body}</p>
                 <div class="notice-actions">
-                  {n.order_id && (
+                  {(n.link_path || n.order_id) && (
                     <form method="post">
-                      <input type="hidden" name="action" value="abrir" /><input type="hidden" name="id" value={n.id} /><input type="hidden" name="order" value={n.order_id} />
-                      <button class="btn btn-sm" type="submit"><Icon name="clipboard" />Ver la reparación</button>
+                      <input type="hidden" name="action" value="abrir" /><input type="hidden" name="id" value={n.id} />
+                      {n.link_path ? <input type="hidden" name="link" value={n.link_path} /> : <input type="hidden" name="order" value={n.order_id} />}
+                      <button class="btn btn-sm" type="submit"><Icon name="clipboard" />{linkLabel(n)}</button>
                     </form>
                   )}
                   {!n.read_at && (

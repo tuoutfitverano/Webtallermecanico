@@ -17,7 +17,7 @@
  *
  * Sin dependencias de Astro: se prueba con dobles en notifications.test.ts.
  */
-import type { ClaimedNotification } from './templates.ts';
+import { isKnownTemplate, type ClaimedNotification } from './templates.ts';
 import type { DispatchSummary } from './dispatcher.ts';
 import type { SendOutcome } from './types.ts';
 
@@ -148,7 +148,9 @@ export async function dispatchWhatsapp(deps: WhatsappDispatchDeps, opts: { limit
 
   for (const n of batch) {
     let outcome: SendOutcome;
-    if (n.template !== WHATSAPP_TEMPLATE || !/^[0-9]{8,15}$/.test(n.recipient)) {
+    // Los dos tipos de aviso viajan en la misma plantilla aprobada por Meta
+    // (taller, título y detalle); la plantilla interna solo decide el texto.
+    if (!isKnownTemplate(n.template) || !/^[0-9]{8,15}$/.test(n.recipient)) {
       outcome = { kind: 'permanente', code: 'error' };
     } else {
       try {
