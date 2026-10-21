@@ -1,0 +1,20 @@
+---
+/** Factura del cliente para imprimir o guardar en PDF (solo emitidas y suyas: portal_invoice). */
+import InvoicePrint, { type PrintInvoice } from '../../../../components/InvoicePrint.astro';
+import { portalPage } from '../../../../lib/server/portal.ts';
+import { isUuid } from '../../../../lib/server/panel.ts';
+import { logAuth } from '../../../../lib/server/auth.ts';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+const id = Astro.params.id ?? '';
+const back = `/portal/facturas/${id}`;
+if (portal.records.length === 0 || !isUuid(id)) return Astro.redirect('/portal/facturas', 303);
+const { data, error } = await portal.supabase.rpc('portal_invoice', { p_invoice_id: id });
+if (error) logAuth('portal_invoice_error', error.code);
+if (!data) return Astro.redirect('/portal/facturas', 303);
+const invoice = data as PrintInvoice;
+---
+<InvoicePrint invoice={invoice} back={back} />

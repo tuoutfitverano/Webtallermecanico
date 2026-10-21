@@ -1,0 +1,65 @@
+---
+/**
+ * Nueva factura (borrador). Desde una orden (sus líneas), un presupuesto
+ * aceptado (sus líneas) o un cliente (vacía). Se crea con un POST: abrir la
+ * página no crea nada. La base de datos comprueba que todo es del taller.
+ */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const params = Astro.url.searchParams;
+const orderId = isUuid(params.get('orden')) ? params.get('orden')! : '';
+const quoteId = isUuid(params.get('presupuesto')) ? params.get('presupuesto')! : '';
+let customers: Array<{ id: string; full_name: string; phone: string | null }> = [];
+let error = '';
+if (panel.workshop && panel.isOffice) {
+  if (panel.form) {
+    const src = { o: field(panel.form, 'order_id'), q: field(panel.form, 'quote_id'), c: field(panel.form, 'customer_id') };
+    const { data, error: e } = await panel.supabase.rpc('create_invoice_draft', {
+      p_order_id: isUuid(src.o) ? src.o : null, p_quote_id: isUuid(src.q) ? src.q : null, p_customer_id: isUuid(src.c) ? src.c : null,
+    });
+    if (e || !data) { logAuth('panel_invoice_create_error', e?.code); error = e ? dbErrorMessage(e) : 'No se ha creado la factura.'; Astro.response.status = 400; }
+    else return Astro.redirect(`/panel/facturas/${data}?creada=1`, 303);
+  }
+  if (!orderId && !quoteId) {
+    const { data } = await panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: '', p_limit: 300 });
+    customers = (data ?? []) as typeof customers;
+  }
+}
+---
+<PanelLayout panel={panel} title="Nueva factura" section="facturas">
+  <a class="pnl-back" href="/panel/facturas"><Icon name="arrow" />Facturas</a>
+  <header class="pnl-head"><div><h1 class="pnl-title">Nueva factura</h1><p class="pnl-sub">Se crea como borrador: revisas las líneas y la emites cuando esté bien.</p></div></header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Las facturas las crea la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <form method="post" class="card form-stack" data-busy="Creando…">
+      <Flash kind="bad" text={error} />
+      {orderId ? (
+        <><input type="hidden" name="order_id" value={orderId} /><p>Se copiarán las líneas de trabajo y piezas de la orden.</p></>
+      ) : quoteId ? (
+        <><input type="hidden" name="quote_id" value={quoteId} /><p>Se copiarán las líneas del presupuesto aceptado.</p></>
+      ) : (
+        <div class="field">
+          <label for="customer_id">Cliente</label>
+          <select class="select" id="customer_id" name="customer_id" required>
+            <option value="">Elige un cliente</option>
+            {customers.map(c => <option value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+          </select>
+          <p class="hint">La factura empezará vacía. Lo normal es crearla desde una orden o un presupuesto aceptado.</p>
+        </div>
+      )}
+      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear borrador</span></button>
+    </form>
+  )}
+</PanelLayout>

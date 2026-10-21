@@ -1,0 +1,102 @@
+---
+/** Facturas del taller con su estado de cobro (calculado por la base de datos, nunca guardado). Solo la oficina. */
+import PanelLayout from '../../../layouts/PanelLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
+import Flash from '../../../components/panel/Flash.astro';
+import { panelPage } from '../../../lib/server/panel.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDay, formatDateTime } from '../../../lib/panel/format.ts';
+import { formatCents, INVOICE_KIND_LABELS, PAYMENT_STATUS_LABELS } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const FILTERS = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'borradores', label: 'Borradores' },
+  { id: 'pendientes', label: 'Pendientes de cobro' },
+  { id: 'vencidas', label: 'Vencidas' },
+  { id: 'cobradas', label: 'Cobradas' },
+] as const;
+const filter = FILTERS.find(f => f.id === Astro.url.searchParams.get('estado'))?.id ?? 'todas';
+
+interface Row {
+  id: string; kind: 'ordinaria' | 'rectificativa'; status: 'borrador' | 'emitida'; full_number: string | null; issue_date: string | null; due_date: string | null;
+  total_cents: number | null; created_at: string; customers: { full_name: string } | null;
+}
+interface Bal { invoice_id: string; paid_cents: number; pending_cents: number; payment_status: 'pendiente' | 'parcial' | 'cobrada'; overdue: boolean }
+let rows: Row[] = [];
+const balances = new Map<string, Bal>();
+let loadError = false;
+let totals = { pending: 0, overdue: 0 };
+if (panel.workshop && panel.isOffice) {
+  const [r, b] = await Promise.all([
+    panel.supabase.from('invoices').select('id, kind, status, full_number, issue_date, due_date, total_cents, created_at, customers(full_name)')
+      .eq('workshop_id', panel.workshop.id).order('created_at', { ascending: false }).limit(300),
+    panel.supabase.rpc('invoice_balances', { p_workshop_id: panel.workshop.id }),
+  ]);
+  if (r.error || b.error) { logAuth('panel_invoices_error', r.error?.code ?? b.error?.code); loadError = true; }
+  rows = (r.data ?? []) as unknown as Row[];
+  for (const x of (b.data ?? []) as Bal[]) balances.set(x.invoice_id, x);
+  for (const x of balances.values()) { totals.pending += Number(x.pending_cents); if (x.overdue) totals.overdue += Number(x.pending_cents); }
+  rows = rows.filter(r => {
+    const bal = balances.get(r.id);
+    if (filter === 'borradores') return r.status === 'borrador';
+    if (filter === 'pendientes') return bal && bal.payment_status !== 'cobrada';
+    if (filter === 'vencidas') return bal?.overdue;
+    if (filter === 'cobradas') return bal?.payment_status === 'cobrada';
+    return true;
+  });
+}
+const tone = { pendiente: 'pill-warn', parcial: 'pill-warn', cobrada: 'pill-ok' } as const;
+---
+<PanelLayout panel={panel} title="Facturas" section="facturas">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Facturas</h1>
+      <p class="pnl-sub">Facturas, cobros y lo que queda pendiente.</p>
+    </div>
+    {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/facturas/nueva"><Icon name="plus" />Nueva factura</a></div>}
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
+    <div class="empty"><strong>Las facturas las gestiona la oficina del taller (propietario, administrador o recepción).</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      <div class="alert alert-warn" role="note"><Icon name="alert" /><span>Facturación operativa: <strong>no es un sistema VERI*FACTU certificado</strong>. Antes de usarla para facturar de verdad, revísalo con tu asesoría (ver la guía de facturación).</span></div>
+      {loadError && <Flash kind="bad" text="No se han podido cargar las facturas. Recarga la página." />}
+      <section class="kpis" aria-label="Resumen de cobros">
+        <a class="kpi" href="/panel/facturas?estado=pendientes"><span class="kpi-value">{formatCents(totals.pending)}</span><span class="kpi-label">Pendiente de cobro</span></a>
+        <a class="kpi" href="/panel/facturas?estado=vencidas"><span class="kpi-value">{formatCents(totals.overdue)}</span><span class="kpi-label">Vencido</span></a>
+      </section>
+      <nav class="filter-tabs" aria-label="Estado">
+        {FILTERS.map(f => <a href={`/panel/facturas?estado=${f.id}`} aria-current={f.id === filter ? 'page' : undefined}>{f.label}</a>)}
+      </nav>
+      <section class="card" aria-label="Lista de facturas">
+        {rows.length === 0 ? <div class="empty"><strong>No hay facturas con este filtro.</strong><span>Crea una desde una orden terminada o un presupuesto aceptado.</span></div> : (
+          <ul class="list">
+            {rows.map(r => {
+              const bal = balances.get(r.id);
+              return (
+                <li>
+                  <a class="row" href={`/panel/facturas/${r.id}`}>
+                    <span class="row-main">
+                      <span class="row-title"><span class="num">{r.full_number ?? 'Borrador'}</span>{INVOICE_KIND_LABELS[r.kind]}</span>
+                      <span class="row-meta">{r.customers?.full_name ?? '—'} · {r.issue_date ? `emitida ${formatDay(r.issue_date)} · vence ${formatDay(r.due_date)}` : `creada ${formatDateTime(r.created_at)}`}</span>
+                    </span>
+                    <span class="row-side">
+                      {r.status === 'borrador' ? <span class="pill">Borrador</span> : bal && <span class={`pill ${bal.overdue ? 'pill-bad' : tone[bal.payment_status]}`}>{bal.overdue ? 'Vencida' : PAYMENT_STATUS_LABELS[bal.payment_status]}</span>}
+                      {r.total_cents !== null && <span class="money-big">{formatCents(Number(r.total_cents))}</span>}
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </>
+  )}
+</PanelLayout>

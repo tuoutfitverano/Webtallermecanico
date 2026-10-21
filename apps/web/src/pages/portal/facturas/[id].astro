@@ -40,7 +40,7 @@ const pending = inv ? Number(inv.total_cents) - Number(inv.paid_cents) : 0;
     <div class="empty"><strong>Factura no encontrada.</strong><a class="btn" href="/portal/facturas">Ver mis facturas</a></div>
   ) : (
     <>
-      <header class="pnl-head"><div><h1 class="pnl-title">{INVOICE_KIND_LABELS[inv.kind]} {inv.full_number}</h1><p class="pnl-sub">Fecha {formatDay(inv.issue_date)} · vence {formatDay(inv.due_date)}</p></div></header>
+      <header class="pnl-head"><div><h1 class="pnl-title">{INVOICE_KIND_LABELS[inv.kind]} {inv.full_number}</h1><p class="pnl-sub">Fecha {formatDay(inv.issue_date)} · vence {formatDay(inv.due_date)}</p></div><div class="pnl-actions"><a class="btn" href={`/portal/facturas/${inv.id}/imprimir`}><Icon name="printer" />Imprimir o guardar PDF</a></div></header>
       <div class="grid-2">
         <section class="card" aria-labelledby="emisor-t"><h2 id="emisor-t" class="card-title">Emisor</h2><p><strong>{inv.issuer.legal_name ?? inv.issuer.name}</strong><br />NIF {inv.issuer.tax_id}<br />{address(inv.issuer)}</p></section>
         <section class="card" aria-labelledby="dest-t"><h2 id="dest-t" class="card-title">Cliente</h2><p><strong>{inv.recipient.name}</strong>{inv.recipient.tax_id && <><br />NIF {inv.recipient.tax_id}</>}{address(inv.recipient) && <><br />{address(inv.recipient)}</>}</p></section>

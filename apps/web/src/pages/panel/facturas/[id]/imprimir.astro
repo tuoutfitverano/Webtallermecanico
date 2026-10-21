@@ -1,0 +1,36 @@
+---
+/** Factura emitida para imprimir o guardar en PDF (oficina del taller). Los borradores no se imprimen. */
+import InvoicePrint, { type PrintInvoice } from '../../../../components/InvoicePrint.astro';
+import { isUuid, panelPage } from '../../../../lib/server/panel.ts';
+import { formatPlate } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+const id = Astro.params.id ?? '';
+const back = `/panel/facturas/${id}`;
+if (!panel.workshop || !panel.isOffice || !isUuid(id)) return Astro.redirect('/panel/facturas', 303);
+
+const { data } = await panel.supabase.from('invoices')
+  .select('id, kind, status, full_number, issue_date, due_date, notes, issuer, recipient, subtotal_cents, tax_cents, total_cents, taxes, rectification_reason, rectifies_id, vehicles(plate, make, model)')
+  .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle();
+const row = data as unknown as (Record<string, unknown> & { status: string; rectifies_id: string | null; vehicles: { plate: string; make: string; model: string } | null }) | null;
+if (!row || row.status !== 'emitida') return Astro.redirect(back, 303);
+
+const [items, pays, rect] = await Promise.all([
+  panel.supabase.from('invoice_items').select('kind, description, part_number, quantity, unit_price_cents, discount_pct, tax_rate').eq('invoice_id', id).order('position').order('created_at'),
+  panel.supabase.from('payments').select('amount_cents').eq('invoice_id', id).is('voided_at', null),
+  row.rectifies_id ? panel.supabase.from('invoices').select('full_number').eq('id', row.rectifies_id).maybeSingle() : Promise.resolve({ data: null }),
+]);
+const v = row.vehicles;
+const invoice = {
+  ...(row as unknown as PrintInvoice),
+  lines: (items.data ?? []) as PrintInvoice['lines'],
+  paid_cents: (pays.data ?? []).reduce((s, p) => s + Number(p.amount_cents), 0),
+  rectifies: (rect.data as { full_number: string | null } | null)?.full_number ?? null,
+  reason: (row.rectification_reason as string | null) ?? null,
+  vehicle: v ? `${formatPlate(v.plate)} · ${v.make} ${v.model}` : null,
+} satisfies PrintInvoice;
+---
+<InvoicePrint invoice={invoice} back={back} />

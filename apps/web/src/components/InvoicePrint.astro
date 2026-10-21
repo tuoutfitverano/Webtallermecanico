@@ -1,0 +1,141 @@
+---
+/**
+ * Factura emitida en formato documento (para imprimir o guardar en PDF desde
+ * el navegador). Página independiente, siempre en blanco y negro, con los
+ * datos CONGELADOS al emitir (emisor, destinatario, líneas e impuestos).
+ * La usan el panel y el portal; cada página carga los datos con sus permisos.
+ *  ⚠ Factura operativa, NO certificada VERI*FACTU (docs/FACTURACION.md).
+ */
+import '@fontsource-variable/archivo/standard.css';
+import { formatCents, INVOICE_KIND_LABELS, LINE_KIND_LABELS, lineBaseCents, type LineKind } from '@talleres/core';
+import { formatDay } from '../lib/panel/format.ts';
+
+export interface PrintParty { name?: string; legal_name?: string | null; tax_id?: string | null; address?: string | null; postal_code?: string | null; city?: string | null; province?: string | null; footer?: string | null }
+export interface PrintInvoice {
+  full_number: string; kind: 'ordinaria' | 'rectificativa'; issue_date: string; due_date: string | null;
+  issuer: PrintParty; recipient: PrintParty; notes?: string | null;
+  lines: Array<{ kind: LineKind; description: string; part_number: string | null; quantity: number | string; unit_price_cents: number | string; discount_pct: number | string; tax_rate: number | string }>;
+  subtotal_cents: number; tax_cents: number; total_cents: number; taxes: Array<{ rate: number; base_cents: number; tax_cents: number }>;
+  rectifies: string | null; reason: string | null; paid_cents: number; vehicle?: string | null;
+}
+interface Props { invoice: PrintInvoice; back: string }
+const { invoice: inv, back } = Astro.props;
+const address = (p: PrintParty) => [p.address, [p.postal_code, p.city].filter(Boolean).join(' '), p.province].filter(Boolean).join(', ');
+const pct = (n: number | string) => `${Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 })} %`;
+const qty = (n: number | string) => Number(n).toLocaleString('es-ES', { maximumFractionDigits: 2 });
+const pending = Number(inv.total_cents) - Number(inv.paid_cents);
+const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <nav class="tools" aria-label="Acciones">
+      <a href={back}>← Volver</a>
+      <button type="button" id="imprimir">Imprimir o guardar en PDF</button>
+    </nav>
+    <main class="doc">
+      <header class="head">
+        <div>
+          <p class="issuer-name">{inv.issuer.legal_name || inv.issuer.name}</p>
+          {inv.issuer.legal_name && inv.issuer.name && inv.issuer.name !== inv.issuer.legal_name && <p>{inv.issuer.name}</p>}
+          <p>NIF {inv.issuer.tax_id}</p>
+          {address(inv.issuer) && <p>{address(inv.issuer)}</p>}
+        </div>
+        <div class="doc-id">
+          <h1>{INVOICE_KIND_LABELS[inv.kind]}</h1>
+          <dl>
+            <dt>Número</dt><dd>{inv.full_number}</dd>
+            <dt>Fecha</dt><dd>{formatDay(inv.issue_date)}</dd>
+            {inv.due_date && <><dt>Vencimiento</dt><dd>{formatDay(inv.due_date)}</dd></>}
+          </dl>
+        </div>
+      </header>
+
+      <section class="to" aria-label="Cliente">
+        <p class="lbl">Cliente</p>
+        <p><strong>{inv.recipient.name}</strong></p>
+        {inv.recipient.tax_id && <p>NIF {inv.recipient.tax_id}</p>}
+        {address(inv.recipient) && <p>{address(inv.recipient)}</p>}
+        {inv.vehicle && <p>Vehículo: {inv.vehicle}</p>}
+      </section>
+
+      {inv.rectifies && <p class="note"><strong>Rectifica la factura {inv.rectifies}.</strong> {inv.reason}</p>}
+
+      <div class="table-scroll"><table>
+        <thead><tr><th>Concepto</th><th class="n">Cant.</th><th class="n">Precio</th><th class="n">Dto.</th><th class="n">IVA</th><th class="n">Importe</th></tr></thead>
+        <tbody>
+          {inv.lines.map(l => (
+            <tr>
+              <td><span class="kind">{LINE_KIND_LABELS[l.kind]}{l.part_number && ` · Ref. ${l.part_number}`}</span><br />{l.description}</td>
+              <td class="n">{qty(l.quantity)}</td>
+              <td class="n">{formatCents(Number(l.unit_price_cents))}</td>
+              <td class="n">{Number(l.discount_pct) ? pct(l.discount_pct) : '—'}</td>
+              <td class="n">{pct(l.tax_rate)}</td>
+              <td class="n">{formatCents(lineBaseCents({ quantity: Number(l.quantity), unitPriceCents: Number(l.unit_price_cents), discountPct: Number(l.discount_pct), taxRate: Number(l.tax_rate) }))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+
+      <dl class="totals">
+        {inv.taxes.map(t => <><dt>Base imponible {pct(t.rate)}</dt><dd>{formatCents(Number(t.base_cents))}</dd><dt>Cuota IVA {pct(t.rate)}</dt><dd>{formatCents(Number(t.tax_cents))}</dd></>)}
+        <dt class="total">Total</dt><dd class="total">{formatCents(Number(inv.total_cents))}</dd>
+        {Number(inv.paid_cents) !== 0 && <><dt>Pagado</dt><dd>{formatCents(Number(inv.paid_cents))}</dd><dt>Pendiente</dt><dd>{formatCents(pending)}</dd></>}
+      </dl>
+
+      {inv.notes && <p class="note">{inv.notes}</p>}
+      {inv.issuer.footer && <p class="foot">{inv.issuer.footer}</p>}
+      <p class="foot legal">Documento generado por el software de gestión del taller. Este software todavía no es un sistema de facturación certificado VERI*FACTU.</p>
+    </main>
+    <script>
+      document.getElementById('imprimir')?.addEventListener('click', () => window.print());
+    </script>
+    <style is:global>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #ecebe8; color: #111; font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+      .tools { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; max-width: 820px; margin: 0 auto; padding: 16px; }
+      .tools a, .tools button { font: inherit; font-weight: 600; color: #111; background: #fff; border: 1px solid #999; border-radius: 999px; padding: 10px 18px; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; cursor: pointer; }
+      .tools button { background: #111; color: #fff; border-color: #111; }
+      .doc { background: #fff; max-width: 820px; margin: 0 auto 32px; padding: 40px 44px; box-shadow: 0 2px 12px rgb(0 0 0 / 0.08); }
+      .doc p { margin: 0; }
+      .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 2px solid #111; }
+      .issuer-name { font-weight: 700; font-size: 16px; }
+      .doc-id { text-align: right; }
+      .doc-id h1 { font-family: 'Archivo Variable', system-ui, sans-serif; font-stretch: 125%; text-transform: uppercase; font-size: 22px; margin: 0 0 6px; letter-spacing: 0.02em; }
+      .doc-id dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 0; justify-content: end; }
+      .doc-id dt { color: #555; } .doc-id dd { margin: 0; font-weight: 600; }
+      .to { margin: 20px 0; }
+      .lbl { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: #555; }
+      .note { margin: 12px 0 !important; padding: 10px 12px; border-left: 3px solid #111; background: #f4f4f2; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+      th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #555; border-bottom: 1px solid #111; }
+      .n { text-align: right; white-space: nowrap; }
+      .kind { font-size: 12px; color: #555; }
+      .totals { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; max-width: 340px; margin: 16px 0 0 auto; }
+      .totals dd { margin: 0; text-align: right; }
+      .totals .total { font-weight: 700; font-size: 16px; border-top: 2px solid #111; padding-top: 6px; }
+      .foot { margin-top: 20px !important; font-size: 12px; color: #444; }
+      .legal { color: #666; }
+      @media (max-width: 600px) {
+        .doc { padding: 20px 16px; }
+        .doc-id { text-align: left; } .doc-id dl { justify-content: start; }
+        table { font-size: 12px; } th, td { padding: 6px 3px; }
+        .table-scroll { overflow-x: auto; }
+      }
+      @media print {
+        body { background: #fff; }
+        .tools { display: none; }
+        .doc { box-shadow: none; margin: 0; max-width: none; padding: 0; }
+        @page { margin: 16mm; }
+      }
+    </style>
+  </body>
+</html>
