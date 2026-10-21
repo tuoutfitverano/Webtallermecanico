@@ -393,6 +393,26 @@ test('cabeceras de seguridad en la web pública y en el área privada', async ()
   expect(priv.headers.get('cache-control')).toContain('no-store');
 });
 
+test('página 404: responde 404, explica qué pasa, ofrece salidas y cumple accesibilidad en los dos modos', async ({ page, context, isMobile }) => {
+  for (const tema of ['oscuro', 'claro']) {
+    await context.addCookies([{ name: 'tema', value: tema, url: `http://${HOST}` }]);
+    const res = await page.goto('/esta-pagina-no-existe');
+    expect(res?.status()).toBe(404);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Esta página no existe');
+    await expect(page.locator('.nf-path')).toHaveText('/esta-pagina-no-existe');
+    await expect(page.getByRole('link', { name: 'Volver al inicio' })).toHaveAttribute('href', '/');
+    await expect(page.getByRole('link', { name: 'Entra en tu área' })).toHaveAttribute('href', '/acceso');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+    if (!isMobile) {
+      const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+      expect(axe.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => `${tema}: ${v.id}`)).toEqual([]);
+    }
+  }
+  // Una dirección del área privada que no existe también responde 404.
+  expect((await page.goto('/panel/no-existe'))?.status()).toBe(404);
+});
+
 test('teclado: el primer Tab lleva a «Saltar al contenido» en panel y portal', async ({ page, isMobile }) => {
   test.skip(isMobile, 'Teclado: escritorio');
   const f = await fixtures();

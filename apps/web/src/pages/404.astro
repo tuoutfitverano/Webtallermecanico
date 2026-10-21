@@ -1,14 +1,93 @@
 ---
-/** Página no encontrada (sin datos de ningún taller ni detalles técnicos). */
+/**
+ * Página no encontrada (404).
+ *
+ *  · En la web de un taller: con su nombre, su acento y salidas útiles (inicio,
+ *    pedir cita, llamar y área de clientes), en el modo claro u oscuro elegido.
+ *  · Fuera de una web de taller (dominio desconocido o área privada): con el
+ *    estilo de la plataforma.
+ *
+ * Responde con estado 404 y no se indexa. Muestra la dirección pedida (Astro la
+ * escapa) para que se vea qué estaba mal escrito; nunca detalles técnicos.
+ */
 import AuthLayout from '../layouts/AuthLayout.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+import Icon from '../components/Icon.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+import { siteForHost } from '../lib/server/config.ts';
+import { telHref } from '../lib/site/content.ts';
+import { DEFAULT_THEME, THEME_COOKIE, themeFor } from '../lib/theme.ts';
 export const prerender = false;
 Astro.response.status = 404;
+Astro.response.headers.set('cache-control', 'no-store');
+
+const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
+const raw = decodeURIComponent(Astro.url.pathname);
+const path = raw.length > 60 ? `${raw.slice(0, 57)}…` : raw;
+const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.web);
+const tel = site ? telHref(site.content.phone) : '';
+const canAsk = Boolean(site?.sections.solicitudes);
 ---
-<AuthLayout title="Página no encontrada" back={{ href: '/', label: 'Volver al inicio' }}>
-  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
-    <p class="label">// Error 404</p>
-    <h1 id="titulo" class="auth-title heading">Página no encontrada</h1>
-    <p class="auth-lead">La dirección no existe o ha cambiado.</p>
-    <nav class="auth-links"><a href="/">Ir al inicio</a><a href="/mi-area">Mi área</a></nav>
-  </section>
-</AuthLayout>
+{site ? (
+  <SiteLayout site={site} title={`Página no encontrada · ${site.name}`} noindex>
+    <div class="nf">
+      <div class="ambient" aria-hidden="true"></div>
+      <header class="nf-top">
+        <a href="/" class="nf-brand heading">{site.name}</a>
+        <ThemeToggle current={theme} class="round-btn liquid-glass" />
+      </header>
+      <main class="nf-main" aria-labelledby="nf-t">
+        <p class="nf-code" aria-hidden="true">404</p>
+        <p class="label">// Error 404</p>
+        <h1 id="nf-t" class="nf-title heading">Esta página no existe</h1>
+        <p class="nf-lead">No encontramos <code class="nf-path">{path}</code>. Puede que la dirección esté mal escrita o que la página ya no exista.</p>
+        <nav class="nf-actions" aria-label="Qué puedes hacer">
+          <a class="btn btn-primary" href="/"><Icon name="arrow" class="nf-back" />Volver al inicio</a>
+          {canAsk && <a class="btn" href="/#solicitar">Pedir cita</a>}
+          {tel && <a class="btn" href={tel}><Icon name="phone" />Llamar al {site.content.phone}</a>}
+        </nav>
+        <p class="nf-more">¿Eres cliente o trabajas en el taller? <a href="/acceso" rel="nofollow">Entra en tu área</a>.</p>
+      </main>
+    </div>
+  </SiteLayout>
+) : (
+  <AuthLayout title="Página no encontrada" back={{ href: '/', label: 'Volver al inicio' }}>
+    <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+      <p class="label">// Error 404</p>
+      <h1 id="titulo" class="auth-title heading">Página no encontrada</h1>
+      <p class="auth-lead">No encontramos <code class="nf-path">{path}</code>. La dirección no existe o ha cambiado.</p>
+      <nav class="auth-links"><a href="/">Ir al inicio</a><a href="/mi-area">Mi área</a></nav>
+    </section>
+  </AuthLayout>
+)}
+
+<style>
+  .nf { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; overflow: hidden; }
+  .nf .ambient { opacity: .7; }
+  .nf-top {
+    position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: max(16px, env(safe-area-inset-top, 0px)) var(--gutter-r) 0 var(--gutter);
+  }
+  .nf-brand { font-size: 1.5rem; text-decoration: none; color: var(--fg); min-height: 44px; display: inline-flex; align-items: center; }
+  .nf-main {
+    position: relative; z-index: 1; flex: 1; width: 100%; max-width: 720px; margin-inline: auto;
+    display: flex; flex-direction: column; justify-content: center; gap: 16px;
+    padding: 32px var(--gutter-r) 64px var(--gutter);
+  }
+  .nf-code {
+    margin: 0 0 -8px; font-family: var(--font-heading); font-style: italic; line-height: .85; letter-spacing: -.04em;
+    font-size: clamp(6rem, 30vw, 13rem);
+    color: transparent; -webkit-text-stroke: 1px color-mix(in srgb, var(--fg) 45%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 55%, var(--fg)) 0%, transparent 95%);
+    -webkit-background-clip: text; background-clip: text; user-select: none;
+  }
+  .nf-title { margin: 0; font-size: clamp(2.25rem, 7vw, 3.75rem); line-height: 1; letter-spacing: -1px; text-wrap: balance; }
+  .nf-lead { margin: 0; color: var(--fg-80); font-size: 1.0625rem; line-height: 1.6; max-width: 56ch; }
+  .nf-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; padding: 1px 6px; border-radius: 6px; background: var(--field); border: 1px solid var(--line); overflow-wrap: anywhere; }
+  .nf-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+  .nf-actions :global(.nf-back) { transform: rotate(180deg); }
+  .nf-actions :global(.ico) { width: 18px; height: 18px; }
+  .nf-more { margin: 8px 0 0; color: var(--fg-60); font-size: .9375rem; }
+  .nf-more a { color: var(--fg); text-underline-offset: 3px; }
+  @media (max-width: 520px) { .nf-actions .btn { flex: 1 1 100%; } }
+</style>
