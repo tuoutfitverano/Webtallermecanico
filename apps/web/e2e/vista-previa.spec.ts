@@ -104,7 +104,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { full_name: 'Carlos Martín Ortega', phone: '645 678 901', email: 'carlos.martin@correo.test' },
     { full_name: 'Prueba Cliente', phone: '600 000 001', email: CLIENT },
   ];
-  const customers = [];
+  const customers: Array<Record<string, string>> = [];
   for (const p of people) customers.push((await rest('POST', '/customers', owner.tok, { workshop_id: DEMO, ...p }))[0]!);
   const cars = [
     { c: 0, plate: '4821XKL', make: 'Seat', model: 'León 1.5 TSI', year: 2019, fuel: 'gasolina' },
@@ -119,7 +119,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { c: 5, plate: '8352XHW', make: 'Citroën', model: 'C3', year: 2014, fuel: null },
     { c: 5, plate: '6147XLP', make: 'Mercedes-Benz', model: 'Clase A', year: 2022, fuel: null },
   ];
-  const vehicles = [];
+  const vehicles: Array<Record<string, string>> = [];
   for (const v of cars) {
     vehicles.push((await rest('POST', '/vehicles', owner.tok, {
       workshop_id: DEMO, customer_id: customers[v.c]!.id, plate: v.plate, make: v.make, model: v.model, year: v.year, year_kind: 'primera_matriculacion', fuel: v.fuel,
