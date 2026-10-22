@@ -80,9 +80,9 @@
   font-size: .78rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase;
   border-radius: 999px; transition: background-color .25s, color .25s, border-color .25s, transform .16s var(--ease-out);
 }
-[data-area='app'] .btn:hover { border-color: var(--fg); background: transparent; }
+@media (hover: hover) { [data-area='app'] .btn:hover { border-color: var(--fg); background: transparent; } }
 [data-area='app'] .btn-primary { background: var(--fg); color: var(--ink); border-color: var(--fg); }
-[data-area='app'] .btn-primary:hover { background: rgb(var(--fg-rgb) / .86); }
+@media (hover: hover) { [data-area='app'] .btn-primary:hover { background: rgb(var(--fg-rgb) / .86); } }
 [data-area='app'] .btn-sm { font-size: .7rem; letter-spacing: .08em; padding-inline: 14px; }
 [data-area='app'] .btn-danger { color: var(--tone-bad-soft, var(--bad)); }
 /* Móviles pequeños: el texto del botón cabe sin salirse. */
@@ -148,7 +148,7 @@
 [data-area='app'] .pnl-side .pnl-brand { padding: 4px 4px 18px; border-bottom: 1px solid var(--p-line); }
 [data-area='app'] :is(.card, .kpi, .vcard) { border-radius: 16px; }
 [data-area='app'] .kpi { justify-content: space-between; }
-[data-area='app'] .kpi:hover { border-color: var(--p-line-2); }
+@media (hover: hover) { [data-area='app'] .kpi:hover { border-color: var(--p-line-2); } }
 /* El título de la página lleva una raya de acento debajo, como las secciones de la web. */
 [data-area='app'] .pnl-head > div:first-child > .pnl-title::after {
   content: ''; display: block; width: 44px; height: 2px; margin-top: 14px; background: var(--accent);

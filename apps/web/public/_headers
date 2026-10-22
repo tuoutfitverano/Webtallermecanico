@@ -1,0 +1,7 @@
+# Caché de imágenes estáticas (fotogramas del coche, garaje, capturas del software).
+# No llevan huella en el nombre: 1 día en caché y, durante una semana más, se sirven
+# al instante mientras el navegador comprueba en segundo plano si han cambiado.
+/demo/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/plataforma/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
