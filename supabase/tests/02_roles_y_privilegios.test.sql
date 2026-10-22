@@ -46,7 +46,9 @@ select tests.eq((select count(*) from public.vehicles), 0::bigint, 'el admin sin
 reset role;
 select tests.login('00000000-0000-0000-0000-0000000000ad', 'aal2');
 set local role authenticated;
-select tests.eq((select count(*) from public.vehicles), 3::bigint, 'el admin con 2FA ve todos los talleres');
+select tests.eq((select count(*) from public.vehicles), 0::bigint, 'el admin con 2FA pero sin sesión de soporte tampoco ve datos de talleres');
+select public.admin_open_support_session('Incidencia de prueba: revisar vehículos', null, 30);
+select tests.eq((select count(*) from public.vehicles), 3::bigint, 'con 2FA y una sesión de soporte abierta (con motivo), sí');
 select tests.eq(tests.affected($$update public.workshops set status = 'suspendido' where slug = 'taller-chamberi'$$), 1::bigint, 'el admin con 2FA puede suspender un taller');
 reset role;
 

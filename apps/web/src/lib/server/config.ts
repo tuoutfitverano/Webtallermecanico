@@ -15,7 +15,7 @@ import type { LookupDeps, LookupRow } from '../vehicle-lookup/service.ts';
 import type { VehicleLookupProvider } from '../vehicle-lookup/types.ts';
 import { createResendSender } from '../notifications/resend.ts';
 import { dispatchEmails, type DispatchDeps, type DispatchSummary } from '../notifications/dispatcher.ts';
-import type { ClaimedNotification } from '../notifications/templates.ts';
+import { renderInvitationEmail, type ClaimedNotification } from '../notifications/templates.ts';
 import type { ChannelSender } from '../notifications/types.ts';
 import { createMetaWhatsappSender, dispatchWhatsapp, type ClaimedWhatsapp, type WhatsappSender } from '../notifications/whatsapp.ts';
 
@@ -198,6 +198,21 @@ function emailSender(): ChannelSender | null {
 /** ¿Hay email configurado en la plataforma? (para el panel: no se puede activar si no). */
 export function emailAvailable(): boolean {
   return emailSender() !== null;
+}
+
+/**
+ * Envía por correo una invitación al área de cliente. Devuelve «enviado» solo si
+ * el proveedor la ha ACEPTADO; sin proveedor, «sin_proveedor» (la invitación
+ * queda pendiente de envío y el panel lo dice: nunca se simula).
+ */
+export async function sendInvitationEmail(inv: { id: string; to: string; workshopName: string; url: string; expiresAt: Date; replyTo?: string | null }): Promise<'enviado' | 'sin_proveedor' | 'error'> {
+  const sender = emailSender();
+  if (!sender) return 'sin_proveedor';
+  const mail = renderInvitationEmail(inv.workshopName, inv.url, inv.expiresAt);
+  const outcome = await sender.send({ id: `invitacion-${inv.id}`, to: inv.to, subject: mail.subject, html: mail.html, text: mail.text, fromName: inv.workshopName, replyTo: inv.replyTo ?? null });
+  if (outcome.kind === 'aceptado') return 'enviado';
+  log('invitation_email_error', { code: outcome.code });
+  return 'error';
 }
 
 /** Envía los emails pendientes (de una orden o de todos). Solo con la clave secreta, desde el servidor. */

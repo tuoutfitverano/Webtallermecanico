@@ -51,7 +51,7 @@ Este documento explica **cómo está construida la plataforma y por qué**. Est�
 
 | Rol | Cómo se reconoce | Puede |
 | --- | --- | --- |
-| Administrador de plataforma | Tabla `platform_admins` **y** sesión con 2FA (`aal2`) | Todo. Sin 2FA no tiene ningún privilegio. |
+| Administrador de plataforma | Tabla `platform_admins` **y** sesión con 2FA (`aal2`) **y** una sesión de soporte abierta, con motivo y caducidad (`admin_open_support_session`) | Con sesión de soporte: lectura de los datos para resolver una incidencia (queda registrado en `access_events`). Sin ella: solo el resumen de talleres sin datos personales. Sin 2FA no tiene ningún privilegio. Ver `docs/MULTITALLER.md`. |
 | Propietario (`propietario` = owner) | `workshop_members.role` | Gestionar su taller, clientes, vehículos, solicitudes web y verificar datos. Invitar administradores y mecánicos, cambiar sus roles y desactivarlos. |
 | Administrador del taller (`administrador` = manager) | `workshop_members.role` | Lo mismo que el propietario sobre los datos; en el equipo solo invita y desactiva **mecánicos**. |
 | Mecánico (`mecanico` = mechanic) | `workshop_members.role = 'mecanico'` | Ver y editar vehículos y clientes de su taller. No borra, no verifica datos, no ve las solicitudes web ni gestiona el equipo. |

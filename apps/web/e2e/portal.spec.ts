@@ -131,11 +131,11 @@ test.describe('Portal · invitación y seguimiento', () => {
 
     // 1. La propietaria abre la ficha y crea la invitación (correo ya rellenado).
     await login(page, 'propietaria@e2e.test', `/panel/clientes/${job.customerId}`);
-    const access = page.getByRole('region', { name: 'Acceso al portal del cliente' });
+    const access = page.getByRole('region', { name: 'Acceso al área de cliente' });
     await expect(access).toContainText('Sin vincular');
     await expect(access.getByLabel('Correo del cliente para entrar en el portal')).toHaveValue(job.email);
-    await access.getByRole('button', { name: 'Crear invitación al portal' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Invitación creada' })).toBeVisible();
+    await access.getByRole('button', { name: 'Invitar al área de cliente' }).click();
+    await expect(page.getByRole('status').filter({ hasText: /Invitación (creada|enviada)/ })).toBeVisible();
     const link = await page.locator('#enlace-portal').inputValue();
     expect(link).toMatch(/\/portal\/invitacion\?token=[0-9a-f]{64}$/);
     // El enlace solo se muestra una vez: al recargar queda la invitación pendiente, sin el código.
@@ -165,7 +165,7 @@ test.describe('Portal · invitación y seguimiento', () => {
     await expect(client).toHaveURL(/\/portal\/invitacion\?token=/);
     await expect(client.getByRole('heading', { name: 'Tu portal en AutoValue' })).toBeVisible();
     await client.getByRole('button', { name: 'Aceptar y ver mi portal' }).click();
-    await expect(client).toHaveURL(/\/portal\?bienvenida=1$/);
+    await expect(client).toHaveURL(/\/portal\?bienvenida=1&taller=[0-9a-f-]{36}$/);
     await expect(client.getByRole('status').filter({ hasText: 'Tu cuenta ya está vinculada' })).toBeVisible();
     await expect(client.getByRole('heading', { name: 'Hola, Lucía' })).toBeVisible();
     await expect(client.locator('.kpi', { hasText: 'Vehículo registrado' })).toContainText('1');
@@ -226,7 +226,7 @@ test.describe('Portal · invitación y seguimiento', () => {
 
     // 9. En la ficha del panel ya consta la vinculación.
     await page.goto(`/panel/clientes/${job.customerId}`);
-    await expect(page.getByRole('region', { name: 'Acceso al portal del cliente' })).toContainText('Vinculada');
+    await expect(page.getByRole('region', { name: 'Acceso al área de cliente' })).toContainText('Vinculada');
     await client.context().close();
   });
 
@@ -336,7 +336,7 @@ test.describe('Portal · permisos en la base de datos', () => {
     expect(rows(patch)).toHaveLength(0);
 
     await login(page, 'mecanico@e2e.test', `/panel/clientes/${job.customerId}`);
-    const access = page.getByRole('region', { name: 'Acceso al portal del cliente' });
+    const access = page.getByRole('region', { name: 'Acceso al área de cliente' });
     await expect(access).toContainText('Las invitaciones al portal las envía la oficina del taller (propietario, administrador o recepción).');
     await expect(access.getByRole('button')).toHaveCount(0);
   });
@@ -446,7 +446,7 @@ test.describe('Portal · acceso, revocación y móvil', () => {
     await expect(page.getByText(`¿Retirar el acceso al portal de ${job.name}?`)).toBeVisible();
     await page.getByRole('button', { name: 'Sí, retirar el acceso' }).click();
     await expect(page.getByRole('status')).toContainText('Acceso al portal retirado');
-    await expect(page.getByRole('region', { name: 'Acceso al portal del cliente' })).toContainText('Sin vincular');
+    await expect(page.getByRole('region', { name: 'Acceso al área de cliente' })).toContainText('Sin vincular');
     // La ficha y la orden siguen ahí.
     await expect(page.getByRole('region', { name: 'Reparaciones' })).toContainText('OR-');
 

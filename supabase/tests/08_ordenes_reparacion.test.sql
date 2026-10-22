@@ -156,10 +156,12 @@ select tests.eq((select count(*) from public.search_repair_orders('aaaaaaaa-0000
   'filtra por empleado asignado');
 reset role;
 
--- Administración de plataforma con 2FA: ve todo.
+-- Administración de plataforma con 2FA: solo con una sesión de soporte abierta.
 select tests.login('00000000-0000-0000-0000-0000000000ad', 'aal2');
 set local role authenticated;
-select tests.eq((select count(*) from public.repair_orders), 2::bigint, 'el admin de plataforma con 2FA ve las órdenes');
+select tests.eq((select count(*) from public.repair_orders), 0::bigint, 'el admin de plataforma con 2FA y sin sesión de soporte no ve las órdenes');
+select public.admin_open_support_session('Incidencia de prueba: revisar órdenes', 'aaaaaaaa-0000-0000-0000-000000000000', 15);
+select tests.eq((select count(*) from public.repair_orders), 2::bigint, 'con sesión de soporte, sí');
 reset role;
 rollback;
 

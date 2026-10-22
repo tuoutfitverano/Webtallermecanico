@@ -23,14 +23,14 @@ import { PANEL_COLOR_COOKIE, panelColor } from '../lib/panel/colors.ts';
 import Icon from '../components/Icon.astro';
 import type { Portal } from '../lib/server/portal.ts';
 
-export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'presupuestos' | 'facturas' | 'avisos' | 'datos';
+export type PortalSection = 'inicio' | 'vehiculos' | 'reparaciones' | 'presupuestos' | 'facturas' | 'avisos' | 'datos' | 'talleres';
 interface Props {
   portal: Portal;
   title: string;
   section?: PortalSection;
 }
 const { portal, title, section } = Astro.props;
-const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'bell' | 'user' | 'file' | 'euro' }> = [
+const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' | 'car' | 'clipboard' | 'bell' | 'user' | 'file' | 'euro' | 'wrench' }> = [
   { id: 'inicio', href: '/portal', label: 'Inicio', icon: 'home' },
   { id: 'vehiculos', href: '/portal/vehiculos', label: 'Mis vehículos', icon: 'car' },
   { id: 'reparaciones', href: '/portal/reparaciones', label: 'Reparaciones', icon: 'clipboard' },
@@ -38,13 +38,17 @@ const nav: Array<{ id: PortalSection; href: string; label: string; icon: 'home' 
   { id: 'presupuestos', href: '/portal/presupuestos', label: 'Presupuestos', icon: 'file' },
   { id: 'facturas', href: '/portal/facturas', label: 'Facturas', icon: 'euro' },
   { id: 'datos', href: '/portal/datos', label: 'Mis datos', icon: 'user' },
+  { id: 'talleres', href: '/portal/talleres', label: 'Mis talleres', icon: 'wrench' },
 ];
 // Móvil: cuatro pestañas y el resto en «Más» (con «Mi cuenta»).
 const tabs = nav.slice(0, 4);
 const more = nav.slice(4);
 const moreOn = more.some(n => n.id === section);
 const linked = portal.records.length > 0;
-const workshopLabel = portal.records.length === 1 ? portal.records[0]!.workshop_name : portal.records.length > 1 ? `${portal.records.length} talleres` : '';
+// Taller elegido: todo lo que se ve en el portal es SOLO de este taller.
+const workshopLabel = portal.workshop?.workshop_name ?? '';
+// Para volver a la misma sección al cambiar de taller (sin identificadores de otro taller en la ruta).
+const switchAction = nav.find(n => n.id === section)?.href ?? '/portal';
 // Color de las tarjetas elegido en este dispositivo (grafito si no hay elección).
 const color = panelColor(Astro.cookies.get(PANEL_COLOR_COOKIE)?.value);
 // Modo claro u oscuro de este dispositivo (claro si no se ha elegido).
@@ -92,7 +96,17 @@ const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
     <div class="pnl-main">
       <header class="pnl-top">
         <div class="pnl-top-workshop">
-          <span class="pnl-workshop-name">{workshopLabel || 'Mi portal'}</span>
+          {portal.allRecords.length > 1 && portal.workshop ? (
+            <form method="get" action={switchAction} class="pnl-switch" data-astro-reload>
+              <label for="taller" class="sr-only">Taller</label>
+              <select id="taller" name="taller" class="pnl-switch-select" data-autosubmit>
+                {portal.allRecords.map(r => <option value={r.workshop_id} selected={r.workshop_id === portal.workshop!.workshop_id}>{r.workshop_name}</option>)}
+              </select>
+              <noscript><button class="btn btn-sm" type="submit">Cambiar</button></noscript>
+            </form>
+          ) : (
+            <span class="pnl-workshop-name">{workshopLabel || 'Mi portal'}</span>
+          )}
           {linked && <span class="pnl-role">Cliente</span>}
         </div>
         <div class="pnl-top-side">

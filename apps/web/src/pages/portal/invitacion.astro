@@ -20,10 +20,12 @@ const { supabase, user } = page;
 
 let error = '';
 if (page.form && token) {
-  const { error: e } = await supabase.rpc('accept_customer_invitation', { p_token: token });
+  const { data, error: e } = await supabase.rpc('accept_customer_invitation', { p_token: token });
   if (!e) {
     logAuth('customer_invite_accept_ok');
-    return Astro.redirect('/portal?bienvenida=1', 303);
+    // Entra directamente en el taller que le ha invitado (el que dice la base de datos).
+    const ws = (Array.isArray(data) ? data[0] : data) as { workshop_id?: string } | null;
+    return Astro.redirect(`/portal?bienvenida=1${ws?.workshop_id ? `&taller=${ws.workshop_id}` : ''}`, 303);
   }
   logAuth('customer_invite_accept_error', e.code);
   error = dbErrorMessage(e);
@@ -52,7 +54,7 @@ const blocked = !invitation ? 'El enlace de invitación no es válido. Comprueba
     {invitation && !blocked ? (
       <>
         <h1 id="titulo" class="auth-title heading">Tu portal en {invitation.workshop_name}</h1>
-        <p class="auth-lead">Al aceptar, podrás ver desde aquí tus vehículos y el estado de tus reparaciones en este taller.</p>
+        <p class="auth-lead">Al aceptar, {invitation.workshop_name} aparecerá en «Mis talleres» con tus vehículos y reparaciones. Si ya usas AutoValue con otro taller, es la misma cuenta: no se crea otra.</p>
         {error && <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>}
         {invitation.email_matches ? (
           <form method="post" class="auth-form" data-busy="Vinculando…">

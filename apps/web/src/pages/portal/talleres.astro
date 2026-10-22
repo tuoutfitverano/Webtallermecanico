@@ -1,0 +1,130 @@
+---
+/**
+ * «Mis talleres»: los talleres a los que está vinculada la cuenta, con sus datos
+ * públicos y un resumen REAL de lo del cliente en cada uno (portal_workshops).
+ * Cada taller va en su propia tarjeta; «Entrar» elige ese taller para el resto
+ * del portal (el servidor lo vuelve a validar).
+ *
+ * Añadir un taller: solo con una invitación válida (enlace o código), que se
+ * comprueba en /portal/invitacion. Conocer el nombre de un taller no da acceso.
+ */
+import PortalLayout from '../../layouts/PortalLayout.astro';
+import Icon from '../../components/Icon.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { firstName, portalPage } from '../../lib/server/portal.ts';
+import { field } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDate } from '../../lib/panel/format.ts';
+import { invitationToken } from '../../lib/portal/workshop.ts';
+import { telHref } from '../../lib/site/content.ts';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+let typed = '';
+if (portal.form && field(portal.form, 'action') === 'codigo') {
+  typed = field(portal.form, 'codigo').slice(0, 400);
+  const token = invitationToken(typed);
+  if (token) return Astro.redirect(`/portal/invitacion?token=${token}`, 303);
+  flash = { kind: 'bad', text: 'Eso no parece un enlace ni un código de invitación. Copia el enlace completo del mensaje del taller.' };
+  Astro.response.status = 422;
+}
+
+interface Workshop {
+  workshop_id: string; customer_id: string; slug: string; name: string; logo: string | null; city: string | null; address: string | null;
+  phone: string | null; email: string | null; public_host: string | null; linked_at: string | null;
+  vehicles: number; active_orders: number; ready_orders: number; pending_quotes: number;
+}
+const { data, error } = await portal.supabase.rpc('portal_workshops');
+if (error) logAuth('portal_workshops_error', error.code);
+const loadError = Boolean(error);
+const workshops = (data ?? []) as Workshop[];
+const name = firstName(portal.allRecords);
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+---
+<PortalLayout portal={portal} title="Mis talleres" section="talleres">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Mis talleres</h1>
+      <p class="pnl-sub">{name ? `${name}, una` : 'Una'} sola cuenta para todos tus talleres. Cada taller ve solo lo suyo.</p>
+    </div>
+  </header>
+  <Flash kind={flash.kind} text={flash.text} />
+  {loadError && <Flash kind="bad" text="No hemos podido cargar tus talleres. Recarga la página en unos minutos." />}
+
+  {workshops.length === 0 && !loadError ? (
+    <div class="empty">
+      <strong>Todavía no estás vinculado a ningún taller.</strong>
+      <span>Cuando tu taller te invite, abre el enlace que te mande (o pégalo abajo) y aparecerá aquí.</span>
+    </div>
+  ) : (
+    <ul class="ws-grid" aria-label="Talleres vinculados">
+      {workshops.map(w => {
+        const current = portal.workshop?.workshop_id === w.workshop_id;
+        const facts = [
+          w.vehicles > 0 && plural(w.vehicles, 'vehículo', 'vehículos'),
+          w.active_orders > 0 && plural(w.active_orders, 'reparación en curso', 'reparaciones en curso'),
+          w.ready_orders > 0 && plural(w.ready_orders, 'listo para recoger', 'listos para recoger'),
+          w.pending_quotes > 0 && plural(w.pending_quotes, 'presupuesto por responder', 'presupuestos por responder'),
+        ].filter(Boolean);
+        return (
+          <li class:list={['card', 'ws-card', { 'is-current': current }]}>
+            <div class="ws-head">
+              {w.logo
+                ? <img class="ws-logo" src={w.logo} alt="" width="48" height="48" loading="lazy" decoding="async" />
+                : <span class="ws-logo ws-initial" aria-hidden="true">{w.name.trim().charAt(0).toUpperCase()}</span>}
+              <div class="ws-title">
+                <h2 class="card-title" style="margin:0">{w.name}</h2>
+                <span class="row-meta">{[w.city, w.linked_at && `vinculado desde el ${formatDate(w.linked_at)}`].filter(Boolean).join(' · ')}</span>
+              </div>
+              {current && <span class="pill pill-ok">Seleccionado</span>}
+            </div>
+            <p class="ws-facts">{facts.length ? facts.join(' · ') : 'Sin trabajos en curso ni presupuestos pendientes.'}</p>
+            {(w.address || w.phone || w.public_host) && (
+              <p class="row-meta">
+                {w.address && <span>{w.address}</span>}
+                {w.phone && <> · <a href={telHref(w.phone)}>{w.phone}</a></>}
+                {w.public_host && <> · <a href={`https://${w.public_host}`} rel="noopener">{w.public_host}</a></>}
+              </p>
+            )}
+            <div class="ws-actions">
+              {current
+                ? <a class="btn btn-sm" href="/portal">Ir al inicio de este taller</a>
+                : <a class="btn btn-sm btn-primary" href={`/portal?taller=${w.workshop_id}`} data-astro-reload aria-label={`Entrar en ${w.name}`}>Entrar en {w.name}</a>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  )}
+
+  <section class="card" aria-labelledby="anadir-t" style="margin-top:16px">
+    <h2 id="anadir-t" class="card-title"><Icon name="plus" />Añadir un taller</h2>
+    <p class="hint">Para añadir un taller necesitas su invitación. Por seguridad, no se puede añadir buscando su nombre: así nadie ve tus datos sin permiso del taller.</p>
+    <!-- data-astro-reload: la invitación se abre en otra plantilla (AuthLayout); con navegación completa. -->
+    <form method="post" class="form-stack" style="margin-top:12px" data-busy="Comprobando…" data-astro-reload>
+      <input type="hidden" name="action" value="codigo" />
+      <div class="field">
+        <label for="codigo">Enlace o código de invitación</label>
+        <input class="input mono" id="codigo" name="codigo" autocomplete="off" spellcheck="false" maxlength="400" required value={typed} aria-describedby="codigo-hint" />
+        <p class="hint" id="codigo-hint">Solo funciona con tu correo ({portal.user.email}), una vez y mientras no caduque.</p>
+      </div>
+      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Usar la invitación</span></button>
+    </form>
+  </section>
+</PortalLayout>
+
+<style>
+  .ws-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); }
+  .ws-card { display: grid; gap: 10px; min-width: 0; }
+  .ws-card.is-current { outline: 2px solid var(--tone-ok); outline-offset: -2px; }
+  .ws-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .ws-title { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .ws-logo { width: 48px; height: 48px; border-radius: 12px; object-fit: contain; flex: none; }
+  .ws-initial { display: grid; place-items: center; font-weight: 700; font-size: 1.25rem; border: 1px solid var(--p-line-2); }
+  .ws-facts { margin: 0; }
+  .ws-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>

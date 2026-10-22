@@ -17,14 +17,18 @@ export interface AuthPage {
   isPost: boolean;
   /** Formulario recibido (solo en POST desde nuestra propia web). */
   form: FormData | null;
+  /** Cabeceras que se añaden a las siguientes llamadas a la base de datos (ver AuthRequestContext). */
+  extraHeaders: Record<string, string>;
 }
 
 export async function authPage(Astro: AstroGlobal): Promise<AuthPage> {
+  const extraHeaders: Record<string, string> = {};
   const supabase = createAuthClient({
     request: Astro.request,
     url: Astro.url,
     cookies: Astro.cookies,
     responseHeaders: Astro.response.headers,
+    extraHeaders,
   });
   const user = await getSessionUser(supabase);
   const isPost = Astro.request.method === 'POST';
@@ -32,7 +36,7 @@ export async function authPage(Astro: AstroGlobal): Promise<AuthPage> {
   if (isPost && isSameOriginPost(Astro.request)) {
     form = await Astro.request.formData().catch(() => null);
   }
-  return { supabase, user, origin: authOrigin(Astro.request, Astro.url), self: requestOrigin(Astro.request, Astro.url), isPost, form };
+  return { supabase, user, origin: authOrigin(Astro.request, Astro.url), self: requestOrigin(Astro.request, Astro.url), isPost, form, extraHeaders };
 }
 
 /**

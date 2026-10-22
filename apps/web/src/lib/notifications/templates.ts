@@ -86,3 +86,30 @@ export function renderEmail(n: ClaimedNotification, portalOrigin: string | null)
 </body></html>`;
   return { subject, html, text };
 }
+
+/**
+ * Invitación al área de cliente. Es el ÚNICO correo que lleva un enlace con
+ * código: personal, de un solo uso, que caduca y que solo funciona con el
+ * correo invitado (lo comprueba la base de datos al aceptarla).
+ */
+export function renderInvitationEmail(workshopName: string, url: string, expiresAt: Date): RenderedEmail {
+  const subject = oneLine(`${workshopName} te invita a tu área de cliente`, 150);
+  const until = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'Europe/Madrid' }).format(expiresAt);
+  const lead = `${workshopName} te invita a tu área de cliente de AutoValue: desde ahí podrás seguir tus vehículos, reparaciones, presupuestos y facturas de este taller.`;
+  const note = `El enlace es personal, solo funciona con este correo, una vez y hasta el ${until}. Si ya tienes cuenta en AutoValue (por otro taller), entra con ella: no hace falta crear otra. Si no esperabas este correo, ignóralo.`;
+  const text = [lead, '', `Aceptar la invitación: ${url}`, '', note, '', `— ${workshopName}`].join('\n');
+  const html = `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:24px 12px;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;border:1px solid #e4e4e7">
+      <tr><td style="padding:24px 24px 8px;font-size:14px;color:#52525b">${escapeHtml(workshopName)}</td></tr>
+      <tr><td style="padding:0 24px"><h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#09090b">Tu área de cliente</h1></td></tr>
+      <tr><td style="padding:0 24px;font-size:16px;line-height:1.5"><p style="margin:0 0 14px">${escapeHtml(lead)}</p></td></tr>
+      <tr><td style="padding:4px 24px 20px"><a href="${escapeHtml(url)}" style="display:inline-block;background:#09090b;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:999px;font-size:15px">Aceptar la invitación</a></td></tr>
+      <tr><td style="padding:16px 24px 24px;border-top:1px solid #e4e4e7;font-size:12px;line-height:1.5;color:#71717a">${escapeHtml(note)}</td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+  return { subject, html, text };
+}

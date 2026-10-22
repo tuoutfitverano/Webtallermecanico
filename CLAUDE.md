@@ -18,6 +18,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Auditoría, despliegue y lanzamiento: `docs/AUDITORIA_FASE8.md`, `docs/DESPLIEGUE.md`, `docs/CHECKLIST_LANZAMIENTO.md`, `docs/DATOS_PERSONALES.md`
 - Versión real sin coste (Cloudflare Workers + Supabase gratis, flujo «Publicar versión real»): `docs/PUBLICAR.md`, `scripts/publicar/`
 - Guía del propietario (pasos de GitHub, legal, contraseñas, copias, correo y WhatsApp): `docs/GUIA_PROPIETARIO.md`
+- Cuentas de cliente multitaller (una cuenta, varios talleres, entrada desde la web del taller, soporte de la plataforma): `docs/MULTITALLER.md`
 
 ## Estructura
 
@@ -26,7 +27,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
   src/pages/              index (web del taller: diseño según theme.design), clasico (diseño anterior, solo demo), privacidad, aviso-legal, api/solicitudes.ts
                           acceso, registro, recuperar, salir, auth/confirmar, cuenta/, invitacion (área privada)
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
-                          portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
+                          portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, talleres, entrar/[slug], invitacion) — portal del cliente; area-cliente (desde la web del taller)
                           panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web), panel/taller (datos, servicios y ajustes de facturación)
                           panel/planificacion, panel/mantenimientos, panel/copia (copia del taller), panel/presupuestos/, panel/facturas/ (+ [id]/imprimir), panel/recordatorios, panel/estadisticas
                           presupuesto/[token] (respuesta del cliente sin cuenta); portal/presupuestos/, portal/facturas/
@@ -162,6 +163,8 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Nunca al cliente: `internal_notes`, personal asignado, autores de cambios, otros clientes. Diagnosis y trabajo solo con `show_details_to_customer`. Sin fechas prometidas.
 - Solo gestores cambian `customer_notes` y `show_details_to_customer` (lo impone `repair_orders_guard`).
 - El cliente añade vehículos a SU ficha (`portal_add_vehicle`: dato «cliente», pendiente de verificar; 10/día) y los quita a una **papelera de 30 días** (`portal_remove_vehicle` / `portal_restore_vehicle` / `portal_vehicle_trash`). Quitar NUNCA borra: `vehicles.portal_hidden_at` solo lo oculta en el portal; el taller conserva siempre el vehículo y su historial. No se quita con una reparación en curso; una orden nueva lo devuelve al portal. Solo esas funciones cambian `portal_hidden_at`/`added_by_customer` (`vehicles_portal_guard`).
+- **Multitaller:** una cuenta, varios talleres (una ficha por taller). El portal trabaja con UN taller cada vez: `portalPage` valida `?taller=`/cookie `portal_taller` contra `portal_profile` y envía la cabecera `x-portal-taller` (`authPage().extraHeaders`); `private.portal_scope()` hace que TODAS las `portal_*` devuelvan solo ese taller (solo estrecha). `portal.records` = la ficha del taller elegido; `portal.allRecords` = todas. «Mis talleres» (`/portal/talleres`, `portal_workshops`). La web del taller enlaza a `/area-cliente` → `/portal/entrar/<slug>` (`workshop_entry`: nunca crea vínculos). Historial de vínculos en `customer_account_links` y registro en `access_events` (solo disparadores). Formularios que llevan a otra plantilla (p. ej. a `/portal/invitacion`) con `data-astro-reload`.
+- Administración global: 2FA **y** sesión de soporte con motivo (`admin_open_support_session`) para ver datos; sin ella solo `admin_workshops_overview` (sin datos personales). Nunca devuelvas a `is_platform_admin()` el acceso permanente.
 - Tras iniciar sesión se va a `/mi-area` (personal → `/panel`, cliente → `/portal`, resto → `/cuenta`). Un cliente en `/panel` ve `acceso-denegado` (403).
 - Los valores nuevos de un enum no se pueden usar en la misma transacción que los crea: compara `kind::text`.
 

@@ -17,7 +17,7 @@ const links = [
   site.sections.proceso && { href: '#proceso', label: 'Proceso' },
   site.salesEnabled && { href: '#digitalizar', label: 'Para talleres' },
   showContact && { href: '#contacto', label: 'Contacto' },
-  { href: '/acceso', label: 'Área de clientes', rel: 'nofollow' },
+  { href: '/area-cliente', label: 'Área de clientes', rel: 'nofollow' },
 ].filter(Boolean) as { href: string; label: string; rel?: string }[];
 const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.web);
 const cta = site.salesEnabled

@@ -1,0 +1,84 @@
+---
+/**
+ * Entrada al portal desde la web de un taller (/area-cliente en su dominio).
+ *
+ *  · Exige sesión (si no, al acceso y vuelta aquí).
+ *  · La base de datos dice si ESTA cuenta tiene una relación activa con ese
+ *    taller (workshop_entry). Conocer el identificador del taller no da acceso
+ *    a nada y esta página nunca crea un vínculo.
+ *  · Vinculada → entra en el portal con ese taller elegido.
+ *  · Personal del taller → a su panel.
+ *  · Sin relación → lo explica y ofrece las vías seguras: abrir o pegar su
+ *    invitación, o pedírsela al taller.
+ */
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import Icon from '../../../components/Icon.astro';
+import { portalPage } from '../../../lib/server/portal.ts';
+import { logAuth } from '../../../lib/server/auth.ts';
+import { telHref } from '../../../lib/site/content.ts';
+
+export const prerender = false;
+
+const portal = await portalPage(Astro);
+if (portal instanceof Response) return portal;
+const slug = (Astro.params.slug ?? '').toLowerCase();
+
+interface Entry { workshop_id: string; name: string; phone: string | null; public_host: string | null; linked: boolean; pending_invitation: boolean }
+let entry: Entry | null = null;
+let loadError = false;
+if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug) && slug.length <= 60) {
+  const { data, error } = await portal.supabase.rpc('workshop_entry', { p_slug: slug });
+  if (error) { logAuth('portal_entry_error', error.code); loadError = true; }
+  entry = (Array.isArray(data) ? data[0] : null) ?? null;
+}
+if (entry?.linked) return Astro.redirect(`/portal?taller=${entry.workshop_id}`, 303);
+if (entry) {
+  // Personal del taller: su sitio es el panel.
+  const { data } = await portal.supabase.rpc('my_workshops');
+  if (((data ?? []) as Array<{ workshop_id: string }>).some(w => w.workshop_id === entry!.workshop_id)) {
+    return Astro.redirect(`/panel?taller=${entry.workshop_id}`, 303);
+  }
+}
+if (!entry && !loadError) Astro.response.status = 404;
+---
+<PortalLayout portal={portal} title={entry ? entry.name : 'Taller'} section="talleres">
+  {!entry ? (
+    <div class="empty">
+      <strong>{loadError ? 'No hemos podido comprobar el taller.' : 'No encontramos este taller.'}</strong>
+      <span>{loadError ? 'Recarga la página en unos minutos.' : 'Puede que su web ya no esté publicada. Si tienes un enlace de invitación, ábrelo directamente.'}</span>
+      <a class="btn" href="/portal/talleres">Ir a mis talleres</a>
+    </div>
+  ) : (
+    <>
+      <header class="pnl-head">
+        <div>
+          <h1 class="pnl-title">{entry.name}</h1>
+          <p class="pnl-sub">Has entrado desde la web de este taller.</p>
+        </div>
+      </header>
+      <section class="card" aria-labelledby="sin-vinculo">
+        <h2 id="sin-vinculo" class="card-title"><Icon name="shield" />Todavía no estás vinculado a este taller</h2>
+        <p>Tu cuenta de AutoValue ({portal.user.email}) no tiene una relación activa con {entry.name}. Por seguridad, solo el taller puede autorizarla: así nadie ve tus datos por conocer tu nombre, tu correo o tu matrícula.</p>
+        {entry.pending_invitation && (
+          <div class="alert alert-ok" role="status" style="margin-top:12px"><Icon name="mail" /><span>{entry.name} te ha enviado una invitación a este correo. Abre el enlace que te mandaron o pégalo abajo.</span></div>
+        )}
+        <form method="post" action="/portal/talleres" class="form-stack" style="margin-top:16px" data-busy="Comprobando…" data-astro-reload>
+          <input type="hidden" name="action" value="codigo" />
+          <div class="field">
+            <label for="codigo">Enlace o código de invitación</label>
+            <input class="input mono" id="codigo" name="codigo" autocomplete="off" spellcheck="false" maxlength="400" required aria-describedby="codigo-hint" />
+            <p class="hint" id="codigo-hint">Lo encontrarás en el mensaje que te envió el taller. Solo funciona con tu correo, una vez y mientras no caduque.</p>
+          </div>
+          <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Usar la invitación</span></button>
+        </form>
+        <h3 class="card-title" style="margin-top:20px">¿No tienes invitación?</h3>
+        <p class="hint">Pídesela a {entry.name}: te la enviarán a tu correo.</p>
+        <p style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+          {entry.phone && <a class="btn btn-sm" href={telHref(entry.phone)}><Icon name="phone" />Llamar al {entry.phone}</a>}
+          {entry.public_host && <a class="btn btn-sm" href={`https://${entry.public_host}/#solicitar`} rel="noopener">Escribir al taller desde su web</a>}
+        </p>
+      </section>
+      {portal.allRecords.length > 0 && <p style="margin-top:16px"><a href="/portal/talleres">Ir a mis talleres</a></p>}
+    </>
+  )}
+</PortalLayout>

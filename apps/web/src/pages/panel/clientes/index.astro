@@ -6,6 +6,7 @@ import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import { panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { LINK_STATUS, type LinkStatus } from '../../../lib/panel/links.ts';
 
 export const prerender = false;
 
@@ -16,10 +17,16 @@ interface Row { id: string; full_name: string; phone: string | null; email: stri
 const q = (Astro.url.searchParams.get('q') ?? '').trim().slice(0, 100);
 let rows: Row[] = [];
 let error = false;
+let links = new Map<string, LinkStatus>();
 if (panel.workshop) {
-  const { data, error: e } = await panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: q, p_limit: 100 });
-  if (e) { logAuth('panel_customers_error', e.code); error = true; }
-  rows = (data ?? []) as Row[];
+  const [r, l] = await Promise.all([
+    panel.supabase.rpc('search_customers', { p_workshop_id: panel.workshop.id, p_query: q, p_limit: 100 }),
+    panel.supabase.rpc('customer_link_overview', { p_workshop_id: panel.workshop.id }),
+  ]);
+  if (r.error) { logAuth('panel_customers_error', r.error.code); error = true; }
+  if (l.error) logAuth('panel_customer_links_error', l.error.code);
+  rows = (r.data ?? []) as Row[];
+  links = new Map(((l.data ?? []) as Array<{ customer_id: string; status: LinkStatus }>).map(x => [x.customer_id, x.status]));
 }
 const deleted = Astro.url.searchParams.get('borrado') === '1';
 ---
@@ -59,6 +66,7 @@ const deleted = Astro.url.searchParams.get('borrado') === '1';
                     <span class="row-meta">{[c.phone, c.email].filter(Boolean).join(' · ') || 'Sin datos de contacto'}</span>
                   </span>
                   <span class="row-side">
+                    {links.get(c.id) && <span class={`pill ${LINK_STATUS[links.get(c.id)!].tone}`} title="Acceso al área de cliente">{LINK_STATUS[links.get(c.id)!].short}</span>}
                     <span class="row-meta">{c.vehicle_count} {c.vehicle_count === 1 ? 'vehículo' : 'vehículos'}</span>
                     {c.open_orders > 0 && <span class="row-meta">{c.open_orders} en curso</span>}
                   </span>

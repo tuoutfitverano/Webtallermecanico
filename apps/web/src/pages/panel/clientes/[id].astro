@@ -16,6 +16,8 @@ import CustomerFields from '../../../components/panel/CustomerFields.astro';
 import { readCustomerForm } from '../../../lib/panel/customer-form.ts';
 import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { emailAvailable, sendInvitationEmail } from '../../../lib/server/config.ts';
+import { LINK_STATUS, type LinkStatus } from '../../../lib/panel/links.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { formatDate, formatDateTime } from '../../../lib/panel/format.ts';
 import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
@@ -37,7 +39,7 @@ let errors: Partial<Record<string, string>> = {};
 let editValues: Record<string, string> | null = null;
 let askDelete = false;
 let askUnlink = false;
-let inviteLink: { email: string; url: string } | null = null;
+let inviteLink: { email: string; url: string; sent: 'enviado' | 'sin_proveedor' | 'error' } | null = null;
 let inviteEmail: string | null = null;
 
 if (panel.form && panel.workshop && isUuid(id)) {
@@ -65,14 +67,22 @@ if (panel.form && panel.workshop && isUuid(id)) {
   } else if (action === 'invitar') {
     inviteEmail = field(panel.form, 'invite_email').trim();
     const { data, error } = await panel.supabase.rpc('create_customer_invitation', { p_customer_id: id, p_email: inviteEmail || null });
-    const created = (Array.isArray(data) ? data[0] : null) as { token: string } | null;
+    const created = (Array.isArray(data) ? data[0] : null) as { invitation_id: string; token: string; expires_at: string } | null;
     if (error || !created?.token) {
       logAuth('panel_customer_invite_error', error?.code);
       flash = { kind: 'bad', text: dbErrorMessage(error) };
       Astro.response.status = 400;
     } else {
       logAuth('panel_customer_invite_ok');
-      inviteLink = { email: inviteEmail, url: `${panel.origin}/portal/invitacion?token=${encodeURIComponent(created.token)}` };
+      const url = `${panel.origin}/portal/invitacion?token=${encodeURIComponent(created.token)}`;
+      // El correo exacto lo decide la base de datos (el escrito o el de la ficha).
+      const { data: inv } = await panel.supabase.from('customer_invitations').select('email').eq('id', created.invitation_id).maybeSingle();
+      const to = (inv as { email: string } | null)?.email ?? inviteEmail;
+      const sent = to
+        ? await sendInvitationEmail({ id: created.invitation_id, to, workshopName: panel.workshop.name, url, expiresAt: new Date(created.expires_at) })
+        : 'error';
+      logAuth('panel_customer_invite_email', sent);
+      inviteLink = { email: to, url, sent };
       inviteEmail = null;
     }
   } else if (action === 'anular-invitacion') {
@@ -139,9 +149,12 @@ let vehicles: Array<{ id: string; plate: string; make: string; model: string }> 
 let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
 let invitations: Invitation[] = [];
 let prefs = { operational_email: true, marketing_email: false, operational_whatsapp: false, updated_at: null as string | null };
+let linkHistory: Array<{ id: string; status: 'activa' | 'revocada'; origin: string; linked_at: string; revoked_at: string | null }> = [];
+let linkStatus: LinkStatus | null = null;
+const mailOn = emailAvailable();
 let consentLog: Array<{ id: number; channel: string; purpose: string; granted: boolean; source: string; created_at: string }> = [];
 if (panel.workshop && isUuid(id)) {
-  const [c, v, o, i, pr, cl] = await Promise.all([
+  const [c, v, o, i, pr, lh, lo, cl] = await Promise.all([
     panel.supabase.from('customers').select('id, full_name, phone, email, internal_notes, tax_id, address_line, postal_code, city, province, created_at, user_id, portal_linked_at').eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
     panel.supabase.from('vehicles').select('id, plate, make, model').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('plate'),
     panel.supabase.from('repair_orders').select('id, number, status, updated_at, vehicles(plate, make, model)').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('updated_at', { ascending: false }).limit(50),
@@ -151,6 +164,11 @@ if (panel.workshop && isUuid(id)) {
         .eq('status', 'pendiente').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false })
       : Promise.resolve({ data: [] }),
     panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email, operational_whatsapp, updated_at').eq('customer_id', id).maybeSingle(),
+    // Historial de vinculaciones (oficina, por RLS) y estado actual del acceso.
+    panel.isOffice
+      ? panel.supabase.from('customer_account_links').select('id, status, origin, linked_at, revoked_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('linked_at', { ascending: false }).limit(10)
+      : Promise.resolve({ data: [] }),
+    panel.supabase.rpc('customer_link_overview', { p_workshop_id: panel.workshop.id }),
     // Registro de consentimientos: solo gestores (RLS «consent log: lectura gestores»).
     panel.isManager
       ? panel.supabase.from('communication_consent_log').select('id, channel, purpose, granted, source, created_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id)
@@ -158,6 +176,8 @@ if (panel.workshop && isUuid(id)) {
       : Promise.resolve({ data: [] }),
   ]);
   if (pr.data) prefs = pr.data as typeof prefs;
+  linkHistory = (lh.data ?? []) as typeof linkHistory;
+  linkStatus = ((lo.data ?? []) as Array<{ customer_id: string; status: LinkStatus }>).find(x => x.customer_id === id)?.status ?? null;
   consentLog = (cl.data ?? []) as typeof consentLog;
   customer = (c.data as Customer | null) ?? null;
   vehicles = (v.data ?? []) as typeof vehicles;
@@ -166,6 +186,7 @@ if (panel.workshop && isUuid(id)) {
 }
 if (panel.workshop && !customer) Astro.response.status = 404;
 const values = editValues ?? customer ?? {};
+const LINK_ORIGIN: Record<string, string> = { invitacion: 'aceptó una invitación', migracion: 'ya estaba vinculada antes del historial', sistema: 'vinculada por la plataforma' };
 const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su portal', panel: 'por el taller', queja_proveedor: 'automático (queja o rebote del email)' };
 ---
 <PanelLayout panel={panel} title={customer?.full_name ?? 'Cliente'} section="clientes">
@@ -196,7 +217,8 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
             )}
           </section>
           <section class="card" aria-labelledby="portal">
-            <h2 id="portal" class="card-title"><Icon name="shield" />Acceso al portal del cliente</h2>
+            <h2 id="portal" class="card-title"><Icon name="shield" />Acceso al área de cliente</h2>
+            {linkStatus && <p style="margin-bottom:10px"><span class={`pill ${LINK_STATUS[linkStatus].tone}`}>{LINK_STATUS[linkStatus].short}</span> <span class="hint">{LINK_STATUS[linkStatus].long}</span></p>}
             {customer.user_id ? (
               <>
                 <p><span class="status status-listo">Vinculada</span> El cliente entra con su cuenta y ve sus vehículos y reparaciones de este taller{customer.portal_linked_at ? ` desde el ${formatDate(customer.portal_linked_at)}` : ''}.</p>
@@ -226,10 +248,17 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
                   <>
                     {inviteLink && (
                       <div class="invite-result" style="margin-top:12px">
-                        <div class="alert alert-ok" role="status">
-                          <Icon name="check" />
-                          <span>Invitación creada para <strong>{inviteLink.email || customer.email}</strong>. Envíale este enlace (por WhatsApp o correo). Solo funciona con ese correo, una vez y durante 7 días. <strong>No se volverá a mostrar.</strong></span>
-                        </div>
+                        {inviteLink.sent === 'enviado' ? (
+                          <div class="alert alert-ok" role="status">
+                            <Icon name="check" />
+                            <span>Invitación enviada por correo a <strong>{inviteLink.email}</strong> (aceptada por el proveedor de correo; la entrega no está confirmada). Solo funciona con ese correo, una vez y durante 7 días. Si no le llega, compártele este enlace. <strong>No se volverá a mostrar.</strong></span>
+                          </div>
+                        ) : (
+                          <div class="alert alert-warn" role="status">
+                            <Icon name="alert" />
+                            <span>Invitación creada para <strong>{inviteLink.email}</strong>, <strong>pendiente de envío</strong>: {inviteLink.sent === 'sin_proveedor' ? 'la plataforma todavía no tiene servicio de correo, así que no se ha enviado nada.' : 'el correo no se ha podido enviar ahora.'} Envíale tú este enlace (por WhatsApp o correo). Solo funciona con ese correo, una vez y durante 7 días. <strong>No se volverá a mostrar.</strong></span>
+                          </div>
+                        )}
                         <div class="copy-row">
                           <input class="input mono" id="enlace-portal" value={inviteLink.url} readonly aria-label="Enlace de invitación al portal" />
                           <button class="btn" type="button" data-copy="enlace-portal">Copiar</button>
@@ -242,7 +271,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
                           <li class="row">
                             <span class="row-main">
                               <span class="row-title">Invitación pendiente para {inv.email}</span>
-                              <span class="row-meta">Enviada el {formatDate(inv.created_at)} · caduca el {formatDateTime(inv.expires_at)}</span>
+                              <span class="row-meta">Creada el {formatDate(inv.created_at)} · caduca el {formatDateTime(inv.expires_at)}</span>
                             </span>
                             <form method="post" class="row-side" data-busy="Anulando…">
                               <input type="hidden" name="action" value="anular-invitacion" />
@@ -258,15 +287,26 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
                       <div class="field">
                         <label for="invite_email">Correo del cliente para entrar en el portal</label>
                         <input class="input" id="invite_email" name="invite_email" type="email" inputmode="email" maxlength="254" required value={inviteEmail ?? customer.email ?? ''} aria-describedby="invite_hint" />
-                        <p class="hint" id="invite_hint">Se crea un enlace personal que solo funciona con este correo. {invitations.length > 0 ? 'Crear otro anula el pendiente.' : ''} No se envía ningún correo automático: compártelo tú.</p>
+                        <p class="hint" id="invite_hint">Se crea un enlace personal que solo funciona con este correo. {invitations.length > 0 ? 'Crear otro anula el pendiente.' : ''} {mailOn ? 'Se le envía por correo y además verás el enlace para compartirlo.' : 'Todavía no hay servicio de correo: verás el enlace para compartirlo tú.'} Si ya tiene cuenta de AutoValue (por otro taller), se vincula esa misma cuenta.</p>
                       </div>
-                      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>{invitations.length > 0 ? 'Crear un enlace nuevo' : 'Crear invitación al portal'}</span></button>
+                      <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>{invitations.length > 0 ? 'Crear un enlace nuevo' : 'Invitar al área de cliente'}</span></button>
                     </form>
                   </>
                 )}
               </>
             )}
           </section>
+          {panel.isOffice && linkHistory.length > 0 && (
+            <section class="card" aria-labelledby="vinculos">
+              <h2 id="vinculos" class="card-title"><Icon name="history" />Historial de acceso</h2>
+              <ul class="plain-list small">
+                {linkHistory.map(l => (
+                  <li>{l.status === 'activa' ? 'Vinculada' : 'Vinculada y después retirada'} · {LINK_ORIGIN[l.origin] ?? l.origin} · desde el {formatDate(l.linked_at)}{l.revoked_at && ` hasta el ${formatDate(l.revoked_at)}`}</li>
+                ))}
+              </ul>
+              <p class="hint" style="margin-top:8px">Retirar el acceso no borra la ficha, los vehículos ni las reparaciones: solo impide que la cuenta los vea.</p>
+            </section>
+          )}
           <section class="card" aria-labelledby="comunicaciones">
             <h2 id="comunicaciones" class="card-title"><Icon name="bell" />Comunicaciones</h2>
             <dl class="facts">

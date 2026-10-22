@@ -419,7 +419,7 @@ test.describe('color del panel sin JavaScript', () => {
 test('portal del cliente: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
   const f = await fixtures();
   await login(page, f.email, '/portal');
-  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/portal/vehiculos/nuevo', '/portal/vehiculos/papelera', `/portal/vehiculos/${f.vehicle}`], isMobile);
+  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/portal/vehiculos/nuevo', '/portal/vehiculos/papelera', `/portal/vehiculos/${f.vehicle}`, '/portal/talleres'], isMobile);
 });
 
 test('portal: el modo elegido se mantiene al cambiar de sección, sin parpadeos', async ({ page, isMobile }) => {

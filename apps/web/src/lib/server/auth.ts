@@ -19,6 +19,11 @@ export interface AuthRequestContext {
   cookies: AstroCookies;
   /** Cabeceras de la respuesta (Astro.response.headers en una página). */
   responseHeaders: Headers;
+  /**
+   * Cabeceras extra para la base de datos, que se pueden fijar DESPUÉS de crear el
+   * cliente (p. ej. el taller elegido en el portal, ya validado). Solo estrechan.
+   */
+  extraHeaders?: Record<string, string>;
 }
 
 export interface SessionUser {
@@ -29,7 +34,18 @@ export interface SessionUser {
 export function createAuthClient(ctx: AuthRequestContext): SupabaseClient | null {
   const env = authEnv();
   if (!env) return null;
+  const extra = ctx.extraHeaders;
   return createServerClient(env.url, env.publishableKey, {
+    ...(extra ? {
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+          if (Object.keys(extra).length === 0) return fetch(input, init);
+          const headers = new Headers(init?.headers);
+          for (const [k, v] of Object.entries(extra)) headers.set(k, v);
+          return fetch(input, { ...init, headers });
+        },
+      },
+    } : {}),
     // httpOnly: el JavaScript del navegador nunca lee la sesión (todo pasa por el servidor).
     cookieOptions: { path: '/', sameSite: 'lax', secure: ctx.url.protocol === 'https:', httpOnly: true },
     cookies: {

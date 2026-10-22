@@ -134,6 +134,17 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   const [inv] = await rest('POST', '/rpc/create_customer_invitation', owner.tok, { p_customer_id: customers[5]!.id });
   await rest('POST', '/rpc/accept_customer_invitation', client.tok, { p_token: inv!.token });
 
+  // ---- Multitaller: «Prueba Cliente» también es cliente de «Taller Otro» (otra ficha, MISMA cuenta, por invitación).
+  const other = await token('otro@e2e.test');
+  const otherWs = (await rest('GET', '/workshops?slug=eq.taller-otro&select=id', other.tok))[0]!.id!;
+  await fetch(`${PROXY}/rest/v1/workshop_sites?workshop_id=eq.${otherWs}`, {
+    method: 'PATCH', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: JSON.stringify({ published: true }),
+  });
+  const [otherCustomer] = await rest('POST', '/customers', other.tok, { workshop_id: otherWs, full_name: 'Prueba Cliente', phone: '600 000 001', email: CLIENT });
+  await rest('POST', '/vehicles', other.tok, { workshop_id: otherWs, customer_id: otherCustomer!.id, plate: '3051XPR', make: 'Dacia', model: 'Sandero', year: 2020, year_kind: 'primera_matriculacion' });
+  const [otherInv] = await rest('POST', '/rpc/create_customer_invitation', other.tok, { p_customer_id: otherCustomer!.id });
+  await rest('POST', '/rpc/accept_customer_invitation', client.tok, { p_token: otherInv!.token });
+
   // ---- Órdenes en distintos estados (el historial y los avisos los crea la base de datos)
   const flow = ['recibido', 'diagnosis', 'esperando_recambios', 'en_reparacion', 'listo', 'entregado'];
   const jobs = [
@@ -278,7 +289,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   await login(page, WORKER, '/panel', DEMO_PASSWORD);
   const w = await crawl(page, 'trabajador', ['/panel', '/panel/ordenes', '/panel/mantenimientos', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
   await login(page, CLIENT, '/portal', DEMO_PASSWORD);
-  const c = await crawl(page, 'cliente', ['/portal', '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 80);
+  const c = await crawl(page, 'cliente', ['/portal', '/portal/talleres', '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 80);
   expect(t).toBeGreaterThan(20);
   expect(w).toBeGreaterThan(5);
   expect(c).toBeGreaterThan(5);
