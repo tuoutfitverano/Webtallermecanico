@@ -14,9 +14,9 @@ import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { readVehicleForm } from '../../../lib/panel/vehicle-form.ts';
-import { formatDate, formatDateTime, formatDay } from '../../../lib/panel/format.ts';
+import { formatDate, formatDateTime, formatDay, todayMadrid } from '../../../lib/panel/format.ts';
 import {
-  DATA_SOURCE_LABELS, formatCents, FUEL_LABELS, formatPlate, INVOICE_KIND_LABELS, orderLabel, quoteLabel, QUOTE_STATUS_LABELS, VERIFICATION_LABELS, YEAR_KIND_LABELS,
+  DATA_SOURCE_LABELS, describeServiceInterval, formatCents, SERVICE_DUE_LABELS, serviceDueState, type ServiceDueState, FUEL_LABELS, formatPlate, INVOICE_KIND_LABELS, orderLabel, quoteLabel, QUOTE_STATUS_LABELS, VERIFICATION_LABELS, YEAR_KIND_LABELS,
   type DataSource, type FuelType, type RepairStatus, type VerificationStatus, type YearKind,
 } from '@talleres/core';
 
@@ -68,6 +68,20 @@ if (panel.form && panel.workshop && isUuid(id)) {
         flash = { kind: 'ok', text: 'Cambios guardados.' };
       }
     }
+  } else if ((action === 'mantenimiento' || action === 'mantenimiento-quitar') && panel.isOffice) {
+    // Uno hecho fuera del taller (o en el taller antes de usar el panel). La base de datos calcula el próximo.
+    const interval = field(panel.form, 'interval_id');
+    const day = action === 'mantenimiento' ? field(panel.form, 'done_on') : '';
+    const kmText = field(panel.form, 'done_km').trim().replace(/\D/g, '');
+    if (!isUuid(interval) || (action === 'mantenimiento' && !/^\d{4}-\d{2}-\d{2}$/.test(day))) {
+      flash = { kind: 'bad', text: 'Elige el mantenimiento y la fecha en que se hizo.' }; Astro.response.status = 422;
+    } else {
+      const { error } = await panel.supabase.rpc('set_vehicle_service', {
+        p_vehicle_id: id, p_interval_id: interval, p_done_on: day || null, p_done_km: kmText ? Number(kmText) : null,
+      });
+      if (error) { logAuth('panel_vehicle_service_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
+      else flash = { kind: 'ok', text: action === 'mantenimiento' ? 'Mantenimiento anotado. El próximo ya está calculado.' : 'Anotación quitada.' };
+    }
   } else if (action === 'pedir-borrar') {
     askDelete = true;
   } else if (action === 'borrar') {
@@ -89,10 +103,14 @@ let orders: Array<{ id: string; number: number; status: RepairStatus; received_a
 let customers: Array<{ id: string; full_name: string; phone: string | null }> = [];
 let quotes: Array<{ id: string; number: number; version: number; status: string; total_cents: number | null; created_at: string; title: string | null }> = [];
 let invoices: Array<{ id: string; full_number: string | null; kind: 'ordinaria' | 'rectificativa'; status: string; total_cents: number | null; issue_date: string | null; created_at: string }> = [];
+interface Interval { id: string; name: string; every_months: number | null; every_km: number | null }
+interface Service { interval_id: string; last_done_on: string; last_done_km: number | null; next_due_on: string | null; next_due_km: number | null; source: 'orden' | 'manual'; order_id: string | null }
+let intervals: Interval[] = [];
+let services = new Map<string, Service>();
 if (panel.workshop && isUuid(id)) {
   const ws = panel.workshop.id;
   const office = panel.isOffice;
-  const [v, o, c, q, f] = await Promise.all([
+  const [v, o, c, q, f, si, vs] = await Promise.all([
     panel.supabase.from('vehicles')
       .select('id, plate, make, model, year, year_kind, fuel, customer_id, internal_notes, data_source, verification_status, created_at, version, vin, mileage, mileage_at, next_service_date, next_service_km, next_service_notes, portal_hidden_at, added_by_customer, customers(id, full_name), lookup_fields, vehicle_lookups(provider, completed_at, result)')
       .eq('id', id).eq('workshop_id', ws).maybeSingle(),
@@ -101,13 +119,19 @@ if (panel.workshop && isUuid(id)) {
     panel.supabase.rpc('search_customers', { p_workshop_id: ws, p_query: '', p_limit: 200 }),
     office ? panel.supabase.from('quotes').select('id, number, version, status, total_cents, created_at, title').eq('vehicle_id', id).eq('workshop_id', ws).neq('status', 'sustituido').order('created_at', { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
     office ? panel.supabase.from('invoices').select('id, full_number, kind, status, total_cents, issue_date, created_at').eq('vehicle_id', id).eq('workshop_id', ws).order('created_at', { ascending: false }).limit(50) : Promise.resolve({ data: [] }),
+    panel.supabase.from('service_intervals').select('id, name, every_months, every_km').eq('workshop_id', ws).eq('active', true).order('position').order('name'),
+    panel.supabase.from('vehicle_services').select('interval_id, last_done_on, last_done_km, next_due_on, next_due_km, source, order_id').eq('vehicle_id', id).eq('workshop_id', ws),
   ]);
+  intervals = (si.data ?? []) as Interval[];
+  services = new Map(((vs.data ?? []) as Service[]).map(x => [x.interval_id, x]));
   vehicle = (v.data as unknown as Vehicle | null) ?? null;
   orders = (o.data ?? []) as unknown as typeof orders;
   customers = (c.data ?? []) as typeof customers;
   quotes = (q.data ?? []) as typeof quotes;
   invoices = (f.data ?? []) as typeof invoices;
 }
+const today = todayMadrid();
+const dueTone: Record<ServiceDueState, string> = { vencido: 'pill-bad', pronto: 'pill-warn', al_dia: 'pill-ok' };
 const km = (n: number | null | undefined) => (n === null || n === undefined ? '' : `${n.toLocaleString('es-ES')} km`);
 if (panel.workshop && !vehicle) Astro.response.status = 404;
 const values: Record<string, string> = editValues ?? (vehicle ? {
@@ -151,6 +175,52 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
               <dt>Verificación externa</dt><dd>{VERIFICATION_LABELS[vehicle.verification_status]}</dd>
               {vehicle.internal_notes && <><dt>Notas internas</dt><dd class="note-internal">{vehicle.internal_notes}</dd></>}
             </dl>
+          </section>
+          <section class="card" aria-labelledby="mant">
+            <h2 id="mant" class="card-title"><Icon name="wrench" />Mantenimientos</h2>
+            {intervals.length === 0 ? <p class="hint">El taller no tiene mantenimientos periódicos activos.{panel.isManager && <> <a href="/panel/mantenimientos">Configurarlos</a></>}</p> : (
+              <ul class="list">
+                {intervals.map(i => {
+                  const s = services.get(i.id);
+                  const state = s ? serviceDueState({ dueOn: s.next_due_on, dueKm: s.next_due_km }, today, vehicle!.mileage) : null;
+                  return (
+                    <li class="row">
+                      <span class="row-main">
+                        <span class="row-title">{i.name}</span>
+                        <span class="row-meta">{s
+                          ? <>Hecho el {formatDay(s.last_done_on)}{s.last_done_km !== null && ` a ${km(s.last_done_km)}`}{s.source === 'manual' ? ' (anotado a mano)' : s.order_id ? <> · <a href={`/panel/ordenes/${s.order_id}`}>ver orden</a></> : ''} · Próximo: {[s.next_due_on && formatDay(s.next_due_on), s.next_due_km !== null && `a los ${km(s.next_due_km)}`].filter(Boolean).join(' o ') || 'sin calcular'}</>
+                          : `${describeServiceInterval(i.every_months, i.every_km)} · sin registros`}</span>
+                      </span>
+                      <span class="row-side">
+                        {state && <span class={`pill ${dueTone[state]}`}>{SERVICE_DUE_LABELS[state]}</span>}
+                        {s?.source === 'manual' && panel.isOffice && (
+                          <form method="post" data-busy="Quitando…">
+                            <input type="hidden" name="action" value="mantenimiento-quitar" /><input type="hidden" name="interval_id" value={i.id} />
+                            <button class="btn btn-sm" type="submit" aria-label={`Quitar la anotación de «${i.name}»`}><span class="spinner" aria-hidden="true"></span><span data-label>Quitar</span></button>
+                          </form>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {panel.isOffice && intervals.length > 0 && (
+              <details style="margin-top:12px">
+                <summary style="cursor:pointer">Anotar uno hecho fuera del taller</summary>
+                <form method="post" class="form-stack" style="margin-top:12px" data-busy="Guardando…" novalidate>
+                  <input type="hidden" name="action" value="mantenimiento" />
+                  <div class="field"><label for="m-interval">Mantenimiento</label>
+                    <select class="select" id="m-interval" name="interval_id" required>{intervals.map(i => <option value={i.id}>{i.name}</option>)}</select></div>
+                  <div class="form-row">
+                    <div class="field"><label for="m-day">Fecha en que se hizo</label><input class="input" id="m-day" name="done_on" type="date" max={today} required /></div>
+                    <div class="field"><label for="m-km">Kilómetros <span class="muted">(opcional)</span></label><input class="input" id="m-km" name="done_km" inputmode="numeric" placeholder="Ej.: 120500" /></div>
+                  </div>
+                  <p class="hint">Si después se hace en el taller con una orden, cuenta el más reciente.</p>
+                  <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Anotar</span></button>
+                </form>
+              </details>
+            )}
           </section>
           {vehicle.vehicle_lookups && (
             <section class="card" aria-labelledby="consulta">

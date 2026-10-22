@@ -22,7 +22,7 @@ import { LINE_SELECT, lineColumns, readLine, type LineRow } from '../../../lib/p
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
 import {
   fieldErrors, formatCents, formatPlate, INVOICE_STATUS_LABELS, isOrderPriority, isRepairStatus, ORDER_PRIORITIES, ORDER_PRIORITY_LABELS, orderLabel,
-  orderUpdateSchema, QUOTE_STATUS_LABELS, quoteLabel, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES, whatsappLink,
+  orderUpdateSchema, QUOTE_STATUS_LABELS, describeServiceInterval, quoteLabel, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES, whatsappLink,
   type OrderPriority, type QuoteStatus, type RepairStatus,
 } from '@talleres/core';
 
@@ -145,6 +145,18 @@ if (panel.form && panel.workshop && order) {
       else flash = { kind: 'ok', text: 'Línea quitada.' };
     }
     lines = await loadLines();
+  } else if (action === 'mantenimientos') {
+    // Lo marcado en el formulario frente a lo guardado: se añade lo nuevo y se quita lo desmarcado.
+    const wanted = new Set(panel.form.getAll('interval').map(String).filter(isUuid));
+    const { data: current } = await panel.supabase.from('order_services').select('interval_id').eq('order_id', order.id);
+    const had = new Set((current ?? []).map(r => r.interval_id as string));
+    const add = [...wanted].filter(x => !had.has(x)).map(interval_id => ({ order_id: order!.id, workshop_id: panel.workshop!.id, interval_id }));
+    const remove = [...had].filter(x => !wanted.has(x));
+    const r1 = add.length ? await panel.supabase.from('order_services').insert(add) : { error: null };
+    const r2 = !r1.error && remove.length ? await panel.supabase.from('order_services').delete().eq('order_id', order.id).in('interval_id', remove) : { error: null };
+    const error = r1.error ?? r2.error;
+    if (error) { logAuth('panel_order_services_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
+    else flash = { kind: 'ok', text: order.status === 'entregado' ? 'Mantenimientos guardados. El calendario del vehículo ya está actualizado.' : 'Mantenimientos guardados. Al entregar el vehículo se calculará el próximo.' };
   } else if (action === 'empezar' || action === 'parar') {
     const { error } = await panel.supabase.rpc(action === 'empezar' ? 'start_work' : 'stop_work', { p_order_id: order.id });
     if (error) { logAuth('panel_work_log_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
@@ -175,14 +187,20 @@ let team: Awaited<ReturnType<typeof loadTeam>> = [];
 let logs: Array<{ id: number; user_id: string | null; started_at: string; ended_at: string | null }> = [];
 let quotes: Array<{ id: string; number: number; version: number; status: QuoteStatus; total_cents: number | null }> = [];
 let invoices: Array<{ id: string; full_number: string | null; status: 'borrador' | 'emitida'; total_cents: number | null; kind: string }> = [];
+let intervals: Array<{ id: string; name: string; every_months: number | null; every_km: number | null; active: boolean }> = [];
+let doneServices = new Set<string>();
 if (order) {
-  const [e, t, l, q, i] = await Promise.all([
+  const [e, t, l, q, i, si, os] = await Promise.all([
     panel.supabase.from('repair_order_events').select('id, kind, customer_message, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
     loadTeam(panel),
     panel.supabase.from('repair_order_work_logs').select('id, user_id, started_at, ended_at').eq('order_id', order.id).order('started_at', { ascending: false }),
     panel.isOffice ? panel.supabase.from('quotes').select('id, number, version, status, total_cents').eq('order_id', order.id).neq('status', 'sustituido').order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
     panel.isOffice ? panel.supabase.from('invoices').select('id, full_number, status, total_cents, kind').eq('order_id', order.id).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
+    panel.supabase.from('service_intervals').select('id, name, every_months, every_km, active').eq('workshop_id', panel.workshop!.id).order('position').order('name'),
+    panel.supabase.from('order_services').select('interval_id').eq('order_id', order.id),
   ]);
+  doneServices = new Set((os.data ?? []).map(r => r.interval_id as string));
+  intervals = ((si.data ?? []) as typeof intervals).filter(x => x.active || doneServices.has(x.id));
   events = (e.data ?? []) as Event[];
   team = t;
   logs = (l.data ?? []) as typeof logs;
@@ -386,6 +404,29 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
               <button class="btn btn-sm" type="submit">Guardar</button>
             </form>
             <p class="hint" style="margin-top:6px">Actualizan el kilometraje del vehículo y quedan en su historial.</p>
+          </section>
+          <section class="card" aria-labelledby="mant-t">
+            <h2 id="mant-t" class="card-title"><Icon name="wrench" />Mantenimientos hechos</h2>
+            {intervals.length === 0 ? <p class="hint">El taller no tiene mantenimientos periódicos activos. {panel.isManager && <a href="/panel/mantenimientos">Configurarlos</a>}</p> : (
+              order.status === 'entregado' && !panel.isOffice ? (
+                <>
+                  {doneServices.size === 0 ? <p class="hint">No se marcó ninguno.</p> : <ul class="plain-list">{intervals.filter(x => doneServices.has(x.id)).map(x => <li>{x.name}</li>)}</ul>}
+                  <p class="hint" style="margin-top:8px">Entregada: los cambia la oficina del taller.</p>
+                </>
+              ) : (
+                <form method="post" class="form-stack" data-busy="Guardando…">
+                  <input type="hidden" name="action" value="mantenimientos" />
+                  <fieldset class="checks">
+                    <legend class="sr-only">Mantenimientos hechos en esta orden</legend>
+                    {intervals.map(x => (
+                      <label class="check"><input type="checkbox" name="interval" value={x.id} checked={doneServices.has(x.id)} /><span>{x.name} <span class="muted small">{describeServiceInterval(x.every_months, x.every_km)}</span></span></label>
+                    ))}
+                  </fieldset>
+                  <p class="hint">Al entregar el vehículo se calcula el próximo de cada uno (fecha de entrega y kilómetros a la entrada).</p>
+                  <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar mantenimientos</span></button>
+                </form>
+              )
+            )}
           </section>
           {panel.isOffice && (
             <section class="card" aria-labelledby="docs-t">

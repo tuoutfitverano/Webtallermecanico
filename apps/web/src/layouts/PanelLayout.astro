@@ -26,20 +26,21 @@ import Icon from '../components/Icon.astro';
 import type { Panel } from '../lib/server/panel.ts';
 import { ROLE_LABELS } from '../lib/auth/validate.ts';
 
-export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos' | 'solicitudes' | 'taller' | 'planificacion' | 'presupuestos' | 'facturas' | 'estadisticas' | 'recordatorios';
+export type PanelSection = 'inicio' | 'ordenes' | 'vehiculos' | 'clientes' | 'equipo' | 'avisos' | 'solicitudes' | 'taller' | 'planificacion' | 'presupuestos' | 'facturas' | 'estadisticas' | 'recordatorios' | 'mantenimientos';
 interface Props {
   panel: Panel;
   title: string;
   section?: PanelSection;
 }
 const { panel, title, section } = Astro.props;
-type NavIcon = 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' | 'mail' | 'cog' | 'calendar' | 'file' | 'euro' | 'chart' | 'clock';
+type NavIcon = 'home' | 'clipboard' | 'car' | 'users' | 'user' | 'bell' | 'mail' | 'cog' | 'calendar' | 'file' | 'euro' | 'chart' | 'clock' | 'wrench';
 const nav: Array<{ id: PanelSection; href: string; label: string; icon: NavIcon }> = [
   { id: 'inicio', href: '/panel', label: 'Inicio', icon: 'home' },
   { id: 'ordenes', href: '/panel/ordenes', label: 'Órdenes', icon: 'clipboard' },
   { id: 'vehiculos', href: '/panel/vehiculos', label: 'Vehículos', icon: 'car' },
   { id: 'clientes', href: '/panel/clientes', label: 'Clientes', icon: 'user' },
   { id: 'planificacion', href: '/panel/planificacion', label: 'Planificación', icon: 'calendar' },
+  { id: 'mantenimientos', href: '/panel/mantenimientos', label: 'Mantenimientos', icon: 'wrench' },
   // Oficina (propietario, administrador, recepción): la base de datos tampoco enseña estos datos a los demás.
   ...(panel.isOffice ? [
     { id: 'presupuestos' as const, href: '/panel/presupuestos', label: 'Presupuestos', icon: 'file' as const },

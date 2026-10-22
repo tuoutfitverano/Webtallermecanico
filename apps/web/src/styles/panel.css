@@ -380,6 +380,8 @@ details.danger-zone[open] > summary { margin-bottom: 10px; }
 .nstatus-fallido { color: var(--tone-bad); border-color: color-mix(in srgb, var(--tone-bad) 45%, transparent); }
 .nstatus-cancelado { color: var(--p-muted); }
 .check-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; }
+/* Grupo de casillas (mantenimientos de una orden). */
+.checks { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 10px; }
 
 /* ---------- Taller y menú «Más» (integración) ---------- */
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }

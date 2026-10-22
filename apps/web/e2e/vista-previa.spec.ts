@@ -224,6 +224,22 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   // La clienta añade un coche desde su portal y lo quita después: queda en su papelera (30 días) y el taller lo conserva.
   const added = (await rest('POST', '/rpc/portal_add_vehicle', client.tok, { p_customer_id: customers[5]!.id, p_plate: '3390XNB', p_make: 'Seat', p_model: 'Ibiza', p_year: 2012, p_year_kind: 'primera_matriculacion' })) as unknown as string;
   await rest('POST', '/rpc/portal_remove_vehicle', client.tok, { p_vehicle_id: added });
+  // Mantenimientos periódicos: los de la revisión entregada del Seat y algunos anotados a mano
+  // (hechos antes de usar el panel) en los coches de «Prueba Cliente». Fechas de demostración.
+  const ivs = await rest('GET', `/service_intervals?workshop_id=eq.${DEMO}&select=id,name`, owner.tok);
+  const iv = (name: string) => ivs.find(x => x.name === name)!.id!;
+  for (const name of ['Cambio de aceite y filtro', 'Revisión general', 'Filtros de aire y habitáculo']) {
+    await rest('POST', '/order_services', owner.tok, { order_id: orders[1]!.id, workshop_id: DEMO, interval_id: iv(name) });
+  }
+  const done = [
+    { v: 6, name: 'Pre-ITV', on: day(-355), km: null },
+    { v: 6, name: 'Correa de distribución', on: day(-4 * 365), km: 31000 },
+    { v: 7, name: 'Cambio de aceite y filtro', on: day(-400), km: 140500 },
+    { v: 8, name: 'Revisión general', on: day(-120), km: 18200 },
+  ];
+  for (const d of done) {
+    await rest('POST', '/rpc/set_vehicle_service', owner.tok, { p_vehicle_id: vehicles[d.v]!.id, p_interval_id: iv(d.name), p_done_on: d.on, p_done_km: d.km });
+  }
   // La clienta pide recordatorios de mantenimiento; el taller activa las reglas y se generan.
   await rest('POST', '/rpc/set_service_reminders', client.tok, { p_customer_id: customers[5]!.id, p_enabled: true });
   await rest('PATCH', `/reminder_settings?workshop_id=eq.${DEMO}`, owner.tok, { revision_enabled: true, quote_enabled: true, pickup_enabled: true });
@@ -258,9 +274,9 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
 
   // ---- Recorrido de pantallas
   await login(page, 'propietaria@e2e.test', '/panel');
-  const t = await crawl(page, 'taller', ['/panel', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/panel/planificacion', '/panel/presupuestos', '/panel/facturas', '/panel/recordatorios', '/panel/estadisticas', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 260);
+  const t = await crawl(page, 'taller', ['/panel', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/panel/planificacion', '/panel/mantenimientos', '/panel/presupuestos', '/panel/facturas', '/panel/recordatorios', '/panel/estadisticas', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 260);
   await login(page, WORKER, '/panel', DEMO_PASSWORD);
-  const w = await crawl(page, 'trabajador', ['/panel', '/panel/ordenes', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
+  const w = await crawl(page, 'trabajador', ['/panel', '/panel/ordenes', '/panel/mantenimientos', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
   await login(page, CLIENT, '/portal', DEMO_PASSWORD);
   const c = await crawl(page, 'cliente', ['/portal', '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 80);
   expect(t).toBeGreaterThan(20);

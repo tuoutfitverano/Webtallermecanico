@@ -13,8 +13,8 @@ La publicación la hace GitHub con el flujo «Publicar versión real» (`.github
 | Funciona | Queda pendiente (no inventado) |
 |---|---|
 | Web pública de AutoValue en `https://autovalue-web.<tu-subdominio>.workers.dev` | Dominio propio (se añade después) |
-| Registro, acceso, panel del taller y portal del cliente, con datos guardados | Correos a clientes: hace falta un proveedor de email (Resend) y SMTP propio. Sin ellos, los avisos se ven en el portal y los correos quedan «pendientes» |
-| Formularios de la web con antispam (Turnstile) | WhatsApp y consulta por matrícula (servicios de pago, apagados) |
+| Registro, acceso, panel del taller y portal del cliente, con datos guardados | Correos a clientes: se activan solos si pones `RESEND_API_KEY` y `EMAIL_FROM` (ver `GUIA_PROPIETARIO.md`, apartado 6). Sin ellos, los avisos se ven en el portal y los correos quedan «pendientes» |
+| Formularios de la web con antispam (Turnstile) | WhatsApp (se activa con sus claves, apartado 6 de la guía) y consulta por matrícula (servicio de pago, apagado) |
 | Mantenimiento automático cada 5 minutos | Copias externas: ver `docs/COPIAS_SEGURIDAD.md` |
 
 **Planes gratuitos, a tener en cuenta:**
@@ -65,6 +65,20 @@ Para crear `CLOUDFLARE_API_TOKEN`:
 
    Confirma tu cuenta, crea el taller AutoValue con su web y te hace propietario.
 4. Entra en `https://…workers.dev/acceso`: verás el panel del taller. Desde **Equipo** invitas a tus empleados y desde cada ficha de cliente, a tus clientes al portal.
+
+Explicación paso a paso, diciendo dónde está cada botón: [`GUIA_PROPIETARIO.md`](GUIA_PROPIETARIO.md).
+
+### Opcionales: correo y WhatsApp
+
+Si existen, el paso 1 los pasa a la web (y, con Resend, configura también el correo de las cuentas de Supabase). Si no, siguen apagados.
+
+| Nombre | Tipo | Para qué |
+|---|---|---|
+| `RESEND_API_KEY` | Secreto | Correo (Resend) |
+| `EMAIL_FROM` | Variable | Remitente en tu dominio verificado |
+| `RESEND_WEBHOOK_SECRET` | Secreto | Confirmación de entrega (opcional) |
+| `WHATSAPP_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | Secretos | WhatsApp (Meta) |
+| `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE` | Variables | Número de empresa y plantilla (opcional) |
 
 Para publicar cambios nuevos del código, se repite solo el paso 1. Los datos no se tocan; solo se aplican las migraciones nuevas.
 

@@ -39,13 +39,16 @@ if (portal.form && portal.records.length > 0 && isUuid(id)) {
 
 let vehicle: Vehicle | null = null;
 let orders: Order[] = [];
+let services: Array<{ name: string; last_done_on: string; next_due_on: string | null; next_due_km: number | null }> = [];
 if (portal.records.length > 0 && isUuid(id)) {
-  const [v, o] = await Promise.all([
+  const [v, o, s] = await Promise.all([
     portal.supabase.rpc('portal_vehicles'),
     portal.supabase.rpc('portal_orders', { p_filter: 'todas', p_vehicle_id: id }),
+    portal.supabase.rpc('portal_vehicle_services', { p_vehicle_id: id }),
   ]);
   vehicle = ((v.data ?? []) as Vehicle[]).find(x => x.id === id) ?? null;
   orders = vehicle ? (o.data ?? []) as Order[] : [];
+  services = vehicle ? (s.data ?? []) as typeof services : [];
 }
 if (portal.records.length > 0 && !vehicle) Astro.response.status = 404;
 const km = (n: number) => `${n.toLocaleString('es-ES')} km`;
@@ -93,14 +96,26 @@ const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next
           <p class="hint" style="margin-top:12px">Si algún dato no es correcto, díselo a tu taller.</p>
         </section>
         <section class="card" aria-labelledby="revision">
-          <h2 id="revision" class="card-title"><Icon name="calendar" />Próxima revisión</h2>
-          {hasService ? (
+          <h2 id="revision" class="card-title"><Icon name="calendar" />Próxima revisión y mantenimientos</h2>
+          {hasService && (
             <dl class="facts">
               {vehicle.next_service_date && <><dt>Fecha recomendada</dt><dd>{formatDay(vehicle.next_service_date)}</dd></>}
               {vehicle.next_service_km !== null && <><dt>O a los</dt><dd>{km(vehicle.next_service_km)}</dd></>}
               {vehicle.next_service_notes && <><dt>Recomendación del taller</dt><dd>{vehicle.next_service_notes}</dd></>}
             </dl>
-          ) : <p class="hint">Tu taller todavía no ha anotado la próxima revisión.</p>}
+          )}
+          {services.length > 0 && (
+            <ul class="list" aria-label="Mantenimientos" style={hasService ? 'margin-top:12px' : undefined}>
+              {services.map(x => (
+                <li class="row"><span class="row-main">
+                  <span class="row-title">{x.name}</span>
+                  <span class="row-meta">Próximo: {[x.next_due_on && formatDay(x.next_due_on), x.next_due_km !== null && `a los ${km(x.next_due_km)}`].filter(Boolean).join(' o ') || 'sin fecha'} · último el {formatDay(x.last_done_on)}</span>
+                </span></li>
+              ))}
+            </ul>
+          )}
+          {!hasService && services.length === 0 && <p class="hint">Tu taller todavía no ha anotado la próxima revisión ni otros mantenimientos.</p>}
+          <p class="hint" style="margin-top:12px">Las fechas son orientativas (lo primero que llegue: la fecha o los kilómetros).</p>
           <p class="hint" style="margin-top:12px">Si quieres que te lo recordemos, actívalo en <a href="/portal/datos">Mis datos</a>.</p>
         </section>
         <section class="card" aria-labelledby="quitar-t">

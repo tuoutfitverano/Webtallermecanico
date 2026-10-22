@@ -150,7 +150,7 @@ const link = (r: Row) => r.quote_id ? `/panel/presupuestos/${r.quote_id}` : r.or
               <input type="hidden" name="action" value="ajustes" />
               <fieldset class="rule">
                 <legend>Revisión del vehículo (al cliente)</legend>
-                <label class="check"><input type="checkbox" name="revision_enabled" checked={settings.revision_enabled} /><span>Avisar al cliente antes de la próxima revisión. <span class="muted">Solo a quien lo pidió en su portal; usa la fecha o los km de la próxima revisión de la ficha del vehículo.</span></span></label>
+                <label class="check"><input type="checkbox" name="revision_enabled" checked={settings.revision_enabled} /><span>Avisar al cliente antes de la próxima revisión. <span class="muted">Solo a quien lo pidió en su portal; usa la próxima revisión de la ficha del vehículo y los <a href="/panel/mantenimientos">mantenimientos</a> que le tocan.</span></span></label>
                 <div class="form-row">
                   <div class="field"><label for="r-days">Días antes</label><input class="input" id="r-days" name="revision_days_before" type="number" min="1" max="90" value={settings.revision_days_before} /></div>
                   <div class="field"><label for="r-km">Kilómetros antes</label><input class="input" id="r-km" name="revision_km_margin" type="number" min="100" max="20000" step="100" value={settings.revision_km_margin} /></div>

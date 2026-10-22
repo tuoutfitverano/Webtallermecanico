@@ -1,0 +1,204 @@
+---
+/**
+ * Mantenimientos periódicos del taller (cambio de aceite, revisión, pre-ITV,
+ * correa de distribución…): cada cuántos meses y/o kilómetros.
+ *
+ *  · Todo el personal ve la lista y lo que vence pronto; la cambian el
+ *    propietario y los administradores (lo impone la base de datos).
+ *  · No se borran: se desactivan, para no perder el historial de los vehículos.
+ *  · La lista de partida es orientativa: cada taller la ajusta a su criterio y
+ *    a lo que indique cada fabricante.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, isUuid, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../lib/auth/messages.ts';
+import { formatDay, todayMadrid } from '../../lib/panel/format.ts';
+import {
+  describeServiceInterval, fieldErrors, formatPlate, SERVICE_DUE_LABELS, SERVICE_KM, SERVICE_MONTHS, serviceDueState, serviceIntervalSchema,
+  type ServiceDueState,
+} from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+interface Interval { id: string; name: string; every_months: number | null; every_km: number | null; active: boolean; position: number }
+interface Due {
+  vehicle_id: string; interval_id: string; next_due_on: string | null; next_due_km: number | null;
+  service_intervals: { name: string; active: boolean } | null;
+  vehicles: { plate: string; make: string; model: string; mileage: number | null; customers: { full_name: string } | null } | null;
+}
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+let errors: Partial<Record<string, string>> = {};
+let errorFor = '';
+let draft: Record<string, string> | null = null;
+
+if (panel.form && panel.workshop && panel.isManager) {
+  const form = panel.form;
+  const action = field(form, 'action');
+  const rowId = field(form, 'id');
+  if (action === 'guardar' || action === 'anadir') {
+    const input = { name: field(form, 'name'), everyMonths: field(form, 'every_months'), everyKm: field(form, 'every_km'), active: action === 'anadir' || form.get('active') === 'on' };
+    const parsed = serviceIntervalSchema.safeParse(input);
+    errorFor = action === 'anadir' ? 'nuevo' : rowId;
+    if (!parsed.success || (action === 'guardar' && !isUuid(rowId))) {
+      errors = parsed.success ? {} : fieldErrors(parsed.error);
+      draft = { name: input.name, every_months: input.everyMonths, every_km: input.everyKm };
+      flash = { kind: 'bad', text: 'Revisa los campos marcados.' };
+      Astro.response.status = 422;
+    } else {
+      const row = { name: parsed.data.name, every_months: parsed.data.everyMonths, every_km: parsed.data.everyKm, active: parsed.data.active };
+      const { error } = action === 'anadir'
+        ? await panel.supabase.from('service_intervals').insert({ ...row, workshop_id: panel.workshop.id, position: 100 })
+        : await panel.supabase.from('service_intervals').update(row).eq('id', rowId).eq('workshop_id', panel.workshop.id);
+      if (error) {
+        logAuth('panel_service_interval_error', error.code);
+        draft = { name: input.name, every_months: input.everyMonths, every_km: input.everyKm };
+        flash = { kind: 'bad', text: error.code === '23505' ? 'Ya hay un mantenimiento con ese nombre.' : dbErrorMessage(error) };
+        Astro.response.status = 400;
+      } else {
+        errorFor = '';
+        flash = { kind: 'ok', text: action === 'anadir' ? 'Mantenimiento añadido.' : 'Cambios guardados. Los próximos de cada vehículo ya están recalculados.' };
+      }
+    }
+  }
+}
+
+let intervals: Interval[] = [];
+let due: Array<Due & { state: ServiceDueState }> = [];
+let loadError = false;
+const today = todayMadrid();
+if (panel.workshop) {
+  const ws = panel.workshop.id;
+  // Lo que vence en los próximos 60 días (o ya ha vencido) y lo que tiene kilómetros previstos (se filtra abajo con los km actuales).
+  const limit = new Date(Date.parse(today) + 60 * 86_400_000).toISOString().slice(0, 10);
+  const [i, d] = await Promise.all([
+    panel.supabase.from('service_intervals').select('id, name, every_months, every_km, active, position').eq('workshop_id', ws).order('active', { ascending: false }).order('position').order('name'),
+    panel.supabase.from('vehicle_services')
+      .select('vehicle_id, interval_id, next_due_on, next_due_km, service_intervals(name, active), vehicles(plate, make, model, mileage, customers(full_name))')
+      .eq('workshop_id', ws).or(`next_due_on.lte.${limit},next_due_km.not.is.null`).order('next_due_on', { ascending: true, nullsFirst: false }).limit(500),
+  ]);
+  if (i.error || d.error) { logAuth('panel_service_intervals_load_error', i.error?.code ?? d.error?.code); loadError = true; }
+  intervals = (i.data ?? []) as Interval[];
+  due = ((d.data ?? []) as unknown as Due[])
+    .filter(x => x.service_intervals?.active && x.vehicles)
+    .map(x => ({ ...x, state: serviceDueState({ dueOn: x.next_due_on, dueKm: x.next_due_km }, today, x.vehicles!.mileage, { days: 60, km: 2000 }) }))
+    .filter(x => x.state !== 'al_dia')
+    .sort((a, b) => (a.state === b.state ? 0 : a.state === 'vencido' ? -1 : 1));
+}
+const val = (iv: Interval | null, key: 'name' | 'every_months' | 'every_km') =>
+  draft && errorFor === (iv?.id ?? 'nuevo') ? draft[key] : iv ? String(iv[key] ?? '') : '';
+const err = (iv: Interval | null, key: string) => (errorFor === (iv?.id ?? 'nuevo') ? errors[key] : undefined);
+const dueTone: Record<ServiceDueState, string> = { vencido: 'pill-bad', pronto: 'pill-warn', al_dia: 'pill-ok' };
+---
+<PanelLayout panel={panel} title="Mantenimientos" section="mantenimientos">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Mantenimientos</h1>
+      <p class="pnl-sub">Cada cuánto toca cada servicio y qué vehículos lo necesitan pronto.</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No se han podido cargar los mantenimientos. Recarga la página." />}
+      <p class="hint">Se marcan en cada orden. Al entregar el vehículo, se calcula el próximo: fecha de entrega más los meses, y kilómetros de entrada más los km (lo primero que llegue).</p>
+
+      <section class="card" aria-labelledby="pronto-t">
+        <h2 id="pronto-t" class="card-title"><Icon name="clock" />Vencen pronto</h2>
+        {due.length === 0 ? (
+          <div class="empty"><strong>Ningún vehículo tiene mantenimientos vencidos ni en los próximos 60 días.</strong><span>Aparecen aquí cuando se entrega una orden con mantenimientos marcados.</span></div>
+        ) : (
+          <ul class="list">
+            {due.map(x => (
+              <li><a class="row" href={`/panel/vehiculos/${x.vehicle_id}`}>
+                <span class="row-main">
+                  <span class="row-title"><span class="plate">{formatPlate(x.vehicles!.plate)}</span>{x.service_intervals!.name}</span>
+                  <span class="row-meta">{x.vehicles!.make} {x.vehicles!.model}{x.vehicles!.customers && ` · ${x.vehicles!.customers.full_name}`} · {[x.next_due_on && formatDay(x.next_due_on), x.next_due_km !== null && `a los ${x.next_due_km.toLocaleString('es-ES')} km`].filter(Boolean).join(' o ')}{x.vehicles!.mileage !== null && x.next_due_km !== null && ` (ahora ${x.vehicles!.mileage.toLocaleString('es-ES')} km)`}</span>
+                </span>
+                <span class="row-side"><span class={`pill ${dueTone[x.state]}`}>{SERVICE_DUE_LABELS[x.state]}</span></span>
+              </a></li>
+            ))}
+          </ul>
+        )}
+        {panel.isOffice && <p class="hint" style="margin-top:12px">Para avisar al cliente automáticamente, activa la regla «Revisión» en <a href="/panel/recordatorios">Recordatorios</a> (solo le llega si él lo pidió en su portal).</p>}
+      </section>
+
+      <section class="card" aria-labelledby="lista-t">
+        <h2 id="lista-t" class="card-title"><Icon name="wrench" />Lista del taller</h2>
+        {panel.isManager
+          ? <p class="hint">La lista de partida es orientativa: ajústala a tu criterio y a lo que indique cada fabricante. Un mantenimiento desactivado deja de ofrecerse y de avisar, pero se conserva su historial.</p>
+          : <p class="hint">La cambian el propietario y los administradores del taller.</p>}
+        {intervals.length === 0 && <p class="hint">Todavía no hay mantenimientos.</p>}
+        {!panel.isManager ? (
+          <ul class="list">
+            {intervals.map(i => (
+              <li class="row"><span class="row-main"><span class="row-title">{i.name}</span><span class="row-meta">{describeServiceInterval(i.every_months, i.every_km)}</span></span>
+                {!i.active && <span class="row-side"><span class="pill">Desactivado</span></span>}</li>
+            ))}
+          </ul>
+        ) : (
+          <ul class="svc-list">
+            {intervals.map(i => (
+              <li>
+                <form method="post" class="svc-row" data-busy="Guardando…" novalidate aria-label={`Mantenimiento «${i.name}»`}>
+                  <input type="hidden" name="action" value="guardar" /><input type="hidden" name="id" value={i.id} />
+                  <div class={`field svc-name ${err(i, 'name') ? 'has-error' : ''}`}><label for={`n-${i.id}`}>Nombre</label>
+                    <input class="input" id={`n-${i.id}`} name="name" maxlength="80" required value={val(i, 'name')} />
+                    {err(i, 'name') && <p class="field-error">{err(i, 'name')}</p>}</div>
+                  <div class={`field ${err(i, 'everyMonths') ? 'has-error' : ''}`}><label for={`m-${i.id}`}>Cada (meses)</label>
+                    <input class="input" id={`m-${i.id}`} name="every_months" inputmode="numeric" min={SERVICE_MONTHS.min} max={SERVICE_MONTHS.max} placeholder="—" value={val(i, 'every_months')} />
+                    {err(i, 'everyMonths') && <p class="field-error">{err(i, 'everyMonths')}</p>}</div>
+                  <div class={`field ${err(i, 'everyKm') ? 'has-error' : ''}`}><label for={`k-${i.id}`}>o cada (km)</label>
+                    <input class="input" id={`k-${i.id}`} name="every_km" inputmode="numeric" min={SERVICE_KM.min} max={SERVICE_KM.max} placeholder="—" value={val(i, 'every_km')} />
+                    {err(i, 'everyKm') && <p class="field-error">{err(i, 'everyKm')}</p>}</div>
+                  <label class="check svc-active"><input type="checkbox" name="active" checked={i.active} /><span>Activo</span></label>
+                  <button class="btn btn-sm" type="submit" aria-label={`Guardar «${i.name}»`}><span class="spinner" aria-hidden="true"></span><span data-label>Guardar</span></button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {panel.isManager && (
+        <section class="card" aria-labelledby="nuevo-t">
+          <h2 id="nuevo-t" class="card-title"><Icon name="plus" />Añadir mantenimiento</h2>
+          <form method="post" class="svc-row" data-busy="Guardando…" novalidate>
+            <input type="hidden" name="action" value="anadir" />
+            <div class={`field svc-name ${err(null, 'name') ? 'has-error' : ''}`}><label for="n-nuevo">Nombre</label>
+              <input class="input" id="n-nuevo" name="name" maxlength="80" required placeholder="Ej.: Líquido refrigerante" value={val(null, 'name')} />
+              {err(null, 'name') && <p class="field-error">{err(null, 'name')}</p>}</div>
+            <div class={`field ${err(null, 'everyMonths') ? 'has-error' : ''}`}><label for="m-nuevo">Cada (meses)</label>
+              <input class="input" id="m-nuevo" name="every_months" inputmode="numeric" placeholder="Ej.: 24" value={val(null, 'every_months')} />
+              {err(null, 'everyMonths') && <p class="field-error">{err(null, 'everyMonths')}</p>}</div>
+            <div class={`field ${err(null, 'everyKm') ? 'has-error' : ''}`}><label for="k-nuevo">o cada (km)</label>
+              <input class="input" id="k-nuevo" name="every_km" inputmode="numeric" placeholder="Ej.: 60000" value={val(null, 'every_km')} />
+              {err(null, 'everyKm') && <p class="field-error">{err(null, 'everyKm')}</p>}</div>
+            <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Añadir</span></button>
+          </form>
+          <p class="hint" style="margin-top:8px">Pon los meses, los kilómetros o las dos cosas (cuenta lo primero que llegue).</p>
+        </section>
+      )}
+    </>
+  )}
+</PanelLayout>
+
+<style>
+  .svc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .svc-list > li + li { border-top: 1px solid var(--p-line); }
+  .svc-list .svc-row { padding: 12px 0; }
+  .svc-row { display: grid; gap: 10px 12px; grid-template-columns: 1fr 1fr; align-items: end; min-width: 0; }
+  .svc-row .svc-name { grid-column: 1 / -1; }
+  .svc-row .svc-active { align-self: center; }
+  @media (min-width: 900px) {
+    .svc-row { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; }
+    .svc-row .svc-name { grid-column: auto; }
+  }
+</style>

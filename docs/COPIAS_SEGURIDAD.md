@@ -2,6 +2,19 @@
 
 Qué se copia, dónde, cada cuánto y **cómo se recupera**. Nada de esto funciona en producción hasta completar «Puesta en marcha». La copia y la restauración se prueban solas en local y en CI con `npm run test:backup`.
 
+## Copia de cada taller (la descarga el propio taller)
+
+Además de la copia de la plataforma, cada taller puede bajarse **sus** datos cuando quiera desde **Panel → Taller → Copia de seguridad** (`/panel/copia`):
+
+- **Copia completa** (JSON): clientes, vehículos, órdenes e historial, presupuestos, facturas y cobros, mantenimientos, avisos, recordatorios, solicitudes de la web, ajustes y equipo.
+- **Tablas para Excel** (CSV con «;» y tildes correctas): clientes, vehículos, órdenes, trabajos, presupuestos, facturas, cobros y mantenimientos.
+- Solo el **propietario** y los **administradores**, y solo de su taller: lo decide la base de datos (`export_workshop_data`). Sin huellas de enlaces, invitaciones ni antispam.
+- Cada descarga queda anotada (quién y cuándo) y se ve en la misma página.
+- La copia lleva datos personales: el taller debe guardarla en un sitio seguro. Recomendado: una vez al mes y antes de cambios grandes.
+- Pruebas: `supabase/tests/19_copia_taller.test.sql` (incluida la comprobación de que ninguna tabla del taller se queda fuera) y `apps/web/e2e/gestion.spec.ts`.
+
+Esta copia **no sustituye** a la de la plataforma: es la del taller, para que la tenga él (y para la portabilidad de sus datos). No restaura nada por sí sola.
+
 ## Qué protege cada cosa
 
 | Qué | Lo que da el proveedor | Lo que hacemos nosotros |

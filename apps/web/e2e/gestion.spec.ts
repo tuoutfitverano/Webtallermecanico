@@ -214,3 +214,109 @@ test.describe('Gestión · planificación, estadísticas, recordatorios y roles'
     }
   });
 });
+
+test.describe('Gestión · mantenimientos periódicos', () => {
+  test('el taller fija la periodicidad, la marca en la orden y al entregar se calcula el próximo', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test');
+    // Un mantenimiento propio del taller, con su periodicidad.
+    const name = `Líquido refrigerante ${stamp()}`;
+    await page.goto('/panel/mantenimientos');
+    await expect(page.getByRole('heading', { name: 'Mantenimientos', level: 1 })).toBeVisible();
+    await expect(page.getByLabel('Mantenimiento «Cambio de aceite y filtro»')).toBeVisible();
+    const add = page.locator('form', { has: page.getByRole('button', { name: 'Añadir', exact: true }) });
+    await add.getByLabel('Nombre').fill(name);
+    await add.getByRole('button', { name: 'Añadir', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Revisa los campos marcados');
+    await expect(page.locator('.field-error').first()).toContainText('meses');
+    await add.getByLabel('Cada (meses)').fill('24');
+    await add.getByLabel('o cada (km)').fill('60.000');
+    await add.getByRole('button', { name: 'Añadir', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Mantenimiento añadido.');
+    await expect(page.getByLabel(`Mantenimiento «${name}»`).getByLabel('Cada (meses)')).toHaveValue('24');
+
+    // Se marca en la orden; cuenta al entregar (fecha de entrega y km de entrada).
+    const job = await createJob(page);
+    await page.goto(job.orderUrl);
+    const kmIn = page.getByRole('textbox', { name: 'Kilómetros a la entrada' });
+    await kmIn.fill('98000');
+    await page.locator('form', { has: kmIn }).getByRole('button', { name: 'Guardar' }).click();
+    await expect(page.getByRole('status')).toContainText('Kilómetros guardados.');
+    const card = page.locator('section', { has: page.getByRole('heading', { name: 'Mantenimientos hechos' }) });
+    await card.getByLabel(/Cambio de aceite y filtro/).check();
+    await card.getByLabel(new RegExp(name)).check();
+    await card.getByRole('button', { name: 'Guardar mantenimientos' }).click();
+    await expect(page.getByRole('status')).toContainText('Al entregar el vehículo se calculará el próximo.');
+    await expect(card.getByLabel(new RegExp(name))).toBeChecked();
+    await page.getByRole('button', { name: 'Listo para recoger' }).click();
+    await expect(page.getByRole('status')).toContainText('Estado actualizado.');
+    await page.getByRole('button', { name: 'Entregado' }).click();
+    await expect(page.locator('.pnl-title')).toContainText('Entregado');
+
+    await page.goto(job.vehicleUrl);
+    const mant = page.locator('section', { has: page.getByRole('heading', { name: 'Mantenimientos', exact: true }) });
+    await expect(mant.locator('li', { hasText: name })).toContainText('a los 158.000 km');
+    await expect(mant.locator('li', { hasText: name })).toContainText('Al día');
+    await expect(mant.locator('li', { hasText: 'Cambio de aceite y filtro' })).toContainText('a los 113.000 km');
+
+    // Uno hecho fuera del taller: la pre-ITV de hace casi un año → le toca pronto.
+    const lastYear = new Date(Date.now() - 360 * 86_400_000).toISOString().slice(0, 10);
+    await mant.getByText('Anotar uno hecho fuera del taller').click();
+    await mant.getByLabel('Mantenimiento', { exact: true }).selectOption({ label: 'Pre-ITV' });
+    await mant.getByLabel('Fecha en que se hizo').fill(lastYear);
+    await mant.getByRole('button', { name: 'Anotar' }).click();
+    await expect(page.getByRole('status')).toContainText('Mantenimiento anotado.');
+    await expect(mant.locator('li', { hasText: 'Pre-ITV' })).toContainText('(anotado a mano)');
+    await expect(mant.locator('li', { hasText: 'Pre-ITV' })).toContainText('Pronto');
+
+    await page.goto('/panel/mantenimientos');
+    await expect(page.locator('section', { has: page.getByRole('heading', { name: 'Vencen pronto' }) }).locator('li', { hasText: job.plate.display }))
+      .toContainText('Pre-ITV');
+  });
+
+  test('el mecánico ve la lista, pero no la cambia', async ({ page }) => {
+    await login(page, 'mecanico@e2e.test');
+    await page.goto('/panel/mantenimientos');
+    await expect(page.getByText('La cambian el propietario y los administradores del taller.')).toBeVisible();
+    await expect(page.getByText('Cambio de aceite y filtro')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Guardar|Añadir/ })).toHaveCount(0);
+  });
+});
+
+test.describe('Gestión · copia de seguridad del taller', () => {
+  test('la propietaria descarga la copia completa y una tabla para Excel', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test');
+    const job = await createJob(page);
+    await page.goto('/panel/taller');
+    await page.getByRole('link', { name: 'Ir a la copia de seguridad' }).click();
+    await expect(page.getByRole('heading', { name: 'Copia de seguridad', level: 1 })).toBeVisible();
+
+    const [full] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Descargar copia completa' }).click()]);
+    expect(full.suggestedFilename()).toMatch(/^copia-[a-z0-9-]+-\d{4}-\d{2}-\d{2}\.json$/);
+    const text = await (await import('node:fs/promises')).readFile((await full.path())!, 'utf8');
+    const copy = JSON.parse(text) as { formato: string; tablas: Record<string, unknown[]>; equipo: unknown[] };
+    expect(copy.formato).toBe('copia-taller-v1');
+    expect(JSON.stringify(copy.tablas.customers)).toContain(job.name);
+    expect(copy.tablas.repair_orders!.length).toBeGreaterThan(0);
+    expect(copy.equipo.length).toBeGreaterThan(0);
+    expect(text).not.toContain('token_hash');
+    expect(text).not.toContain('client_hash');
+
+    await page.getByLabel('Qué tabla').selectOption({ label: 'Clientes' });
+    const [csv] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Descargar tabla' }).click()]);
+    expect(csv.suggestedFilename()).toMatch(/-clientes-\d{4}-\d{2}-\d{2}\.csv$/);
+    const body = await (await import('node:fs/promises')).readFile((await csv.path())!, 'utf8');
+    expect(body.charCodeAt(0)).toBe(0xfeff);
+    expect(body.split('\r\n')[0]).toContain('full_name');
+    expect(body).toContain(job.name);
+
+    await page.reload();
+    await expect(page.locator('section', { has: page.getByRole('heading', { name: 'Últimas descargas' }) })).toContainText('tabla CSV');
+  });
+
+  test('el mecánico no descarga la copia', async ({ page }) => {
+    await login(page, 'mecanico@e2e.test');
+    await page.goto('/panel/copia');
+    await expect(page.getByText('La copia la descargan el propietario o un administrador del taller.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Descargar/ })).toHaveCount(0);
+  });
+});

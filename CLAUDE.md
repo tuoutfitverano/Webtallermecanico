@@ -17,6 +17,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Presupuestos, facturas y cobros (operativa, NO VERI*FACTU): `docs/FACTURACION.md`
 - Auditoría, despliegue y lanzamiento: `docs/AUDITORIA_FASE8.md`, `docs/DESPLIEGUE.md`, `docs/CHECKLIST_LANZAMIENTO.md`, `docs/DATOS_PERSONALES.md`
 - Versión real sin coste (Cloudflare Workers + Supabase gratis, flujo «Publicar versión real»): `docs/PUBLICAR.md`, `scripts/publicar/`
+- Guía del propietario (pasos de GitHub, legal, contraseñas, copias, correo y WhatsApp): `docs/GUIA_PROPIETARIO.md`
 
 ## Estructura
 
@@ -27,7 +28,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           panel/ (inicio, ordenes/, vehiculos/, clientes/, equipo) — panel del taller
                           portal/ (inicio, vehiculos/, reparaciones/, avisos, datos, invitacion) — portal del cliente
                           panel/avisos (avisos a clientes), panel/solicitudes (solicitudes de la web), panel/taller (datos, servicios y ajustes de facturación)
-                          panel/planificacion, panel/presupuestos/, panel/facturas/ (+ [id]/imprimir), panel/recordatorios, panel/estadisticas
+                          panel/planificacion, panel/mantenimientos, panel/copia (copia del taller), panel/presupuestos/, panel/facturas/ (+ [id]/imprimir), panel/recordatorios, panel/estadisticas
                           presupuesto/[token] (respuesta del cliente sin cuenta); portal/presupuestos/, portal/facturas/
                           api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend; whatsapp = Meta)
                           cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
@@ -198,6 +199,8 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Facturas: **operativas, NO certificadas VERI*FACTU**; nunca digas lo contrario. Numeración sin huecos por serie y año (`issue_invoice`), datos congelados al emitir, `invoice_records` encadenado e inmutable. Emitida = no se cambia ni se borra (rectificativa). Cobros: nunca más del total; se anulan con motivo, no se borran. Sin pagos en línea ni datos de tarjeta.
 - Las operaciones de sistema usan la marca `app.quote_op` / `app.invoice_op` dentro de funciones `security definer`, comprobada con `private.quote_system_op()` / `private.invoice_system_op()` (que además exigen que el usuario actual no sea `authenticated` ni `anon`).
 - Fecha prevista de entrega (`due_at`) es interna: nunca al cliente. El fichaje (`start_work`/`stop_work`) usa la hora del servidor.
+- Mantenimientos periódicos (`/panel/mantenimientos`): lista por taller (`service_intervals`, meses y/o km; gerencia edita, no se borran: se desactivan), marcados en la orden (`order_services`), próximo calculado SOLO por la base de datos al entregar (`vehicle_services`, `private.refresh_vehicle_service`); anotación manual de la oficina con `set_vehicle_service`; portal con `portal_vehicle_services`; recordatorios en `private.generate_service_reminders()` (regla «revisión», opt-in del cliente). Reglas en `packages/core/src/maintenance.ts`. La lista de partida es orientativa.
+- Copia del taller (`/panel/copia`, gerencia): `export_workshop_data` (security definer, filtra por `workshop_id`, quita huellas/tokens, anota en `workshop_data_exports`). Una tabla nueva con `workshop_id` se añade a `private.export_tables()` (lo exige `19_copia_taller.test.sql`). Los formularios de descarga llevan `data-astro-reload`.
 - Avisos nuevos con `private.enqueue_notice(...)` (plantilla `aviso_v1`, `link_path` solo `/portal/…`, `dedupe_key`). Recordatorios en `private.generate_reminders()` dentro de `run_maintenance`; los de revisión solo si el cliente lo pidió (`set_service_reminders` desde el portal).
 - Estadísticas solo con datos reales (`workshop_stats`, `security invoker`). Nunca números de ejemplo en producción.
 - Enlaces `wa.me` (`whatsappLink`) solo PREPARAN el mensaje: nunca se registran como enviados.

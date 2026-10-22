@@ -35,7 +35,7 @@ async function login(page: Page, email: string, next: string) {
   await page.waitForURL(u => u.pathname === next);
 }
 
-let ids: { customer: string; order: string; email: string } | null = null;
+let ids: { customer: string; order: string; vehicle: string; email: string } | null = null;
 async function fixtures() {
   if (ids) return ids;
   const owner = await token('propietaria@e2e.test');
@@ -48,7 +48,14 @@ async function fixtures() {
   const plate = `${Math.floor(1000 + Math.random() * 9000)}${Array.from({ length: 3 }, () => letters[Math.floor(Math.random() * 20)]).join('')}`;
   const [v] = await post('/vehicles', owner, { workshop_id: DEMO, customer_id: c!.id, plate, make: 'Seat', model: 'Ibiza', year: 2015, year_kind: 'fabricacion' });
   const [o] = await post('/repair_orders', owner, { workshop_id: DEMO, vehicle_id: v!.id, customer_id: c!.id, problem_description: 'Revisión general' });
-  ids = { customer: c!.id!, order: o!.id!, email };
+  // Un mantenimiento anotado, para que la ficha del vehículo y el portal lo enseñen.
+  const iv = await fetch(`${PROXY}/rest/v1/service_intervals?select=id&workshop_id=eq.${DEMO}&name=eq.Pre-ITV`, { headers: { apikey: ANON, authorization: `Bearer ${owner}` } });
+  const [pre] = (await iv.json()) as Array<{ id: string }>;
+  await fetch(`${PROXY}/rest/v1/rpc/set_vehicle_service`, {
+    method: 'POST', headers: { apikey: ANON, authorization: `Bearer ${owner}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ p_vehicle_id: v!.id, p_interval_id: pre!.id, p_done_on: new Date(Date.now() - 350 * 86_400_000).toISOString().slice(0, 10) }),
+  });
+  ids = { customer: c!.id!, order: o!.id!, vehicle: v!.id!, email };
   return ids;
 }
 
@@ -105,7 +112,7 @@ test('web pública: accesibilidad, consola, enlaces y móvil', async ({ page, is
 });
 
 test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
-  test.setTimeout(150_000); // 20 pantallas
+  test.setTimeout(180_000); // 23 pantallas
   const f = await fixtures();
   await login(page, 'propietaria@e2e.test', '/panel');
   await audit(page, [
@@ -113,6 +120,7 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
     '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
     '/panel/planificacion', '/panel/planificacion?vista=semana', '/panel/presupuestos', '/panel/presupuestos/nuevo',
     '/panel/facturas', '/panel/facturas/nueva', '/panel/recordatorios', '/panel/estadisticas',
+    '/panel/mantenimientos', `/panel/vehiculos/${f.vehicle}`, '/panel/copia',
   ], isMobile);
 });
 
@@ -411,7 +419,7 @@ test.describe('color del panel sin JavaScript', () => {
 test('portal del cliente: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
   const f = await fixtures();
   await login(page, f.email, '/portal');
-  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/portal/vehiculos/nuevo', '/portal/vehiculos/papelera'], isMobile);
+  await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/portal/vehiculos/nuevo', '/portal/vehiculos/papelera', `/portal/vehiculos/${f.vehicle}`], isMobile);
 });
 
 test('portal: el modo elegido se mantiene al cambiar de sección, sin parpadeos', async ({ page, isMobile }) => {

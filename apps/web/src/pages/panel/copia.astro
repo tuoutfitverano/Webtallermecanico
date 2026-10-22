@@ -1,0 +1,113 @@
+---
+/**
+ * Copia de los datos del taller (propietario y administradores).
+ *
+ *  · Archivo completo (JSON): todo lo del taller, para guardarlo o llevárselo.
+ *  · Tablas sueltas (CSV) para abrir con Excel o LibreOffice.
+ *  · La base de datos decide quién puede (export_workshop_data), quita las
+ *    huellas y claves internas y anota cada descarga.
+ *  · Descarga con POST: un enlace o una imagen de otra web no pueden lanzarla.
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDateTime, todayMadrid } from '../../lib/panel/format.ts';
+import { CSV_TABLES, exportFileName, isCsvTable, toCsv } from '../../lib/panel/export.ts';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+if (panel.form && panel.workshop && panel.isManager) {
+  const kind = field(panel.form, 'formato');
+  const table = field(panel.form, 'tabla');
+  if (kind !== 'json' && !(kind === 'csv' && isCsvTable(table))) {
+    flash = { kind: 'bad', text: 'Elige qué quieres descargar.' };
+    Astro.response.status = 422;
+  } else {
+    const { data, error } = await panel.supabase.rpc('export_workshop_data', { p_workshop_id: panel.workshop.id, p_format: kind });
+    if (error || !data) {
+      logAuth('panel_export_error', error?.code);
+      flash = { kind: 'bad', text: 'No se ha podido preparar la copia. Inténtalo de nuevo en unos minutos.' };
+      Astro.response.status = 400;
+    } else {
+      const day = todayMadrid();
+      const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
+      if (kind === 'json') {
+        return new Response(JSON.stringify(data, null, 1), {
+          headers: { ...headers, 'content-type': 'application/json; charset=utf-8', 'content-disposition': `attachment; filename="${exportFileName(panel.workshop.slug, day, '', 'json')}"` },
+        });
+      }
+      const csvTable = CSV_TABLES[table as keyof typeof CSV_TABLES].table;
+      const rows = ((data as { tablas: Record<string, Array<Record<string, unknown>>> }).tablas[csvTable] ?? []);
+      return new Response(toCsv(rows), {
+        headers: { ...headers, 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${exportFileName(panel.workshop.slug, day, table, 'csv')}"` },
+      });
+    }
+  }
+}
+
+let log: Array<{ id: number; exported_by: string | null; format: string; created_at: string }> = [];
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+if (panel.workshop && panel.isManager) {
+  const [l, t] = await Promise.all([
+    panel.supabase.from('workshop_data_exports').select('id, exported_by, format, created_at').eq('workshop_id', panel.workshop.id).order('created_at', { ascending: false }).limit(10),
+    loadTeam(panel),
+  ]);
+  log = (l.data ?? []) as typeof log;
+  team = t;
+}
+---
+<PanelLayout panel={panel} title="Copia de seguridad" section="taller">
+  <a class="pnl-back" href="/panel/taller"><Icon name="arrow" />Taller</a>
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Copia de seguridad</h1>
+      <p class="pnl-sub">Descarga todos los datos de tu taller cuando quieras.</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isManager ? (
+    <div class="empty"><strong>La copia la descargan el propietario o un administrador del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+  ) : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      <div class="alert alert-warn" role="note"><Icon name="shield" /><span>La copia lleva datos personales de tus clientes. Guárdala en un sitio seguro (por ejemplo, un disco cifrado o tu nube con contraseña) y no la mandes por correo ni la compartas.</span></div>
+      <div class="grid-2">
+        <section class="card" aria-labelledby="completa-t">
+          <h2 id="completa-t" class="card-title"><Icon name="file" />Copia completa</h2>
+          <p class="hint">Un solo archivo con todo: clientes, vehículos, órdenes e historial, presupuestos, facturas y cobros, mantenimientos, avisos, recordatorios, solicitudes de la web, ajustes y equipo.</p>
+          <!-- data-astro-reload: la descarga la hace el navegador (el enrutador de páginas no sabe guardar archivos). -->
+          <p class="hint" style="margin-top:8px">Formato JSON: sirve para guardarla, para que un técnico la lea o para llevarte los datos a otro programa. Recomendado: una vez al mes y antes de cambios grandes.</p>
+          <form method="post" style="margin-top:14px" data-astro-reload>
+            <input type="hidden" name="formato" value="json" />
+            <button class="btn btn-primary" type="submit"><Icon name="arrow" />Descargar copia completa</button>
+          </form>
+        </section>
+        <section class="card" aria-labelledby="csv-t">
+          <h2 id="csv-t" class="card-title"><Icon name="clipboard" />Tablas para Excel</h2>
+          <p class="hint">Una tabla en CSV (se abre con Excel, Numbers o LibreOffice).</p>
+          <form method="post" class="form-stack" style="margin-top:14px" data-astro-reload>
+            <input type="hidden" name="formato" value="csv" />
+            <div class="field"><label for="tabla">Qué tabla</label>
+              <select class="select" id="tabla" name="tabla">{Object.entries(CSV_TABLES).map(([id, t]) => <option value={id}>{t.label}</option>)}</select></div>
+            <button class="btn" type="submit"><Icon name="arrow" />Descargar tabla</button>
+          </form>
+        </section>
+      </div>
+      <section class="card" aria-labelledby="registro-t">
+        <h2 id="registro-t" class="card-title"><Icon name="history" />Últimas descargas</h2>
+        {log.length === 0 ? <p class="hint">Todavía no se ha descargado ninguna copia.</p> : (
+          <ul class="plain-list small">
+            {log.map(x => <li>{formatDateTime(x.created_at)} · {memberName(team, x.exported_by, panel.user.id)} · {x.format === 'json' ? 'copia completa' : 'tabla CSV'}</li>)}
+          </ul>
+        )}
+        <p class="hint" style="margin-top:10px">Además, la plataforma hace su propia copia diaria cifrada de todos los talleres. Esta descarga es tu copia, para que la tengas tú.</p>
+      </section>
+    </>
+  )}
+</PanelLayout>

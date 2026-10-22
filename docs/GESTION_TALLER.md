@@ -33,13 +33,25 @@ Los permisos los decide la base de datos (RLS y disparadores), no la interfaz: o
 - **Tablero** por estados (mover de estado y asignar desde la tarjeta) y **semana** (lo planificado por día).
 - Filtros por mecánico y prioridad; alertas de retrasos y órdenes sin asignar.
 
+## Mantenimientos periódicos (`/panel/mantenimientos`)
+
+Cada taller tiene **su** lista: nombre y cada cuántos **meses** y/o **kilómetros** (cuenta lo primero que llegue).
+
+- Nace con una lista de partida **orientativa** que el taller ajusta a su criterio y a lo que diga cada fabricante: cambio de aceite y filtro (12 meses / 15.000 km), revisión general (12 / 15.000), pre-ITV (12 meses), filtros de aire y habitáculo (24 / 30.000), líquido de frenos (24 meses) y correa de distribución (60 / 100.000).
+- La cambian el propietario y los administradores; el resto del equipo la ve. No se borran: se **desactivan** (dejan de ofrecerse y de avisar, pero se conserva el historial).
+- En cada orden se marcan los «Mantenimientos hechos» (también el mecánico, en sus órdenes). Al **entregar** el vehículo, la base de datos calcula el próximo: fecha de entrega + meses y kilómetros de entrada + km. Si el taller cambia la periodicidad, se recalculan los próximos de todos los vehículos.
+- La oficina puede anotar en la ficha del vehículo uno hecho **fuera del taller** (o antes de usar el panel). Cuenta el más reciente entre lo anotado y las órdenes.
+- «Vencen pronto»: vencidos o en los próximos 60 días / 2.000 km (con el último kilometraje conocido).
+- El cliente ve en su portal los mantenimientos de sus vehículos (`portal_vehicle_services`). Los recordatorios usan la regla «Revisión» (abajo): solo le llegan si él lo pidió.
+- Base de datos: `service_intervals`, `order_services`, `vehicle_services` (solo la escribe la base de datos), `set_vehicle_service`. Reglas compartidas: `packages/core/src/maintenance.ts`.
+
 ## Recordatorios (`/panel/recordatorios`)
 
 Los genera la base de datos una vez al día en el mantenimiento programado (`/api/notificaciones/procesar` → `run_maintenance`), aunque nadie tenga el panel abierto. Cada uno tiene una clave única: **nunca se repite**.
 
 | Tipo | A quién | Cuándo |
 |---|---|---|
-| Revisión del vehículo | Cliente, **solo si lo pidió** en su portal | N días antes de la fecha o N km antes |
+| Revisión y mantenimientos del vehículo | Cliente, **solo si lo pidió** en su portal | N días antes de la fecha o N km antes (próxima revisión de la ficha y cada mantenimiento periódico) |
 | Presupuesto sin respuesta | Cliente | N días después de enviarlo |
 | Vehículo sin recoger | Cliente | N días después de estar listo |
 | Trabajo retrasado | Solo el taller | Pasada la fecha prevista |
@@ -57,5 +69,5 @@ Los genera la base de datos una vez al día en el mantenimiento programado (`/ap
 
 ## Pruebas
 
-- Base de datos: `supabase/tests/15_gestion_taller.test.sql` y `16_facturacion_recordatorios.test.sql`.
+- Base de datos: `supabase/tests/15_gestion_taller.test.sql`, `16_facturacion_recordatorios.test.sql` y `18_mantenimientos.test.sql`.
 - Navegador: `apps/web/e2e/gestion.spec.ts` (incluye la cuenta de recepción `recepcion@e2e.test`).

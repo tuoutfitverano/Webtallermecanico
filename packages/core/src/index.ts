@@ -4,3 +4,4 @@ export * from './requests.ts';
 export * from './workshop.ts';
 export * from './money.ts';
 export * from './documents.ts';
+export * from './maintenance.ts';
