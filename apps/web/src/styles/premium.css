@@ -112,8 +112,9 @@
   font-family: var(--pm-display); font-stretch: 112%;
   font-size: .8rem; font-weight: 650; letter-spacing: .12em; text-transform: uppercase;
   text-decoration: none; border-radius: 999px;
-  transition: background-color .25s, color .25s, border-color .25s, transform .25s;
+  transition: background-color .25s, color .25s, border-color .25s, transform .16s var(--ease-out);
 }
+.pm-btn:active, .pm-round:active { transform: scale(.97); }
 .pm-btn svg { width: 1.05em; height: 1.05em; }
 /* Móviles pequeños: el texto del botón cabe en una línea. */
 @media (max-width: 420px) { .pm-btn { letter-spacing: .06em; padding-inline: 1.1rem; } }
@@ -168,7 +169,7 @@
   display: inline-grid; place-items: center; flex: none;
   width: 44px; height: 44px; padding: 0; border-radius: 50%;
   border: 1px solid var(--pm-line-2); background: color-mix(in srgb, var(--pm-bg) 35%, transparent); color: var(--pm-fg);
-  cursor: pointer; transition: border-color .2s;
+  cursor: pointer; transition: border-color .2s, transform .16s var(--ease-out);
 }
 .pm-round:hover { border-color: var(--pm-fg); }
 .pm-round .ico { width: 18px; height: 18px; }
@@ -407,7 +408,7 @@ html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding
 .pm-tour-copy > p:last-child { margin: 0; color: color-mix(in srgb, var(--pm-fg) 82%, transparent); font-size: 1.05rem; line-height: 1.6; max-width: 42ch; }
 /* Con JavaScript: una pantalla cada vez, con una transición suave. */
 .pm-js .pm-tour-panels { display: grid; gap: 0; }
-.pm-js .pm-tour-panel { grid-area: 1 / 1; transition: opacity .45s ease, transform .45s ease; }
+.pm-js .pm-tour-panel { grid-area: 1 / 1; transition: opacity .3s var(--ease-out), transform .3s var(--ease-out); }
 .pm-js .pm-tour-panel.is-off { opacity: 0; transform: translateY(12px); visibility: hidden; pointer-events: none; }
 .pm-tour-nav { display: flex; gap: 10px; justify-content: flex-end; }
 .pm-round {
@@ -500,8 +501,9 @@ html.stage-on .pm .stage ~ .pm-software { margin-top: -40vh; z-index: 2; padding
   content: ''; position: absolute; left: 0; top: 0; height: 1px;
 }
 .pm-steps::before { right: 0; background: var(--pm-line-2); }
-.pm-steps::after { width: calc(var(--pm-progress) * 100%); background: var(--pm-accent); transition: width .2s linear; }
-html:not(.pm-js) .pm-steps::after { width: 100%; }
+/* La línea de progreso crece con transform (sin recalcular la maquetación en cada scroll). */
+.pm-steps::after { right: 0; background: var(--pm-accent); transform: scaleX(var(--pm-progress, 0)); transform-origin: left; transition: transform .2s linear; }
+html:not(.pm-js) .pm-steps::after { transform: none; }
 .pm-step { display: grid; align-content: start; gap: 10px; padding-top: 26px; position: relative; }
 .pm-step::before {
   content: ''; position: absolute; top: -4px; left: 0; width: 9px; height: 9px; border-radius: 50%;
@@ -515,8 +517,8 @@ html:not(.pm-js) .pm-steps::after { width: 100%; }
   .pm-steps { grid-template-columns: 1fr; gap: 28px; padding-left: 28px; }
   .pm-steps::before, .pm-steps::after { left: 4px; top: 0; width: 1px; }
   .pm-steps::before { right: auto; bottom: 0; height: auto; }
-  .pm-steps::after { height: calc(var(--pm-progress) * 100%); width: 1px; transition: height .2s linear; }
-  html:not(.pm-js) .pm-steps::after { height: 100%; width: 1px; }
+  .pm-steps::after { right: auto; bottom: 0; height: auto; width: 1px; transform: scaleY(var(--pm-progress, 0)); transform-origin: top; }
+  html:not(.pm-js) .pm-steps::after { transform: none; }
   .pm-step { padding-top: 0; }
   .pm-step::before { left: -28px; top: 4px; }
 }

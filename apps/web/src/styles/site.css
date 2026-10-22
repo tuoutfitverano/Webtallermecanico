@@ -11,6 +11,9 @@
    ========================================================= */
 
 :root {
+  /* Curvas de movimiento: salida rápida (respuesta inmediata) y en pantalla (ida y vuelta). */
+  --ease-out: cubic-bezier(.23, 1, .32, 1);
+  --ease-in-out: cubic-bezier(.77, 0, .175, 1);
   color-scheme: dark;
   /* Fondo propio del taller (diseño premium) solo en modo oscuro. */
   --bg: var(--bg-taller, #000);
@@ -366,7 +369,7 @@ html.anim-done .blur-word {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 20px; border-radius: 999px;
   font-weight: 500; color: var(--fg); text-decoration: none;
-  transition: background .2s;
+  transition: background .2s, transform .16s var(--ease-out);
 }
 .btn-glass:hover { background: rgb(var(--fg-rgb) / .08); }
 .btn-plain {
@@ -380,9 +383,11 @@ html.anim-done .blur-word {
   min-height: 48px; padding: 12px 22px; border-radius: 999px;
   border: 1px solid var(--line-2); background: transparent; color: var(--fg);
   font-weight: 500; font-size: 1rem; text-decoration: none; cursor: pointer;
-  transition: background .2s, opacity .2s;
+  transition: background .2s, opacity .2s, transform .16s var(--ease-out);
 }
 .btn:hover { background: rgb(var(--fg-rgb) / .06); }
+/* Al pulsar, el botón cede un poco: confirma que se ha tocado. */
+.btn:active:not(:disabled), .btn-glass:active { transform: scale(.97); }
 .btn-primary { background: var(--fg); color: var(--ink); border-color: var(--fg); font-weight: 600; }
 .btn-primary:hover { background: rgb(var(--fg-rgb) / .86); }
 .btn-block { width: 100%; margin-top: 20px; }
@@ -761,6 +766,7 @@ abbr[title] { text-decoration: none; color: var(--accent-soft); }
 /* ---------- Accesibilidad e impresión ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .btn:active, .btn-glass:active, .pm-btn:active, .pm-round:active { transform: none !important; }
 }
 @media print {
   .demo-bar, .site-header, .ambient, .fading-video { display: none !important; }

@@ -414,6 +414,34 @@ test('portal del cliente: accesibilidad, consola y móvil', async ({ page, isMob
   await audit(page, ['/portal', '/portal/vehiculos', '/portal/reparaciones', `/portal/reparaciones/${f.order}`, '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/portal/vehiculos/nuevo', '/portal/vehiculos/papelera'], isMobile);
 });
 
+test('portal: el modo elegido se mantiene al cambiar de sección, sin parpadeos', async ({ page, isMobile }) => {
+  const f = await fixtures();
+  await login(page, f.email, '/portal');
+  const html = page.locator('html');
+  await expect(html).toHaveAttribute('data-theme', 'claro');
+  await page.getByRole('button', { name: 'Modo oscuro' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'oscuro');
+  // Cada cambio de modo durante la navegación queda anotado: no puede volver a «claro» ni un instante.
+  await page.evaluate(() => {
+    const log: string[] = ((window as unknown as { __modos: string[] }).__modos = []);
+    new MutationObserver(() => log.push(document.documentElement.dataset.theme ?? '')).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  });
+  const nav = isMobile ? page.locator('.pnl-tabs') : page.getByRole('complementary', { name: 'Menú del portal' });
+  for (const [name, path] of [['Mis vehículos', '/portal/vehiculos'], ['Reparaciones', '/portal/reparaciones'], ['Inicio', '/portal']] as const) {
+    const link = nav.getByRole('link', { name, exact: true });
+    if (await link.count()) await link.first().click(); else await page.goto(path);
+    await page.waitForURL(u => u.pathname === path);
+    await expect(html, name).toHaveAttribute('data-theme', 'oscuro');
+  }
+  const modos = await page.evaluate(() => (window as unknown as { __modos?: string[] }).__modos ?? []);
+  expect(modos.filter(m => m !== 'oscuro'), `cambios de modo: ${modos.join(', ')}`).toEqual([]);
+  // También al cargar de cero (lo pinta el servidor).
+  for (const path of ['/portal/vehiculos', '/portal/datos', '/portal']) {
+    await page.goto(path);
+    await expect(html, path).toHaveAttribute('data-theme', 'oscuro');
+  }
+});
+
 test('cabeceras de seguridad en la web pública y en el área privada', async () => {
   for (const path of ['/', '/acceso', '/panel', '/api/notificaciones/procesar']) {
     const r = await fetch(`${WEB}${path}`, { headers: { host: HOST }, redirect: 'manual' });

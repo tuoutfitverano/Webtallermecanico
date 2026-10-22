@@ -78,7 +78,7 @@
 [data-area='app'] .btn {
   font-family: var(--font-display); font-stretch: 112%;
   font-size: .78rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase;
-  border-radius: 999px; transition: background-color .25s, color .25s, border-color .25s;
+  border-radius: 999px; transition: background-color .25s, color .25s, border-color .25s, transform .16s var(--ease-out);
 }
 [data-area='app'] .btn:hover { border-color: var(--fg); background: transparent; }
 [data-area='app'] .btn-primary { background: var(--fg); color: var(--ink); border-color: var(--fg); }
