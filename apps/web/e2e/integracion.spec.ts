@@ -56,7 +56,8 @@ test.describe('Navegación', () => {
       await page.goto(path);
       if (isMobile) await page.getByRole('button', { name: menuName, exact: true }).click();
       await page.getByRole('navigation', { name: navName }).getByRole('link', { name: 'Área de clientes' }).click();
-      await expect(page).toHaveURL(/\/acceso$/);
+      // Desde la web de un taller se recuerda el taller: tras entrar, se comprueba la relación con ÉL.
+      await expect(page).toHaveURL(/\/acceso\?next=%2Fportal%2Fentrar%2F[a-z0-9-]+$/);
       await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
     });
   }

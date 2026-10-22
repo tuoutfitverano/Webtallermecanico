@@ -133,4 +133,8 @@ select tests.eq((select count(*) from public.portal_profile() where workshop_id 
 select tests.eq((select count(*) from public.portal_profile()), 1::bigint, 'pero sí la de otro taller (no se toca)');
 reset role;
 
+-- Hora de España: «hoy» en la base de datos es el mismo día que en las pantallas.
+select tests.eq(current_setting('TimeZone'), 'Europe/Madrid', 'la base de datos trabaja con la hora de España');
+select tests.eq(current_date, (now() at time zone 'Europe/Madrid')::date, 'current_date es el día de Madrid (cobros, facturas, vencimientos)');
+
 rollback;
