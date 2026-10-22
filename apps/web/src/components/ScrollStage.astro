@@ -5,6 +5,8 @@
  *  2. Al bajar hacia los servicios, el coche gira al ritmo del scroll (vuelta completa
  *     o la parte que diga frames.turn, o hasta frames.endFrame, hacia delante o hacia atrás
  *     con frames.reverse; turnGap/zoomGap = espacio propio de cada transición).
+ *     Con frames.openFrom, desde ese fotograma (p. ej. el maletero que se abre) se
+ *     reproduce al empezar la última transición, antes del zoom.
  *  3. Antes de la tercera sección, la cámara se acerca hasta la ventanilla
  *     tintada (focusX/focusY) y la pantalla queda oscura: transición a la siguiente.
  *
@@ -29,6 +31,7 @@ const { frames } = Astro.props;
   data-turn={frames.turn}
   data-end-frame={frames.endFrame ?? undefined}
   data-reverse={frames.reverse ? 'true' : undefined}
+  data-open-from={frames.openFrom ?? undefined}
   style={`--turn-gap:${frames.turnGap * 100}vh;--zoom-gap:${frames.zoomGap * 100}vh`}
 >
   <div class="stage-sticky" aria-hidden="true">

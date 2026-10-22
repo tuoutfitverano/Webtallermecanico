@@ -10,7 +10,7 @@ import { expect, test, type Page } from '@playwright/test';
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 test.skip(!PROXY, 'Lanza estas pruebas con scripts/test-e2e.sh');
 
-const FRAME = /\/demo\/autovalue\/giro(-4k)?\//;
+const FRAME = /\/demo\/autovalue\/(giro|giro-4k|maletero)\//;
 // Código pesado de los formularios: el módulo de envío y las reglas compartidas (zod).
 const FORM_CODE = /request-forms-submit|\/packages\/core\/|\/zod\//;
 

@@ -23,6 +23,8 @@ const easeIn = (t: number) => t * t * t;
 const TARGET_W = 0.11;
 const TARGET_H = 0.09;
 const MIN_ZOOM = 16;
+/** Con segunda animación (maletero): parte del último tramo que ocupa, antes del zoom. */
+const OPEN_PART = 0.45;
 
 /** Señales de que la persona va a bajar por la página. */
 const INTENT = ['scroll', 'wheel', 'touchstart', 'keydown'] as const;
@@ -56,6 +58,9 @@ function start(stage: HTMLElement) {
     ? (reverse ? count - endFrame : endFrame)
     : Math.max(1, Math.round(turnPart * (count - 1)));
   const frameAt = (step: number) => (reverse && step > 0 ? count - step : step);
+  // Segunda animación (maletero): desde el paso openFrom se reproduce antes del zoom.
+  const openAttr = Number(stage.dataset.openFrom);
+  const openFrom = !reverse && Number.isInteger(openAttr) && openAttr >= 1 && openAttr < steps ? openAttr : 0;
   if (!canvas || !ctx || !dim || !hero || !turnGap || !zoomGap || !src.includes('{n}') || !(count >= 2)) return;
   const second = turnGap.nextElementSibling as HTMLElement | null;
   // Color de fondo de la web (el diseño premium y el modo claro lo cambian): el fundido final acaba en él.
@@ -163,20 +168,27 @@ function start(stage: HTMLElement) {
     const r1 = Math.max(secondTop - vh * 0.35, r0 + vh * 0.8);
     const turn = easeInOut(clamp((y - r0) / Math.max(1, r1 - r0)));
     // 2 → 3: zoom hasta la ventanilla y fundido al fondo; empieza mientras salen los servicios.
+    // Con segunda animación, la primera parte de ese tramo la reproduce (el maletero se abre)
+    // y el zoom llega después.
     const z0 = zoomTop - vh * 0.9;
-    const zoom = clamp((y - z0) / Math.max(1, zoomEnd - z0));
+    const o1 = openFrom ? z0 + (zoomEnd - z0) * OPEN_PART : z0;
+    const open = openFrom ? easeInOut(clamp((y - z0) / Math.max(1, o1 - z0))) : 0;
+    const zoom = clamp((y - o1) / Math.max(1, zoomEnd - o1));
 
     // Oscurecido continuo: el coche se aclara al empezar a bajar y se vuelve a
     // oscurecer, sin saltos, cuando el texto de la siguiente sección llega al centro.
     let shade: number;
-    if (zoom > 0) shade = zoom < 0.4 ? lerp(0.72, 0.12, zoom / 0.4) : zoom > 0.65 ? lerp(0.12, 1, (zoom - 0.65) / 0.35) : 0.12;
+    if (openFrom && zoom > 0) shade = zoom > 0.65 ? lerp(0.12, 1, (zoom - 0.65) / 0.35) : 0.12;
+    else if (zoom > 0) shade = zoom < 0.4 ? lerp(0.72, 0.12, zoom / 0.4) : zoom > 0.65 ? lerp(0.12, 1, (zoom - 0.65) / 0.35) : 0.12;
+    else if (open > 0) shade = lerp(0.72, 0.12, clamp(open / 0.35));
     else {
       const down = lerp(0.62, 0.12, clamp((y - stageTop) / Math.max(1, heroH * 0.45)));
       const up = lerp(0.12, 0.72, clamp((y - (secondTop - vh * 0.8)) / (vh * 0.55)));
       shade = Math.max(down, up);
     }
 
-    const index = Math.round(turn * steps);
+    const index = !openFrom ? Math.round(turn * steps)
+      : open > 0 ? openFrom + Math.round(open * (steps - openFrom)) : Math.round(turn * openFrom);
     const img = nearest(index);
     // El fotograma dibujado forma parte de la clave: al terminar de cargarse, se redibuja.
     const key = `${img ? frames.indexOf(img) : -1}|${backdrop ? 1 : 0}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;

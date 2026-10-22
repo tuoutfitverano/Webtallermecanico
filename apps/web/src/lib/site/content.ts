@@ -84,6 +84,12 @@ export const scrollFramesSchema = z.object({
    */
   endFrame: z.number().int().min(1).max(239).nullable().default(null),
   reverse: z.boolean().default(false),
+  /**
+   * Segunda animación opcional (p. ej. abrir el maletero): desde este fotograma la
+   * secuencia ya no se reproduce en el giro sino al empezar la última transición,
+   * antes del zoom. Sin ella, todo es giro.
+   */
+  openFrom: z.number().int().min(1).max(239).nullable().default(null),
   turnGap: z.number().min(0).max(2).default(1.3),
   zoomGap: z.number().min(0.6).max(2.5).default(1.7),
 });

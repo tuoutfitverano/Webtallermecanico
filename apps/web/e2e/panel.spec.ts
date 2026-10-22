@@ -411,9 +411,9 @@ test.describe('Panel · móvil y usuarios sin taller', () => {
 
 // ======================================================================
 test.describe('Web pública', () => {
-  test('el coche gira media vuelta con el scroll y se acerca a la ventanilla antes del software', async ({ page }) => {
+  test('el coche gira hasta la trasera, abre el maletero y se acerca a él antes del software', async ({ page }) => {
     const frames: string[] = [];
-    page.on('request', r => { if (r.url().includes('/demo/autovalue/giro/')) frames.push(r.url()); });
+    page.on('request', r => { if (r.url().includes('/demo/autovalue/maletero/')) frames.push(r.url()); });
     await page.goto('/');
     await expect(page.locator('html')).toHaveClass(/stage-on/);
     // Sin bajar no se descarga ningún fotograma (solo la imagen fija); al empezar a bajar, sí.
@@ -424,16 +424,19 @@ test.describe('Web pública', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('La mecánica evoluciona.');
     const dim = () => page.locator('.stage-dim').evaluate(el => Number(getComputedStyle(el).opacity));
     expect(await dim()).toBeGreaterThan(0.5); // portada: coche oscurecido detrás del texto
-    // A mitad del giro (media vuelta, ya fundida con la portada) el coche se ve limpio.
+    // A mitad del giro (ya fundido con la portada) el coche se ve limpio.
     // La portada puede ser más alta que la pantalla: se baja la mitad de la portada.
     await page.evaluate(() => { const h = document.querySelector<HTMLElement>('.stage-content > section')!; scrollTo(0, h.getBoundingClientRect().top + scrollY + h.offsetHeight * 0.5); });
     await expect.poll(dim).toBeLessThan(0.2);
-    // Al final del zoom la pantalla queda oscura (la ventanilla tintada) y empieza el software.
+    // Tras los servicios, el maletero se abre con el coche a la vista (antes del zoom).
+    await page.evaluate(() => { const g = document.querySelector<HTMLElement>('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY - innerHeight * 0.9 + (g.clientHeight + innerHeight * 0.9 - innerHeight) * 0.3); });
+    await expect.poll(dim).toBeLessThan(0.3);
+    // Al final del zoom la pantalla queda oscura (el interior del maletero) y empieza el software.
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
     await expect.poll(dim).toBeGreaterThan(0.95);
-    // Media vuelta: solo se descargan los fotogramas 000–036.
-    const used = [...new Set(frames.map(f => Number(/giro\/(\d+)\.webp/.exec(f)![1])))].sort((a, b) => a - b);
-    expect(used).toEqual(Array.from({ length: 37 }, (_, i) => i));
+    // Giro + maletero: se descargan los 62 fotogramas, ni uno más.
+    const used = [...new Set(frames.map(f => Number(/maletero\/(\d+)\.webp/.exec(f)![1])))].sort((a, b) => a - b);
+    expect(used).toEqual(Array.from({ length: 62 }, (_, i) => i));
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });

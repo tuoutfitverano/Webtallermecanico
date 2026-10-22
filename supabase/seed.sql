@@ -40,18 +40,18 @@ values (
     "matriculas": true
   },
   "scrollFrames": {
-    "src": "/demo/autovalue/giro/{n}.webp",
-    "count": 73,
-    "poster": "/demo/autovalue/portada.webp",
-    "focusX": 0.575,
-    "focusY": 0.405,
+    "src": "/demo/autovalue/maletero/{n}.webp",
+    "count": 62,
+    "poster": "/demo/autovalue/portada-maletero.webp",
+    "focusX": 0.5,
+    "focusY": 0.53,
     "backdrop": "/demo/autovalue/garaje.webp",
     "frameTop": 0.359375,
-    "srcHd": "/demo/autovalue/giro-4k/{n}.webp",
+    "srcHd": null,
     "backdropHd": "/demo/autovalue/garaje-4k.webp",
-    "turn": 0.5,
+    "openFrom": 29,
     "turnGap": 0.35,
-    "zoomGap": 0.85
+    "zoomGap": 1.6
   }
 }$tema$,
   $contenido${
