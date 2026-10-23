@@ -1,23 +1,49 @@
 ---
-/** Privacidad de las cuentas del área privada: texto pendiente (no se inventa). */
-import AuthLayout from '../layouts/AuthLayout.astro';
-import Icon from '../components/Icon.astro';
+/**
+ * Privacidad de las cuentas del área privada (RGPD art. 13). La plataforma es
+ * responsable de la CUENTA; cada taller, de los datos de su taller (ver /privacidad de su web).
+ */
+import PlatformLegalDoc from '../components/PlatformLegalDoc.astro';
+import PlatformHolder from '../components/PlatformHolder.astro';
+import LegalValue from '../components/LegalValue.astro';
+import { emailAvailable } from '../lib/server/config.ts';
+import { PLATFORM_LEGAL as P, SUBPROCESSORS } from '../lib/legal/platform.ts';
 export const prerender = false;
-const items = [
-  'Quién es el responsable de las cuentas de usuario de la plataforma y cómo contactarle.',
-  'Qué datos se guardan (correo, nombre, teléfono opcional, talleres y rol) y para qué: identificarte y darte acceso a tu taller.',
-  'Qué proveedores los tratan (Supabase para la base de datos y el inicio de sesión; Cloudflare para la web; si se activan, el proveedor de email de los avisos y el de datos por matrícula) y dónde.',
-  'Para clientes de un taller: qué ven en su portal, qué avisos reciben y cómo cambiar sus preferencias de comunicación.',
-  'Cuánto tiempo se conservan y cómo borrar la cuenta.',
-  'Cómo ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad, y reclamar ante la AEPD.',
-];
+const providers = SUBPROCESSORS.filter(s => s.when === 'siempre' || (s.when === 'email' && emailAvailable()));
 ---
-<AuthLayout title="Privacidad de las cuentas">
-  <section class="auth-card liquid-glass-strong legal" aria-labelledby="titulo">
-    <p class="label">Información legal</p>
-    <h1 id="titulo" class="auth-title heading">Privacidad de las cuentas</h1>
-    <div class="alert alert-warn" role="note"><Icon name="alert" /><span><strong>Texto pendiente.</strong> El titular de la plataforma debe redactarlo con su asesor legal antes de abrir el registro al público.</span></div>
-    <p>Esta página deberá incluir, al menos:</p>
-    <ul>{items.map(i => <li>{i}</li>)}</ul>
-  </section>
-</AuthLayout>
+<PlatformLegalDoc title="Privacidad de las cuentas">
+  <h2>1. Quién es responsable de qué</h2>
+  <p><strong>Tu cuenta</strong> (correo, nombre y acceso) la gestiona el titular de la plataforma {P.brand}:</p>
+  <PlatformHolder />
+  <p><strong>Lo que hay dentro de cada taller</strong> (tu ficha de cliente, vehículos, reparaciones, presupuestos y facturas, o tu trabajo si eres del equipo) es responsabilidad de ese taller; la plataforma lo trata por su cuenta. Su política está en la sección «Privacidad» de la web de cada taller.</p>
+
+  <h2>2. Qué datos de la cuenta, para qué y por qué</h2>
+  <div class="table-scroll">
+    <table class="legal-table">
+      <thead><tr><th scope="col">Qué</th><th scope="col">Para qué</th><th scope="col">Base legal (RGPD art. 6)</th></tr></thead>
+      <tbody>
+        <tr><td>Correo, nombre, contraseña (cifrada; nadie la puede leer) y, si la activas, la verificación en dos pasos</td><td>Crear tu cuenta, que entres y recuperar el acceso</td><td>Contrato: prestarte el servicio que pides al registrarte (6.1.b)</td></tr>
+        <tr><td>Talleres y rol de cada uno (cliente, mecánico, recepción, administración o propiedad)</td><td>Enseñarte solo lo que te corresponde</td><td>Contrato (6.1.b)</td></tr>
+        <tr><td>Registro de accesos y cambios de permisos (sin contraseñas ni códigos)</td><td>Seguridad: detectar y aclarar accesos indebidos</td><td>Interés legítimo en proteger las cuentas (6.1.f)</td></tr>
+        <tr><td>Correos de la cuenta: confirmar el correo, recuperar la contraseña e invitaciones</td><td>Que puedas usar la cuenta</td><td>Contrato (6.1.b)</td></tr>
+        <tr><td>Cookies técnicas de sesión y, si las aceptas, de preferencias</td><td>Mantener la sesión y recordar el modo y el color</td><td>Técnicas: necesarias. Preferencias: tu consentimiento (6.1.a)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>El personal de la plataforma no ve los datos de ningún taller salvo para darle soporte, con verificación en dos pasos y una sesión con motivo que queda registrada y caduca sola.</p>
+
+  <h2>3. Cuánto tiempo</h2>
+  <p>Mientras tengas la cuenta. Si pides que se borre, se eliminan tus datos de acceso; las fichas que tengas en cada taller siguen siendo de ese taller (por ejemplo, sus facturas, que debe conservar 6 años), pero dejan de estar unidas a tu cuenta.</p>
+
+  <h2>4. Proveedores</h2>
+  <div class="table-scroll">
+    <table class="legal-table">
+      <thead><tr><th scope="col">Proveedor</th><th scope="col">Para qué</th><th scope="col">Dónde</th></tr></thead>
+      <tbody>{providers.map(s => <tr><td>{s.name}</td><td>{s.what}</td><td>{s.where}</td></tr>)}</tbody>
+    </table>
+  </div>
+  <p>Las transferencias fuera del Espacio Económico Europeo se amparan en cláusulas contractuales tipo de la Comisión Europea o en el Marco de Privacidad de Datos UE-EE. UU.</p>
+
+  <h2>5. Tus derechos</h2>
+  <p>Puedes pedir acceder, rectificar, suprimir, oponerte, limitar o llevarte tus datos, y retirar tu consentimiento, escribiendo a <LegalValue value={P.email} label="correo de contacto" />. Te contestamos en un mes como máximo. Para los datos de un taller, escribe a ese taller (o a nosotros y se lo trasladamos). Si no estás conforme, puedes reclamar ante la Agencia Española de Protección de Datos (aepd.es).</p>
+</PlatformLegalDoc>

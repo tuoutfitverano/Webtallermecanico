@@ -68,6 +68,12 @@ const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
       {back && <BackLink {...back} />}
       <slot />
     </main>
+    <footer class="auth-legal" aria-label="Información legal">
+      <a href="/privacidad-cuenta">Privacidad de las cuentas</a>
+      <a href="/condiciones">Condiciones del servicio</a>
+      <a href="/encargo">Encargo del tratamiento</a>
+      <a href="/cookies">Cookies</a>
+    </footer>
     <CookieBanner consent={consent} />
     <script>
       import '../scripts/auth-forms.ts';

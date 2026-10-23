@@ -61,7 +61,13 @@ describe('órdenes de reparación', () => {
 describe('datos del taller', () => {
   it('acepta solo el nombre y deja el resto vacío', () => {
     const r = workshopProfileSchema.parse({ name: '  Taller Uno ', legalName: '', taxId: '', contactEmail: '', contactPhone: '', logoUrl: '' });
-    expect(r).toEqual({ name: 'Taller Uno', legalName: null, taxId: null, contactEmail: null, contactPhone: null, logoUrl: null, addressLine: null, postalCode: null, city: null, province: null });
+    expect(r).toEqual({ name: 'Taller Uno', legalName: null, taxId: null, contactEmail: null, contactPhone: null, logoUrl: null, addressLine: null, postalCode: null, city: null, province: null, registryInfo: null, legalEmail: null });
+  });
+  it('valida y normaliza el correo legal y la inscripción registral', () => {
+    expect(workshopProfileSchema.safeParse({ name: 'Taller', legalEmail: 'no-es-correo' }).success).toBe(false);
+    const r = workshopProfileSchema.parse({ name: 'Taller', legalEmail: 'Legal@Taller.ES', registryInfo: '  RM Madrid, tomo 1 ' });
+    expect(r.legalEmail).toBe('legal@taller.es');
+    expect(r.registryInfo).toBe('RM Madrid, tomo 1');
   });
   it('normaliza correo y NIF', () => {
     const r = workshopProfileSchema.parse({ name: 'Taller', contactEmail: 'Hola@Taller.ES', taxId: 'b12345678' });

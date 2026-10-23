@@ -91,6 +91,7 @@ const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
 
       {inv.notes && <p class="note">{inv.notes}</p>}
       {inv.issuer.footer && <p class="foot">{inv.issuer.footer}</p>}
+      {inv.vehicle && inv.kind === 'ordinaria' && <p class="foot">Garantía: las reparaciones tienen la garantía del artículo 16 del Real Decreto 1457/1986, de al menos 3 meses o 2.000 km (15 días o 2.000 km en vehículos industriales), salvo que las piezas tengan una garantía mayor.</p>}
       <p class="foot legal">Documento generado por el software de gestión del taller. Este software todavía no es un sistema de facturación certificado VERI*FACTU.</p>
     </main>
     <script>

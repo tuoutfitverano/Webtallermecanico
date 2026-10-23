@@ -12,6 +12,7 @@ import { loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
 import { formatDateTime, todayMadrid } from '../../lib/panel/format.ts';
 import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
+import { LEGAL_VERSION } from '../../lib/legal/platform.ts';
 
 export const prerender = false;
 
@@ -31,6 +32,7 @@ let attention: Attention | null = null;
 let late = 0;
 let toReview = 0;
 let freeOrders: number | null = null;
+let termsPending = false;
 if (panel.workshop) {
   const id = panel.workshop.id;
   const today = todayMadrid();
@@ -51,6 +53,8 @@ if (panel.workshop) {
   if (panel.isManager) {
     const { count } = await panel.supabase.from('repair_orders').select('id', { count: 'exact', head: true }).eq('workshop_id', id).not('review_requested_at', 'is', null);
     toReview = count ?? 0;
+    const { data: acc } = await panel.supabase.from('workshop_legal_acceptances').select('id').eq('workshop_id', id).eq('document', 'encargo').eq('version', LEGAL_VERSION).maybeSingle();
+    termsPending = !acc;
   } else if (!panel.isOffice) {
     const { data } = await panel.supabase.rpc('unassigned_repair_orders', { p_workshop_id: id });
     freeOrders = Array.isArray(data) ? data.length : null;
@@ -92,6 +96,9 @@ const kpis = summary ? [
         </div>
       </header>
 
+      {termsPending && (
+        <div class="alert alert-warn" role="note"><Icon name="alert" /><span>Falta aceptar las condiciones del servicio y el contrato de encargo del tratamiento ({panel.workshop.role === 'propietario' ? 'te corresponde a ti' : 'le corresponde a la propietaria'}). <a href="/panel/taller#legal-t">Ir a Taller</a></span></div>
+      )}
       {error && <Flash kind="bad" text="No hemos podido cargar el resumen. Recarga la página; si sigue fallando, puede ser un problema de conexión con la base de datos." />}
 
       {summary && (

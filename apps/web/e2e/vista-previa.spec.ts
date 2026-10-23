@@ -180,7 +180,7 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   // ---- Gestión: datos fiscales FICTICIOS, ajustes, líneas, presupuestos, facturas,
   // planificación, fichajes y recordatorios. Todo es de demostración (base temporal).
   await rest('PATCH', `/workshops?id=eq.${DEMO}`, owner.tok, {
-    legal_name: 'AutoValue Demo S.L. (ficticio)', tax_id: 'B00000000', address_line: 'Calle de Ejemplo 1 (dirección ficticia)', postal_code: '28000', city: 'Madrid',
+    legal_name: 'AutoValue Demo S.L. (ficticio)', tax_id: 'B00000000', address_line: 'Calle de Ejemplo 1 (dirección ficticia)', postal_code: '28000', city: 'Madrid', legal_email: 'legal@autovalue-demo.test',
   });
   await rest('PATCH', `/workshop_billing_settings?workshop_id=eq.${DEMO}`, owner.tok, {
     labour_rate_cents: 4500, payment_terms_days: 15, invoice_footer: 'Factura de demostración. Datos ficticios.',

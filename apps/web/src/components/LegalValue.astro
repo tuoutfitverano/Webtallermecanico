@@ -1,0 +1,7 @@
+---
+/** Un dato legal: el valor real o, si falta, un marcador bien visible. Nunca se inventa. */
+interface Props { value: string | null | undefined; label: string }
+const { value, label } = Astro.props;
+const v = value?.trim();
+---
+{v ? <span>{v}</span> : <mark class="legal-missing">[Falta: {label}]</mark>}

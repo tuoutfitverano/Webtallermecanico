@@ -27,7 +27,7 @@ STATE_INLINE = open(f'{ROOT}/scripts/vista-previa/state-inline.js', encoding='ut
 ROLES = {'taller': ('t', '/panel'), 'trabajador': ('w', '/panel'), 'cliente': ('c', '/portal')}
 PUBLIC = {'': 'index.html', 'acceso': 'acceso.html', 'area-cliente': 'acceso.html', 'registro': 'registro.html', 'recuperar': 'recuperar.html',
           'privacidad': 'privacidad.html', 'aviso-legal': 'aviso-legal.html', 'cookies': 'cookies.html',
-          'condiciones': 'condiciones.html', 'privacidad-cuenta': 'privacidad-cuenta.html'}
+          'condiciones': 'condiciones.html', 'privacidad-cuenta': 'privacidad-cuenta.html', 'encargo': 'encargo.html'}
 UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 fonts, styles = {}, {}
 

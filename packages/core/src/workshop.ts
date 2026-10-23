@@ -122,8 +122,14 @@ export const workshopProfileSchema = z
     postalCode: optText(5),
     city: optText(80),
     province: optText(80),
+    // Datos legales de la web (LSSI art. 10): inscripción registral y correo para asuntos legales.
+    registryInfo: optText(300),
+    legalEmail: optText(254),
   })
   .superRefine((v, ctx) => {
+    if (v.legalEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.legalEmail)) {
+      ctx.addIssue({ code: 'custom', path: ['legalEmail'], message: 'Correo electrónico no válido.' });
+    }
     if (v.postalCode && !/^\d{5}$/.test(v.postalCode)) {
       ctx.addIssue({ code: 'custom', path: ['postalCode'], message: 'El código postal tiene 5 cifras.' });
     }
@@ -143,7 +149,7 @@ export const workshopProfileSchema = z
       ctx.addIssue({ code: 'custom', path: ['logoUrl'], message: 'Debe ser una dirección que empiece por https://' });
     }
   })
-  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase().replace(/[\s.-]/g, '') : null }));
+  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, legalEmail: v.legalEmail ? v.legalEmail.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase().replace(/[\s.-]/g, '') : null }));
 
 export type WorkshopProfileData = z.output<typeof workshopProfileSchema>;
 

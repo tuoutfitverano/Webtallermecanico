@@ -95,7 +95,7 @@ async function audit(page: Page, paths: string[], isMobile: boolean) {
 }
 
 test('web pública: accesibilidad, consola, enlaces y móvil', async ({ page, isMobile }) => {
-  await audit(page, ['/', '/clasico', '/privacidad', '/aviso-legal', '/cookies', '/acceso', '/registro', '/recuperar', '/privacidad-cuenta', '/condiciones'], isMobile);
+  await audit(page, ['/', '/clasico', '/privacidad', '/aviso-legal', '/cookies', '/acceso', '/registro', '/recuperar', '/privacidad-cuenta', '/condiciones', '/encargo'], isMobile);
   // Enlaces internos de las dos portadas (premium y clásica): ninguno roto.
   for (const home of ['/', '/clasico']) {
     await page.goto(home);
@@ -120,7 +120,7 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
     '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
     '/panel/planificacion', '/panel/planificacion?vista=semana', '/panel/presupuestos', '/panel/presupuestos/nuevo',
     '/panel/facturas', '/panel/facturas/nueva', '/panel/recordatorios', '/panel/estadisticas',
-    '/panel/mantenimientos', `/panel/vehiculos/${f.vehicle}`, '/panel/copia', '/cuenta/seguridad',
+    '/panel/mantenimientos', `/panel/vehiculos/${f.vehicle}`, '/panel/copia', '/cuenta/seguridad', `/panel/ordenes/${f.order}/resguardo`,
   ], isMobile);
 });
 

@@ -1,0 +1,139 @@
+---
+/**
+ * Resguardo de depósito del vehículo (Real Decreto 1457/1986, reglamento de
+ * talleres): lo entrega el taller al recibir el coche y el cliente lo presenta
+ * para recogerlo. Página para imprimir (oficina del taller). Solo datos reales
+ * de la orden; las casillas del presupuesto se marcan a mano al firmar.
+ */
+import '@fontsource-variable/archivo/standard.css';
+import { isUuid, panelPage } from '../../../../lib/server/panel.ts';
+import { formatDateTime } from '../../../../lib/panel/format.ts';
+import { formatPlate, orderLabel } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+const id = Astro.params.id ?? '';
+const back = `/panel/ordenes/${id}`;
+if (!panel.workshop || !panel.isOffice || !isUuid(id)) return Astro.redirect('/panel/ordenes', 303);
+
+const [o, w] = await Promise.all([
+  panel.supabase.from('repair_orders')
+    .select('number, received_at, mileage_in, problem_description, vehicles(plate, make, model), customers(full_name, phone, tax_id)')
+    .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
+  panel.supabase.from('workshops').select('name, legal_name, tax_id, address_line, postal_code, city, province, contact_phone').eq('id', panel.workshop.id).maybeSingle(),
+]);
+const order = o.data as unknown as {
+  number: number; received_at: string; mileage_in: number | null; problem_description: string;
+  vehicles: { plate: string; make: string; model: string } | null; customers: { full_name: string; phone: string | null; tax_id: string | null } | null;
+} | null;
+const ws = w.data as { name: string; legal_name: string | null; tax_id: string | null; address_line: string | null; postal_code: string | null; city: string | null; province: string | null; contact_phone: string | null } | null;
+if (!order || !ws) return Astro.redirect(back, 303);
+const address = [ws.address_line, [ws.postal_code, ws.city].filter(Boolean).join(' '), ws.province].filter(Boolean).join(', ');
+const title = `Resguardo de depósito ${orderLabel(order.number)}`;
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <nav class="tools" aria-label="Acciones">
+      <a href={back} data-astro-reload>← Volver</a>
+      <button type="button" id="imprimir">Imprimir o guardar en PDF</button>
+    </nav>
+    <main class="doc">
+      <header class="head">
+        <div>
+          <p class="issuer-name">{ws.legal_name || ws.name}</p>
+          {ws.legal_name && ws.legal_name !== ws.name && <p>{ws.name}</p>}
+          {ws.tax_id ? <p>NIF {ws.tax_id}</p> : <p class="missing">[Falta el NIF del taller: Panel → Taller]</p>}
+          {address ? <p>{address}</p> : <p class="missing">[Falta la dirección del taller: Panel → Taller]</p>}
+          {ws.contact_phone && <p>Tel. {ws.contact_phone}</p>}
+        </div>
+        <div class="doc-id">
+          <h1>Resguardo de depósito</h1>
+          <dl>
+            <dt>Orden</dt><dd>{orderLabel(order.number)}</dd>
+            <dt>Entrada</dt><dd>{formatDateTime(order.received_at)}</dd>
+          </dl>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div>
+          <p class="lbl">Cliente</p>
+          <p><strong>{order.customers?.full_name ?? '—'}</strong></p>
+          {order.customers?.tax_id && <p>NIF {order.customers.tax_id}</p>}
+          {order.customers?.phone && <p>Tel. {order.customers.phone}</p>}
+        </div>
+        <div>
+          <p class="lbl">Vehículo</p>
+          {order.vehicles ? <p><strong>{formatPlate(order.vehicles.plate)}</strong> · {order.vehicles.make} {order.vehicles.model}</p> : <p>—</p>}
+          <p>Kilómetros a la entrada: {order.mileage_in !== null ? order.mileage_in.toLocaleString('es-ES') : '____________'}</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="lbl">Trabajo que se solicita</p>
+        <p class="box">{order.problem_description}</p>
+      </section>
+
+      <section>
+        <p class="lbl">Presupuesto</p>
+        <p>Tienes derecho a un presupuesto previo por escrito. Marca una opción:</p>
+        <p class="checks"><span>☐ Solicito presupuesto previo por escrito</span><span>☐ Renuncio al presupuesto previo</span></p>
+      </section>
+
+      <ul class="notes">
+        <li>Presenta este resguardo para recoger el vehículo.</li>
+        <li>Las reparaciones tienen la garantía del artículo 16 del Real Decreto 1457/1986: al menos 3 meses o 2.000 km (15 días o 2.000 km en vehículos industriales), salvo que las piezas tengan una garantía mayor.</li>
+        <li>Hay hojas de reclamaciones a tu disposición en el taller.</li>
+      </ul>
+
+      <section class="signs">
+        <div><p class="line"></p><p>Firma del cliente</p></div>
+        <div><p class="line"></p><p>Por el taller (firma y sello)</p></div>
+      </section>
+    </main>
+    <script>
+      document.getElementById('imprimir')?.addEventListener('click', () => window.print());
+    </script>
+    <style is:global>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #ecebe8; color: #111; font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+      .tools { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; max-width: 820px; margin: 0 auto; padding: 16px; }
+      .tools a, .tools button { font: inherit; font-weight: 600; color: #111; background: #fff; border: 1px solid #999; border-radius: 999px; padding: 10px 18px; min-height: 44px; display: inline-flex; align-items: center; text-decoration: none; cursor: pointer; }
+      .tools button { background: #111; color: #fff; border-color: #111; }
+      .doc { background: #fff; max-width: 820px; margin: 0 auto 32px; padding: 40px 44px; box-shadow: 0 2px 12px rgb(0 0 0 / 0.08); display: grid; gap: 20px; }
+      .doc p { margin: 0; }
+      .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; padding-bottom: 20px; border-bottom: 2px solid #111; }
+      .issuer-name { font-weight: 700; font-size: 16px; }
+      .missing { background: #fff3c4; padding: 0 4px; }
+      .doc-id { text-align: right; }
+      .doc-id h1 { font-family: 'Archivo Variable', system-ui, sans-serif; font-stretch: 125%; text-transform: uppercase; font-size: 20px; margin: 0 0 6px; letter-spacing: 0.02em; }
+      .doc-id dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 0; justify-content: end; }
+      .doc-id dt { color: #555; } .doc-id dd { margin: 0; font-weight: 600; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+      .lbl { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: #555; margin-bottom: 4px !important; }
+      .box { border: 1px solid #bbb; padding: 10px 12px; min-height: 64px; white-space: pre-wrap; }
+      .checks { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 6px !important; font-weight: 600; }
+      .notes { margin: 0; padding-left: 18px; font-size: 13px; color: #333; display: grid; gap: 4px; }
+      .signs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; margin-top: 24px; }
+      .signs .line { border-bottom: 1px solid #111; height: 56px; }
+      .signs p:last-child { font-size: 12px; color: #555; margin-top: 4px; }
+      @media (max-width: 600px) { .doc { padding: 20px 16px; } .doc-id { text-align: left; } .doc-id dl { justify-content: start; } }
+      @media print {
+        body { background: #fff; }
+        .tools { display: none; }
+        .doc { box-shadow: none; margin: 0; max-width: none; padding: 0; }
+        @page { margin: 16mm; }
+      }
+    </style>
+  </body>
+</html>

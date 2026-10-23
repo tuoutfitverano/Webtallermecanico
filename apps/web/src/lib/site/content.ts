@@ -151,6 +151,16 @@ export type SiteTheme = z.output<typeof siteThemeSchema>;
 export type SiteService = z.output<typeof serviceSchema>;
 export type SiteContent = z.output<typeof siteContentSchema>;
 
+/** Datos legales del titular de la web (LSSI art. 10). Lo que falte se queda en null: nunca se inventa. */
+export interface SiteLegal {
+  legalName: string | null;
+  taxId: string | null;
+  address: string | null;
+  registry: string | null;
+  email: string | null;
+}
+export const EMPTY_LEGAL: SiteLegal = { legalName: null, taxId: null, address: null, registry: null, email: null };
+
 export interface PublicSite {
   /** null = web de demostración local sin base de datos: no puede recibir solicitudes. */
   workshopId: string | null;
@@ -171,6 +181,7 @@ export interface PublicSite {
   /** Sección comercial visible y con formulario: solo en webs de demostración. */
   salesEnabled: boolean;
   content: SiteContent;
+  legal: SiteLegal;
 }
 
 /** Une los datos del taller con su tema y contenido ya validados. */
@@ -181,6 +192,7 @@ export function buildPublicSite(args: {
   isDemoContent: boolean;
   theme: unknown;
   content: unknown;
+  legal?: SiteLegal;
 }): PublicSite {
   const content = siteContentSchema.safeParse(args.content ?? {});
   const theme = siteThemeSchema.parse(typeof args.theme === 'object' && args.theme ? args.theme : {});
@@ -200,7 +212,21 @@ export function buildPublicSite(args: {
     software: theme.software,
     salesEnabled: theme.sections.comercial && args.isDemoContent,
     content: content.success ? content.data : siteContentSchema.parse({}),
+    legal: args.legal ?? EMPTY_LEGAL,
   };
+}
+
+const optText = z.string().nullish().transform(v => (v && v.trim() ? v.trim() : null));
+const legalSchema = z.object({
+  legal_name: optText, tax_id: optText, address_line: optText, postal_code: optText, city: optText, province: optText,
+  registry_info: optText, email: optText,
+}).partial();
+
+function toLegal(raw: z.output<typeof legalSchema> | undefined): SiteLegal {
+  if (!raw) return EMPTY_LEGAL;
+  const place = [raw.postal_code, raw.city].filter(Boolean).join(' ');
+  const address = [raw.address_line, place, raw.province && raw.province !== raw.city ? raw.province : null].filter(Boolean).join(', ');
+  return { legalName: raw.legal_name ?? null, taxId: raw.tax_id ?? null, address: raw.address_line ? address : null, registry: raw.registry_info ?? null, email: raw.email ?? null };
 }
 
 const rpcResultSchema = z.object({
@@ -211,13 +237,14 @@ const rpcResultSchema = z.object({
     theme: z.unknown(),
     content: z.unknown(),
   }),
+  legal: legalSchema.nullish(),
 });
 
 /** Convierte la respuesta de get_public_site en un PublicSite seguro de usar. */
 export function parsePublicSite(raw: unknown): PublicSite | null {
   const parsed = rpcResultSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { workshop, site } = parsed.data;
+  const { workshop, site, legal } = parsed.data;
   return buildPublicSite({
     workshopId: workshop.id,
     slug: workshop.slug,
@@ -225,6 +252,7 @@ export function parsePublicSite(raw: unknown): PublicSite | null {
     isDemoContent: site.is_demo_content,
     theme: site.theme,
     content: site.content,
+    legal: toLegal(legal ?? undefined),
   });
 }
 

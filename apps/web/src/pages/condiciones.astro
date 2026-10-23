@@ -1,24 +1,56 @@
 ---
-/** Condiciones del servicio para los talleres que usan la plataforma: texto pendiente (no se inventa). */
-import AuthLayout from '../layouts/AuthLayout.astro';
-import Icon from '../components/Icon.astro';
+/** Condiciones del servicio para los talleres que usan la plataforma (las acepta la propietaria en el panel). */
+import PlatformLegalDoc from '../components/PlatformLegalDoc.astro';
+import PlatformHolder from '../components/PlatformHolder.astro';
+import { PLATFORM_LEGAL as P } from '../lib/legal/platform.ts';
 export const prerender = false;
-const items = [
-  'Quién presta el servicio (titular de la plataforma, NIF y domicilio) y cómo contactar.',
-  'Qué incluye el servicio (web del taller, panel, portal de clientes, avisos) y qué no.',
-  'Precio, facturación, duración y baja del servicio.',
-  'Contrato de encargado del tratamiento (art. 28 RGPD): la plataforma trata los datos de los clientes del taller por cuenta del taller.',
-  'Subencargados (Supabase, Cloudflare y, si se activan, el proveedor de email y el de datos por matrícula) y transferencias internacionales.',
-  'Disponibilidad, copias de seguridad y qué ocurre con los datos al terminar el contrato (devolución y borrado).',
-  'Responsabilidades, uso aceptable y legislación aplicable.',
-];
 ---
-<AuthLayout title="Condiciones del servicio">
-  <section class="auth-card liquid-glass-strong legal" aria-labelledby="titulo">
-    <p class="label">Información legal</p>
-    <h1 id="titulo" class="auth-title heading">Condiciones del servicio</h1>
-    <div class="alert alert-warn" role="note"><Icon name="alert" /><span><strong>Texto pendiente.</strong> El titular de la plataforma debe redactarlo con su asesor legal antes de dar de alta talleres reales.</span></div>
-    <p>Este documento deberá incluir, al menos:</p>
-    <ul>{items.map(i => <li>{i}</li>)}</ul>
-  </section>
-</AuthLayout>
+<PlatformLegalDoc title="Condiciones del servicio">
+  <h2>1. Quién presta el servicio</h2>
+  <PlatformHolder />
+  <p>Estas condiciones se aplican al taller («el taller») que usa {P.brand}. Las acepta la persona propietaria del taller en su panel; la plataforma guarda qué versión aceptó, quién y cuándo.</p>
+
+  <h2>2. Qué incluye</h2>
+  <ul>
+    <li>La web pública del taller, con formularios de cita, presupuesto y contacto.</li>
+    <li>El panel del taller: clientes, vehículos, órdenes de reparación, planificación, presupuestos, facturas, cobros, recordatorios, estadísticas y equipo con roles.</li>
+    <li>El área de clientes, donde cada cliente invitado ve sus vehículos, reparaciones, presupuestos y facturas.</li>
+    <li>Avisos del estado de la reparación en el área de clientes y, si se activan, por correo y por WhatsApp.</li>
+    <li>Una copia completa de los datos del taller, descargable en cualquier momento desde el panel.</li>
+  </ul>
+
+  <h2>3. Lo que el taller se compromete a hacer</h2>
+  <ul>
+    <li>Dar datos veraces (también los legales de su web) y mantener a salvo las contraseñas de su equipo. Se recomienda la verificación en dos pasos.</li>
+    <li>Tener base legal para los datos de sus clientes e informarles (la web incluye su política de privacidad, con sus datos).</li>
+    <li>Cumplir la normativa de su actividad: presupuesto previo por escrito, resguardo de depósito, garantía de las reparaciones, hojas de reclamaciones y cartel informativo (Real Decreto 1457/1986 y normas de su comunidad autónoma). El programa ayuda, pero la obligación es del taller.</li>
+    <li>No usar la plataforma para fines ilícitos, ni intentar acceder a datos de otros talleres.</li>
+  </ul>
+
+  <h2>4. Facturas: importante</h2>
+  <p>Las facturas que genera el programa son <strong>operativas</strong> (numeración sin huecos, datos congelados al emitir y registro encadenado), pero el programa <strong>todavía no es un sistema certificado VERI*FACTU</strong> (Real Decreto 1007/2023). Cuando ese sistema sea obligatorio para el taller, este deberá emitir sus facturas con un programa que cumpla, salvo que {P.brand} le comunique por escrito que ya está adaptado.</p>
+
+  <h2>5. Precio</h2>
+  <p>El que figure en la oferta que el taller acepte por escrito.</p>
+
+  <h2>6. Datos personales</h2>
+  <p>El taller es el responsable de los datos de sus clientes y de su equipo; {P.brand} los trata por su cuenta como encargada del tratamiento, en los términos del <a href="/encargo">contrato de encargo del tratamiento</a>, que forma parte de estas condiciones.</p>
+
+  <h2>7. Disponibilidad y copias</h2>
+  <p>{P.brand} pone medios razonables para que el servicio funcione de forma continua y segura, pero no garantiza que nunca haya interrupciones (mantenimiento, fallos de proveedores o de internet). Se recomienda que el taller descargue su copia con regularidad.</p>
+
+  <h2>8. Duración y baja</h2>
+  <p>El servicio dura hasta que una de las partes lo dé por terminado, avisando por escrito. Al terminar, el taller puede descargar su copia completa durante {P.deletionDays} días; después se borran sus datos, salvo los que la ley obligue a conservar, que se bloquean y se borran al terminar ese plazo. {P.brand} puede suspender el servicio si el taller lo usa de forma ilícita o pone en riesgo la seguridad de otros talleres.</p>
+
+  <h2>9. Responsabilidad</h2>
+  <p>Cada parte responde de lo que hace. {P.brand} no responde del contenido que introduce el taller ni de sus decisiones con sus clientes. Salvo dolo o culpa grave, la responsabilidad de {P.brand} se limita a lo que el taller haya pagado en los últimos 12 meses.</p>
+
+  <h2>10. Propiedad intelectual</h2>
+  <p>El programa es de {P.brand}. Los datos, textos, imágenes y marcas del taller son del taller.</p>
+
+  <h2>11. Cambios en estas condiciones</h2>
+  <p>Si cambian, se avisa al taller con al menos 30 días de antelación y se le pide aceptar la nueva versión. Si no la acepta, puede darse de baja en las condiciones de la cláusula 8.</p>
+
+  <h2>12. Ley y tribunales</h2>
+  <p>Se rigen por la ley española. Para cualquier conflicto, las partes se someten a los juzgados y tribunales del domicilio del titular de la plataforma, salvo que la ley disponga otra cosa.</p>
+</PlatformLegalDoc>

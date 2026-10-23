@@ -687,6 +687,13 @@ abbr[title] { text-decoration: none; color: var(--accent-soft); }
 .legal p, .legal li { color: var(--fg-80); font-weight: 300; }
 .legal ul { margin: 12px 0 24px; padding-left: 20px; display: grid; gap: 8px; }
 .legal .alert { margin-block: 0 24px; }
+.legal-doc h2 { font-size: 1.15rem; font-weight: 600; letter-spacing: 0; margin: 28px 0 8px; color: var(--fg); }
+.legal-doc p { margin: 0 0 12px; }
+.legal-doc .table-scroll { margin: 8px 0 16px; }
+.legal-doc .legal-version { margin-top: 28px; font-size: .8125rem; color: var(--fg-60); }
+.auth-card.legal-doc ul { margin: 8px 0 12px; }
+/* Dato legal que falta: bien visible, nunca se rellena con un dato inventado. */
+.legal-missing { background: rgb(250 204 21 / .22); color: var(--fg); padding: 0 4px; border-radius: 4px; font-weight: 500; }
 
 /* ---------- Pie ---------- */
 .site-footer { border-top: 1px solid var(--line); background: var(--bg); color: var(--fg-60); font-size: .875rem; }
@@ -741,6 +748,9 @@ abbr[title] { text-decoration: none; color: var(--accent-soft); }
 .auth-links a { color: var(--fg-80); text-underline-offset: 4px; }
 @media (hover: hover) { .auth-links a:hover { color: var(--fg); } }
 .auth-card .alert { margin-bottom: 16px; }
+.auth-legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; padding: 24px max(16px, env(safe-area-inset-left, 0px)) 32px; font-size: .8125rem; }
+.auth-legal a { color: var(--fg-60); text-underline-offset: 4px; }
+@media (hover: hover) { .auth-legal a:hover { color: var(--fg); } }
 .auth-card.legal ul { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 8px; color: var(--fg-80); font-weight: 300; }
 
 .account-head { margin-top: 8px; }

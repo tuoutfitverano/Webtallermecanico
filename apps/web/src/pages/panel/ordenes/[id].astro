@@ -282,6 +282,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             {order.customers?.phone && <> · {order.customers.phone}</>}
           </p>
         </div>
+        {panel.isOffice && <div class="pnl-actions"><a class="btn" href={`/panel/ordenes/${order.id}/resguardo`} data-astro-reload><Icon name="file" />Resguardo de depósito</a></div>}
       </header>
       <Flash kind={flash.kind} text={flash.text} />
       {late && <div class="alert alert-warn" role="note"><Icon name="alert" /><span>La fecha prevista de entrega ({formatDateTime(order.due_at)}) ya ha pasado. Replanifica o avisa al cliente.</span></div>}

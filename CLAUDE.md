@@ -19,6 +19,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Versión real sin coste (Cloudflare Workers + Supabase gratis, flujo «Publicar versión real»): `docs/PUBLICAR.md`, `scripts/publicar/`
 - Guía del propietario (pasos de GitHub, legal, contraseñas, copias, correo y WhatsApp): `docs/GUIA_PROPIETARIO.md`
 - Cuentas de cliente multitaller (una cuenta, varios talleres, entrada desde la web del taller, soporte de la plataforma): `docs/MULTITALLER.md`
+- Información legal (aviso legal, privacidad, cookies, condiciones, encargo RGPD art. 28, resguardo de depósito, VERI*FACTU): `docs/LEGAL.md`
 
 ## Estructura
 
@@ -32,7 +33,7 @@ apps/web/                 Astro 7 + Cloudflare Workers (web pública; luego pane
                           panel/planificacion, panel/mantenimientos, panel/copia (copia del taller), panel/presupuestos/, panel/facturas/ (+ [id]/imprimir), panel/recordatorios, panel/estadisticas
                           presupuesto/[token] (respuesta del cliente sin cuenta); portal/presupuestos/, portal/facturas/
                           api/notificaciones/ (procesar = cron: avisos + mantenimiento; webhook = Resend; whatsapp = Meta)
-                          cookies, condiciones, privacidad-cuenta, 404 (páginas legales: texto pendiente)
+                          aviso-legal, privacidad, cookies (taller); condiciones, encargo, privacidad-cuenta (plataforma); 404
                           mi-area (reparto tras iniciar sesión), acceso-denegado (403)
   src/middleware.ts       Cabeceras de seguridad en todo (CSP frame-ancestors, nosniff, HSTS…); área privada: APP_URL y anti-caché
   src/components/         Secciones de la web y formularios (RequestForm.astro); ClassicHome (diseño clásico)
@@ -95,7 +96,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 3. **Validación doble.** Las reglas viven en `packages/core` y se usan en el navegador (avisar) y en el servidor (decidir). La base de datos vuelve a comprobar lo esencial.
 4. **Éxito solo si se ha guardado.** Un formulario solo muestra "recibido" cuando el servidor responde `ok` tras guardar. Sin almacenamiento configurado, responde error 503: nunca se simula un envío.
 5. **Una cita solicitada no es una cita confirmada.** Las solicitudes nacen con `status = 'nueva'` (pendiente) y los textos lo dicen.
-6. **No inventar datos.** Ni reseñas, precios, años de experiencia, certificaciones, textos legales ni datos de vehículos. Las matrículas solo se consultan en el proveedor contratado, desde el servidor y cuando la persona pulsa «Consultar datos» (ver Fase 6); nunca se rellena un dato que el proveedor no haya devuelto. El contenido de demostración se marca como tal (`is_demo_content`).
+6. **No inventar datos.** Ni reseñas, precios, años de experiencia, certificaciones ni datos de vehículos. Los textos legales se rellenan con datos REALES (taller: Panel → Taller; plataforma: `lib/legal/platform.ts`); si falta uno, se marca «[Falta: …]» (`LegalValue.astro`) y la página avisa. Las matrículas solo se consultan en el proveedor contratado, desde el servidor y cuando la persona pulsa «Consultar datos» (ver Fase 6); nunca se rellena un dato que el proveedor no haya devuelto. El contenido de demostración se marca como tal (`is_demo_content`).
 7. **Datos personales mínimos.** No se guarda el IP (solo una huella HMAC diaria que se borra a los 2 días). Los registros (`console.*`) llevan solo códigos de evento, nunca datos del formulario.
 8. **Migraciones.** Cambios de esquema = nueva migración en `supabase/migrations/` + pruebas en `supabase/tests/`. Revoca `execute` de `public` en cada función nueva y concede solo lo necesario. Las funciones `security definer` llevan `set search_path = ''`.
 9. **Acciones con consecuencias** (borrar datos, migraciones en producción, despliegues, rotar claves): explica el riesgo y pide confirmación antes.
@@ -129,6 +130,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Sección comercial («Quiero digitalizar mi taller», tipo `digitalizacion`): solo con `sections.comercial` + `isDemoContent`; la base de datos solo la acepta si `workshops.status = 'demo'`. Sin datos comerciales inventados ni promesas de resultados.
 - El software se enseña con capturas REALES (`public/plataforma/capturas`, recorrido en `lib/site/software.ts`). Matrícula y email muestran su estado real (`vehicleLookupAvailable()`, `emailAvailable()`); no hay agenda de citas y no se dice que la haya.
 - Las fases 1–8 son etapas internas: no se presentan como módulos en la web.
+- Legal (`docs/LEGAL.md`): `get_public_site` devuelve los datos del titular (`legal`), públicos por la LSSI; proveedores en `SUBPROCESSORS` (`lib/legal/platform.ts`), y la privacidad solo nombra los activados. Aceptación de condiciones + encargo SOLO por la propietaria (`accept_platform_terms`, `workshop_legal_acceptances`, inmutable); subir `LEGAL_VERSION` vuelve a pedirla. Resguardo de depósito en `/panel/ordenes/[id]/resguardo` (oficina); garantía del RD 1457/1986 en las facturas de reparaciones. Las solicitudes web se borran a los 12 meses (`run_maintenance`).
 
 ## Acceso, cuentas y equipos (Fase 3)
 

@@ -16,7 +16,8 @@ import { field, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../lib/auth/messages.ts';
 import { emailAvailable, turnstileSiteKey, vehicleLookupAvailable, whatsappAvailable } from '../../lib/server/config.ts';
-import { formatDate } from '../../lib/panel/format.ts';
+import { formatDate, formatDateTime } from '../../lib/panel/format.ts';
+import { LEGAL_VERSION } from '../../lib/legal/platform.ts';
 import { billingSettingsSchema, fieldErrors, formatCents, parseEuros, workshopProfileSchema } from '@talleres/core';
 
 export const prerender = false;
@@ -28,12 +29,13 @@ interface WorkshopRow {
   name: string; legal_name: string | null; tax_id: string | null; contact_email: string | null;
   contact_phone: string | null; logo_url: string | null; status: string; created_at: string;
   address_line: string | null; postal_code: string | null; city: string | null; province: string | null;
+  registry_info: string | null; legal_email: string | null;
 }
 interface Billing {
   default_tax_rate: number; quote_validity_days: number; labour_rate_cents: number | null; invoice_series: string; rectifying_series: string;
   payment_terms_days: number; quote_conditions: string | null; invoice_footer: string | null;
 }
-const values = { name: '', legal_name: '', tax_id: '', contact_email: '', contact_phone: '', logo_url: '', address_line: '', postal_code: '', city: '', province: '' };
+const values = { name: '', legal_name: '', tax_id: '', contact_email: '', contact_phone: '', logo_url: '', address_line: '', postal_code: '', city: '', province: '', registry_info: '', legal_email: '' };
 const billValues = { default_tax_rate: '', quote_validity_days: '', labour_rate: '', invoice_series: '', rectifying_series: '', payment_terms_days: '', quote_conditions: '', invoice_footer: '' };
 let billErrors: Partial<Record<string, string>> = {};
 let billPosted = false;
@@ -53,6 +55,7 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'datos') {
       name: values.name, legalName: values.legal_name, taxId: values.tax_id,
       contactEmail: values.contact_email, contactPhone: values.contact_phone, logoUrl: values.logo_url,
       addressLine: values.address_line, postalCode: values.postal_code, city: values.city, province: values.province,
+      registryInfo: values.registry_info, legalEmail: values.legal_email,
     });
     if (!parsed.success) {
       errors = fieldErrors(parsed.error);
@@ -64,6 +67,7 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'datos') {
         .update({
           name: d.name, legal_name: d.legalName, tax_id: d.taxId, contact_email: d.contactEmail, contact_phone: d.contactPhone, logo_url: d.logoUrl,
           address_line: d.addressLine, postal_code: d.postalCode, city: d.city, province: d.province,
+          registry_info: d.registryInfo, legal_email: d.legalEmail,
         })
         .eq('id', panel.workshop.id).select('id');
       if (error || !data?.length) {
@@ -114,7 +118,21 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'facturacion
   }
 }
 
+// Condiciones del servicio y contrato de encargo (RGPD art. 28): solo la propietaria las acepta.
+const isOwner = panel.workshop?.role === 'propietario';
+if (panel.form && panel.workshop && field(panel.form, 'action') === 'aceptar-condiciones') {
+  if (field(panel.form, 'acepto') !== '1') {
+    flash = { kind: 'bad', text: 'Marca la casilla para aceptar las condiciones y el contrato de encargo.' };
+    Astro.response.status = 422;
+  } else {
+    const { error } = await panel.supabase.rpc('accept_platform_terms', { p_workshop_id: panel.workshop.id, p_version: LEGAL_VERSION });
+    if (error) { logAuth('panel_terms_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
+    else flash = { kind: 'ok', text: `Condiciones y contrato de encargo aceptados (versión ${LEGAL_VERSION}).` };
+  }
+}
+
 let workshop: WorkshopRow | null = null;
+let accepted: { accepted_at: string } | null = null;
 let billing: Billing | null = null;
 let site: { published: boolean; is_demo_content: boolean } | null = null;
 let domains: Array<{ hostname: string; is_primary: boolean }> = [];
@@ -122,11 +140,14 @@ let loadError = false;
 if (panel.workshop && panel.isManager) {
   const id = panel.workshop.id;
   const [w, s, d, b] = await Promise.all([
-    panel.supabase.from('workshops').select('name, legal_name, tax_id, contact_email, contact_phone, logo_url, status, created_at, address_line, postal_code, city, province').eq('id', id).maybeSingle(),
+    panel.supabase.from('workshops').select('name, legal_name, tax_id, contact_email, contact_phone, logo_url, status, created_at, address_line, postal_code, city, province, registry_info, legal_email').eq('id', id).maybeSingle(),
     panel.supabase.from('workshop_sites').select('published, is_demo_content').eq('workshop_id', id).maybeSingle(),
     panel.supabase.from('workshop_domains').select('hostname, is_primary').eq('workshop_id', id).order('is_primary', { ascending: false }),
     panel.supabase.from('workshop_billing_settings').select('default_tax_rate, quote_validity_days, labour_rate_cents, invoice_series, rectifying_series, payment_terms_days, quote_conditions, invoice_footer').eq('workshop_id', id).maybeSingle(),
   ]);
+  const { data: acc } = await panel.supabase.from('workshop_legal_acceptances').select('accepted_at')
+    .eq('workshop_id', id).eq('document', 'encargo').eq('version', LEGAL_VERSION).maybeSingle();
+  accepted = acc ?? null;
   billing = (b.data as Billing | null) ?? null;
   if (billing && !billPosted) {
     Object.assign(billValues, {
@@ -145,6 +166,7 @@ if (panel.workshop && panel.isManager) {
       name: workshop.name, legal_name: workshop.legal_name ?? '', tax_id: workshop.tax_id ?? '', contact_email: workshop.contact_email ?? '',
       contact_phone: workshop.contact_phone ?? '', logo_url: workshop.logo_url ?? '',
       address_line: workshop.address_line ?? '', postal_code: workshop.postal_code ?? '', city: workshop.city ?? '', province: workshop.province ?? '',
+      registry_info: workshop.registry_info ?? '', legal_email: workshop.legal_email ?? '',
     });
   }
 }
@@ -184,12 +206,12 @@ const integrations = [
             </div>
             <div class="form-row">
               <div class={`field ${err('legalName') ? 'has-error' : ''}`}>
-                <label for="legal_name">Razón social <span class="muted">(opcional)</span></label>
+                <label for="legal_name">Razón social o nombre del titular <span class="muted">(sale en el aviso legal y en las facturas)</span></label>
                 <input class="input" id="legal_name" name="legal_name" maxlength="160" value={values.legal_name} aria-invalid={err('legalName') ? 'true' : undefined} />
                 {err('legalName') && <p class="field-error">{err('legalName')}</p>}
               </div>
               <div class={`field ${err('taxId') ? 'has-error' : ''}`}>
-                <label for="tax_id">NIF / CIF <span class="muted">(opcional)</span></label>
+                <label for="tax_id">NIF / CIF <span class="muted">(aviso legal y facturas)</span></label>
                 <input class="input mono" id="tax_id" name="tax_id" maxlength="20" autocomplete="off" value={values.tax_id} aria-invalid={err('taxId') ? 'true' : undefined} />
                 {err('taxId') && <p class="field-error">{err('taxId')}</p>}
               </div>
@@ -207,7 +229,7 @@ const integrations = [
               </div>
             </div>
             <div class={`field ${err('addressLine') ? 'has-error' : ''}`}>
-              <label for="address_line">Dirección <span class="muted">(sale en presupuestos y facturas)</span></label>
+              <label for="address_line">Dirección <span class="muted">(sale en el aviso legal, presupuestos y facturas)</span></label>
               <input class="input" id="address_line" name="address_line" maxlength="200" autocomplete="off" value={values.address_line} />
             </div>
             <div class="form-row">
@@ -224,6 +246,16 @@ const integrations = [
             <div class="field">
               <label for="province">Provincia</label>
               <input class="input" id="province" name="province" maxlength="80" autocomplete="off" value={values.province} />
+            </div>
+            <div class={`field ${err('legalEmail') ? 'has-error' : ''}`}>
+              <label for="legal_email">Correo para asuntos legales y de privacidad</label>
+              <input class="input" id="legal_email" name="legal_email" type="email" inputmode="email" maxlength="254" value={values.legal_email} aria-invalid={err('legalEmail') ? 'true' : undefined} aria-describedby={err('legalEmail') ? 'legal_email-err' : 'legal_email-hint'} />
+              {err('legalEmail') ? <p class="field-error" id="legal_email-err">{err('legalEmail')}</p> : <p class="hint" id="legal_email-hint">Sale en el aviso legal y en la privacidad de la web: es donde los clientes ejercen sus derechos. Sin él, se usa el correo de la web.</p>}
+            </div>
+            <div class={`field ${err('registryInfo') ? 'has-error' : ''}`}>
+              <label for="registry_info">Inscripción registral <span class="muted">(solo si el titular está inscrito)</span></label>
+              <input class="input" id="registry_info" name="registry_info" maxlength="300" placeholder="Ej.: Registro Mercantil de Madrid, tomo …, folio …, hoja …" value={values.registry_info} />
+              {err('registryInfo') && <p class="field-error">{err('registryInfo')}</p>}
             </div>
             <div class={`field ${err('logoUrl') ? 'has-error' : ''}`}>
               <label for="logo_url">Dirección del logotipo <span class="muted">(opcional, https)</span></label>
@@ -243,6 +275,23 @@ const integrations = [
               {workshop && <><dt>Alta</dt><dd>{formatDate(workshop.created_at)}</dd></>}
             </dl>
             <p class="hint" style="margin-top:10px">El estado y el identificador solo los cambia la plataforma.</p>
+          </section>
+
+          <section class="card" aria-labelledby="legal-t">
+            <h2 id="legal-t" class="card-title"><Icon name="file" />Condiciones y protección de datos</h2>
+            {accepted ? (
+              <p>Aceptadas las <a href="/condiciones" data-astro-reload>condiciones del servicio</a> y el <a href="/encargo" data-astro-reload>contrato de encargo del tratamiento</a> (versión {LEGAL_VERSION}) el {formatDateTime(accepted.accepted_at)}.</p>
+            ) : isOwner ? (
+              <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
+                <input type="hidden" name="action" value="aceptar-condiciones" />
+                <p>Para usar la plataforma con clientes reales, la propietaria del taller acepta las <a href="/condiciones" data-astro-reload>condiciones del servicio</a> y el <a href="/encargo" data-astro-reload>contrato de encargo del tratamiento</a> (la plataforma trata los datos de tus clientes por tu cuenta).</p>
+                <label class="check"><input type="checkbox" name="acepto" value="1" required /> He leído y acepto las condiciones y el contrato de encargo (versión {LEGAL_VERSION})</label>
+                <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Aceptar</span></button>
+              </form>
+            ) : (
+              <p class="hint">Pendiente: la persona propietaria del taller tiene que aceptar las <a href="/condiciones" data-astro-reload>condiciones</a> y el <a href="/encargo" data-astro-reload>contrato de encargo</a>.</p>
+            )}
+            <p class="hint" style="margin-top:8px">El aviso legal y la privacidad de tu web se rellenan solos con los datos de la izquierda: <a href="/aviso-legal" target="_blank" rel="noopener">ver aviso legal</a> · <a href="/privacidad" target="_blank" rel="noopener">ver privacidad</a>.</p>
           </section>
 
           <section class="card" aria-labelledby="web-t">

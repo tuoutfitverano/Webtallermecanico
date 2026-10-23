@@ -152,7 +152,7 @@ Con talleres reales, conviene el plan de pago, que da una copia diaria guardada 
   - **resguardo de depósito** del vehículo.
 
   El programa ayuda con presupuestos, historial y facturas, pero los carteles y las hojas son del taller.
-- [ ] Cada taller necesita su propio aviso legal y su propia privacidad en su web (datos reales, no de ejemplo).
+- [ ] Cada taller rellena sus datos legales en **Panel → Taller** (razón social, NIF, dirección, correo legal): su aviso legal y su privacidad se rellenan solos. La propietaria acepta allí las condiciones y el contrato de encargo. Detalle en `docs/LEGAL.md`.
 
 ## 6. Enviar correos y WhatsApp (además de los avisos en el portal)
 

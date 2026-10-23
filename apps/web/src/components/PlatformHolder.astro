@@ -1,0 +1,12 @@
+---
+/** Datos del titular de la plataforma (o marcadores «[Falta: …]»). */
+import LegalValue from './LegalValue.astro';
+import { PLATFORM_LEGAL as P } from '../lib/legal/platform.ts';
+---
+<ul>
+  <li>Titular: <LegalValue value={P.holder} label="nombre o razón social" /> (nombre comercial: {P.brand})</li>
+  <li>NIF: <LegalValue value={P.taxId} label="NIF" /></li>
+  <li>Domicilio: <LegalValue value={P.address} label="domicilio" /></li>
+  <li>Correo de contacto y de protección de datos: <LegalValue value={P.email} label="correo de contacto" /></li>
+  <li>Inscripción registral: {P.registry ?? 'no consta'}</li>
+</ul>

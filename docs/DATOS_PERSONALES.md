@@ -23,14 +23,14 @@ Documento técnico para preparar la política de privacidad y el registro de act
 
 ## 2. Conservación (pendiente de decidir con el asesor)
 
-Hoy **no hay borrado automático**, salvo:
+Borrado automático (en `run_maintenance`):
 
+- las solicitudes de la web, a los **12 meses** de recibirse;
 - las huellas antispam (2 días);
 - los avisos por email o WhatsApp no enviados (se cancelan a los 2 días).
 
 Hay que decidir y documentar plazos para:
 
-- solicitudes web atendidas;
 - avisos;
 - registro de consentimientos (normalmente se conserva mientras pueda haber reclamaciones);
 - cuentas inactivas;

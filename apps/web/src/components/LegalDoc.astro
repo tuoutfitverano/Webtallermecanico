@@ -1,0 +1,35 @@
+---
+/**
+ * Página legal de la web de un taller. El texto se rellena con los datos REALES
+ * del titular (Panel → Taller); si falta alguno, la página lo dice arriba y
+ * marca el hueco con «[Falta: …]». Nunca se inventan datos.
+ */
+import SiteLayout from '../layouts/SiteLayout.astro';
+import SiteHeader from './SiteHeader.astro';
+import SiteFooter from './SiteFooter.astro';
+import BackLink from './BackLink.astro';
+import type { PublicSite } from '../lib/site/content.ts';
+import { LEGAL_DATE, LEGAL_VERSION } from '../lib/legal/platform.ts';
+interface Props { site: PublicSite; title: string; missing?: string[] }
+const { site, title, missing = [] } = Astro.props;
+---
+<SiteLayout site={site} title={`${title} · ${site.name}`}>
+  <SiteHeader site={site} />
+  <main class="section legal-page glow">
+    <article class="wrap legal legal-doc">
+      <BackLink href="/" label="Volver a la web" />
+      <p class="label">// Información legal</p>
+      <h1 class="heading">{title}</h1>
+      {site.isDemoContent && (
+        <div class="alert alert-warn" role="note"><span><strong>Web de demostración.</strong> Los datos del titular son ficticios: esta web no pertenece a un taller real.</span></div>
+      )}
+      {missing.length > 0 && (
+        <div class="alert alert-warn" role="note"><span><strong>Faltan datos del titular:</strong> {missing.join(', ')}. El taller debe completarlos en su panel (Taller → Datos legales) antes de publicar la web.</span></div>
+      )}
+      <slot />
+      <p class="legal-version">Versión {LEGAL_VERSION} · {LEGAL_DATE}</p>
+      <p><a href="/">Volver a la web</a></p>
+    </article>
+  </main>
+  <SiteFooter site={site} />
+</SiteLayout>

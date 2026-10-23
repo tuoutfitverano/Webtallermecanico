@@ -1,0 +1,20 @@
+---
+/** Página legal de la PLATAFORMA (condiciones, encargo, privacidad de cuentas), con los datos de lib/legal/platform.ts. */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from './Icon.astro';
+import { LEGAL_DATE, LEGAL_VERSION, platformMissing } from '../lib/legal/platform.ts';
+interface Props { title: string }
+const { title } = Astro.props;
+const missing = platformMissing();
+---
+<AuthLayout title={title} wide>
+  <article class="auth-card liquid-glass-strong legal legal-doc" aria-labelledby="titulo">
+    <p class="label">Información legal</p>
+    <h1 id="titulo" class="auth-title heading">{title}</h1>
+    {missing.length > 0 && (
+      <div class="alert alert-warn" role="note"><Icon name="alert" /><span><strong>Faltan datos del titular de la plataforma:</strong> {missing.join(', ')}. Hay que completarlos antes de dar de alta talleres reales.</span></div>
+    )}
+    <slot />
+    <p class="legal-version">Versión {LEGAL_VERSION} · {LEGAL_DATE}</p>
+  </article>
+</AuthLayout>

@@ -1,0 +1,74 @@
+---
+/**
+ * Contrato de encargo del tratamiento (RGPD art. 28.3) entre el taller (responsable)
+ * y la plataforma (encargada). Lo acepta la propietaria del taller en el panel.
+ * Las medidas de seguridad son las que de verdad tiene el programa.
+ */
+import PlatformLegalDoc from '../components/PlatformLegalDoc.astro';
+import PlatformHolder from '../components/PlatformHolder.astro';
+import { PLATFORM_LEGAL as P, SUBPROCESSORS } from '../lib/legal/platform.ts';
+export const prerender = false;
+const WHEN = { siempre: 'Siempre', email: 'Si el taller activa el correo', whatsapp: 'Si el taller activa WhatsApp', matricula: 'Si el taller activa la consulta por matrícula' } as const;
+---
+<PlatformLegalDoc title="Contrato de encargo del tratamiento">
+  <p>Este contrato cumple el artículo 28 del Reglamento (UE) 2016/679 (RGPD) y la Ley Orgánica 3/2018 (LOPDGDD). Forma parte de las <a href="/condiciones">condiciones del servicio</a> y lo acepta la persona propietaria del taller en su panel.</p>
+
+  <h2>1. Partes</h2>
+  <p><strong>Responsable del tratamiento:</strong> el taller que acepta este contrato, con los datos que constan en su panel.</p>
+  <p><strong>Encargada del tratamiento:</strong></p>
+  <PlatformHolder />
+
+  <h2>2. Objeto, duración y finalidad</h2>
+  <p>La encargada trata datos personales por cuenta del taller <strong>solo</strong> para prestarle el servicio descrito en las condiciones (web, panel, área de clientes, avisos y copias), mientras el servicio esté vigente.</p>
+
+  <h2>3. Qué datos y de quién</h2>
+  <ul>
+    <li><strong>Clientes y personas que escriben al taller:</strong> datos de contacto, datos fiscales, vehículos, reparaciones, presupuestos, facturas, pagos, preferencias de comunicación y consentimientos.</li>
+    <li><strong>Equipo del taller:</strong> nombre, correo, rol, tiempos trabajados y registro de accesos.</li>
+    <li>No se tratan categorías especiales de datos (salud, ideología, etc.). El taller no debe introducirlas.</li>
+  </ul>
+
+  <h2>4. Obligaciones de la encargada</h2>
+  <ul>
+    <li>Tratar los datos <strong>solo siguiendo las instrucciones documentadas del taller</strong> (estas condiciones y lo que el taller hace en el panel). Si una instrucción le parece contraria a la ley, lo avisará.</li>
+    <li>Garantizar la <strong>confidencialidad</strong>: quien accede a los datos está obligado a guardar secreto.</li>
+    <li>Aplicar <strong>medidas de seguridad</strong> adecuadas (art. 32 RGPD); como mínimo, las del punto 5.</li>
+    <li>No usar los datos para fines propios, ni cederlos, ni venderlos.</li>
+    <li><strong>Ayudar al taller</strong> a atender los derechos de las personas (acceso, rectificación, supresión, oposición, limitación y portabilidad): el panel permite consultar, corregir y exportar los datos; para suprimir o anonimizar a un cliente con historial, la encargada lo hace a petición del taller.</li>
+    <li>Avisar al taller <strong>sin dilación indebida, y como máximo en 48 horas</strong>, de cualquier violación de la seguridad que afecte a sus datos, con la información disponible para que pueda notificarla a la AEPD si procede.</li>
+    <li>Ayudar al taller en las evaluaciones de impacto y consultas previas que, en su caso, deba hacer.</li>
+    <li>Llevar el registro de actividades de tratamiento que hace por cuenta del taller.</li>
+    <li>Poner a disposición del taller la información necesaria para demostrar el cumplimiento y permitir auditorías razonables, con aviso previo.</li>
+  </ul>
+
+  <h2>5. Medidas de seguridad</h2>
+  <ul>
+    <li>Cada dato lleva el taller al que pertenece y la base de datos impide, con reglas propias (seguridad a nivel de fila), que un taller vea o cambie datos de otro. Los permisos de cada rol (propietario, administrador, recepción, mecánico y cliente) los aplica la base de datos, no solo la pantalla.</li>
+    <li>Conexiones cifradas (HTTPS) y cabeceras de seguridad. La sesión se guarda en cookies que el JavaScript del navegador no puede leer.</li>
+    <li>Contraseñas de al menos 10 caracteres con mayúsculas, minúsculas y números, y verificación en dos pasos disponible para todas las cuentas.</li>
+    <li>El personal de la plataforma solo ve datos de un taller con verificación en dos pasos <strong>y</strong> abriendo una sesión de soporte con un motivo que queda registrado y caduca sola.</li>
+    <li>Registro de accesos y de cambios (altas, roles, invitaciones, vinculaciones, cambios de estado) que nadie puede modificar desde la aplicación.</li>
+    <li>Minimización: la dirección IP no se guarda (solo una huella cifrada que se borra a los 2 días) y las solicitudes de la web se borran a los 12 meses.</li>
+    <li>Copia completa de los datos del taller, descargable por la gerencia en cualquier momento.</li>
+    <li>Pruebas automáticas de permisos y de seguridad antes de cada cambio del programa.</li>
+  </ul>
+
+  <h2>6. Subencargados</h2>
+  <p>El taller autoriza de forma general a la encargada a usar estos proveedores, que firman con ella obligaciones equivalentes a las de este contrato:</p>
+  <div class="table-scroll">
+    <table class="legal-table">
+      <thead><tr><th scope="col">Proveedor</th><th scope="col">Para qué</th><th scope="col">Dónde</th><th scope="col">Cuándo</th></tr></thead>
+      <tbody>{SUBPROCESSORS.map(s => <tr><td>{s.name}</td><td>{s.what}</td><td>{s.where}</td><td>{WHEN[s.when]}</td></tr>)}</tbody>
+    </table>
+  </div>
+  <p>Si se añade o cambia un proveedor, la encargada lo avisará con al menos 30 días de antelación y el taller podrá oponerse; si se opone y no hay alternativa, podrá darse de baja. Las transferencias fuera del Espacio Económico Europeo se amparan en cláusulas contractuales tipo de la Comisión Europea o en el Marco de Privacidad de Datos UE-EE. UU.</p>
+
+  <h2>7. Obligaciones del taller</h2>
+  <ul>
+    <li>Tener base legal para los datos que introduce e informar a sus clientes (su web incluye la política de privacidad con sus datos).</li>
+    <li>Dar las instrucciones por escrito y mantener seguras las cuentas de su equipo.</li>
+  </ul>
+
+  <h2>8. Fin del encargo</h2>
+  <p>Al terminar el servicio, el taller puede descargar su copia completa durante {P.deletionDays} días. Después, la encargada <strong>borra</strong> los datos, salvo los que una ley obligue a conservar, que se mantienen bloqueados hasta que termine ese plazo.</p>
+</PlatformLegalDoc>

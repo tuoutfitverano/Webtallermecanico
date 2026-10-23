@@ -1,21 +1,59 @@
 ---
-import LegalPending from '../components/LegalPending.astro';
-import { siteForHost } from '../lib/server/config.ts';
+/**
+ * Política de privacidad de la web y del área de clientes de un taller (RGPD art. 13).
+ * Responsable: el TALLER (sus datos reales). La plataforma es su encargada del tratamiento.
+ * Solo se mencionan los proveedores que de verdad están activados.
+ */
+import LegalDoc from '../components/LegalDoc.astro';
+import LegalValue from '../components/LegalValue.astro';
+import { emailAvailable, siteForHost, vehicleLookupAvailable, whatsappAvailable } from '../lib/server/config.ts';
+import { PLATFORM_LEGAL, SUBPROCESSORS, workshopMissing } from '../lib/legal/platform.ts';
 export const prerender = false;
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
 if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
+const l = site.legal;
+const email = l.email || site.content.email || null;
+const on = { email: emailAvailable(), whatsapp: whatsappAvailable(), matricula: vehicleLookupAvailable() };
+const providers = SUBPROCESSORS.filter(p => p.when === 'siempre' || on[p.when]);
 ---
-<LegalPending
-  site={site}
-  title="Política de privacidad"
-  items={[
-    'Quién es el responsable del tratamiento y cómo contactarle.',
-    'Qué datos se recogen en los formularios (nombre, teléfono o correo, datos opcionales del vehículo y del mensaje) y para qué se usan: responder a la solicitud.',
-    'La base legal del tratamiento.',
-    'Cuánto tiempo se conservan los datos.',
-    'Quién trata los datos por cuenta del taller (por ejemplo, el proveedor de alojamiento y de base de datos) y si hay transferencias fuera de la UE.',
-    'Si el taller los usa: el portal de clientes, los avisos del estado de la reparación (en el portal y por email, con su proveedor de email) y la consulta de datos del vehículo por matrícula (con su proveedor de datos).',
-    'Que las comunicaciones comerciales solo se envían con consentimiento expreso y cómo retirarlo.',
-    'Cómo ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad, y el derecho a reclamar ante la AEPD.',
-  ]}
-/>
+<LegalDoc site={site} title="Política de privacidad" missing={workshopMissing(l, site.content.email)}>
+  <h2>1. Quién trata tus datos</h2>
+  <p>El responsable es el taller titular de esta web:</p>
+  <ul>
+    <li><LegalValue value={l.legalName} label="nombre o razón social" /> ({site.name}), NIF <LegalValue value={l.taxId} label="NIF" /></li>
+    <li>Domicilio: <LegalValue value={l.address} label="domicilio" /></li>
+    <li>Correo para cualquier asunto de privacidad: <LegalValue value={email} label="correo de contacto" /></li>
+  </ul>
+  <p>El taller usa la plataforma {PLATFORM_LEGAL.brand}, que guarda y trata los datos <strong>solo por cuenta del taller y siguiendo sus instrucciones</strong> (encargada del tratamiento, art. 28 del RGPD).</p>
+
+  <h2>2. Qué datos, para qué, por qué y cuánto tiempo</h2>
+  <div class="table-scroll">
+    <table class="legal-table">
+      <thead><tr><th scope="col">Qué</th><th scope="col">Para qué</th><th scope="col">Base legal (RGPD art. 6)</th><th scope="col">Cuánto tiempo</th></tr></thead>
+      <tbody>
+        <tr><td>Formularios de la web: nombre, teléfono o correo, vehículo o matrícula si los das, día preferido y mensaje</td><td>Contestar a tu solicitud de cita, presupuesto o contacto</td><td>Aplicar medidas precontractuales que tú pides (6.1.b)</td><td>12 meses desde que se recibe; después se borra sola. Si pasas a ser cliente, se guarda en tu ficha</td></tr>
+        <tr><td>Una huella cifrada de tu conexión (nunca la dirección IP en claro) y la comprobación antispam</td><td>Evitar envíos masivos y abusos</td><td>Interés legítimo en proteger la web (6.1.f)</td><td>La huella se borra a los 2 días</td></tr>
+        <tr><td>Si eres cliente: ficha (nombre, teléfono, correo, datos fiscales si pides factura), vehículos, reparaciones, presupuestos, facturas y pagos</td><td>Hacer las reparaciones, darte presupuestos y facturas y atender la garantía</td><td>Contrato (6.1.b) y obligaciones legales del taller (6.1.c)</td><td>Mientras seas cliente. Facturas y documentos contables: 6 años (Código de Comercio, art. 30)</td></tr>
+        <tr><td>Área de clientes: tu cuenta (correo y contraseña cifrada) y lo que ves en ella</td><td>Que consultes tus vehículos, reparaciones, presupuestos y facturas</td><td>Contrato (6.1.b). Solo entras si el taller te invita</td><td>Mientras tengas la cuenta. Puedes dejar de ver el taller o pedir que se borre</td></tr>
+        <tr><td>Avisos del estado de tu reparación{on.email ? ' (en el área de clientes y por correo' : ' (en el área de clientes'}{on.whatsapp ? '; por WhatsApp solo si lo pides' : ''})</td><td>Contarte cómo va tu vehículo</td><td>Contrato (6.1.b)</td><td>Se guardan junto a la reparación</td></tr>
+        <tr><td>Recordatorios de mantenimiento y comunicaciones comerciales</td><td>Avisarte de revisiones y novedades del taller</td><td><strong>Solo con tu consentimiento</strong> (6.1.a). Lo das o lo retiras en «Mis datos» del área de clientes</td><td>Hasta que lo retires</td></tr>
+        {on.matricula && <tr><td>Matrícula del vehículo</td><td>Rellenar los datos técnicos del vehículo cuando el taller pulsa «Consultar datos»</td><td>Contrato (6.1.b)</td><td>Se guarda con el vehículo</td></tr>}
+      </tbody>
+    </table>
+  </div>
+  <p>No se toman decisiones automatizadas sobre ti ni se hacen perfiles. Los datos marcados como obligatorios en los formularios son los necesarios para contestarte.</p>
+
+  <h2>3. Quién más los ve</h2>
+  <p>Nadie fuera del taller, salvo obligación legal (por ejemplo, Hacienda o un juzgado). Para funcionar, la plataforma usa estos proveedores, que solo tratan los datos para prestar su servicio:</p>
+  <div class="table-scroll">
+    <table class="legal-table">
+      <thead><tr><th scope="col">Proveedor</th><th scope="col">Para qué</th><th scope="col">Dónde</th></tr></thead>
+      <tbody>{providers.map(p => <tr><td>{p.name}</td><td>{p.what}</td><td>{p.where}</td></tr>)}</tbody>
+    </table>
+  </div>
+  <p>Cuando un proveedor trata datos fuera del Espacio Económico Europeo, la transferencia se ampara en las garantías de su contrato: cláusulas contractuales tipo de la Comisión Europea o el Marco de Privacidad de Datos UE-EE. UU.</p>
+
+  <h2>4. Tus derechos</h2>
+  <p>Puedes pedir <strong>acceder</strong> a tus datos, <strong>rectificarlos</strong>, <strong>suprimirlos</strong>, <strong>oponerte</strong> o <strong>limitar</strong> su uso, <strong>llevártelos</strong> (portabilidad) y <strong>retirar tu consentimiento</strong> cuando quieras. Escribe a <LegalValue value={email} label="correo de contacto" /> indicando qué pides; si hay dudas sobre tu identidad, te pediremos que la acredites. Te contestaremos en un mes como máximo.</p>
+  <p>Si no estás conforme, puedes reclamar ante la Agencia Española de Protección de Datos (aepd.es).</p>
+</LegalDoc>
