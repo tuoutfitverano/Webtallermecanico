@@ -29,6 +29,8 @@ export interface AuthRequestContext {
 export interface SessionUser {
   id: string;
   email: string;
+  /** Nivel de la sesión: aal2 = ha entrado también con el código de la verificación en dos pasos. */
+  aal: 'aal1' | 'aal2';
 }
 
 export function createAuthClient(ctx: AuthRequestContext): SupabaseClient | null {
@@ -77,7 +79,7 @@ export async function getSessionUser(supabase: SupabaseClient | null): Promise<S
     const { data, error } = await supabase.auth.getClaims();
     const claims = data?.claims;
     if (error || !claims?.sub || claims.is_anonymous) return null;
-    return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : '' };
+    return { id: claims.sub, email: typeof claims.email === 'string' ? claims.email : '', aal: claims.aal === 'aal2' ? 'aal2' : 'aal1' };
   } catch {
     return null;
   }

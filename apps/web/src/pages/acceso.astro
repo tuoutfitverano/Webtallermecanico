@@ -2,7 +2,7 @@
 /** Inicio de sesión con correo y contraseña (Supabase Auth). */
 import AuthLayout from '../layouts/AuthLayout.astro';
 import Icon from '../components/Icon.astro';
-import { authPage, formText } from '../lib/server/auth-page.ts';
+import { authPage, formText, pendingSecondFactor } from '../lib/server/auth-page.ts';
 import { logAuth } from '../lib/server/auth.ts';
 import { DEFAULT_AFTER_LOGIN, safeNext } from '../lib/auth/redirect.ts';
 import { authErrorMessage, AUTH_UNAVAILABLE } from '../lib/auth/messages.ts';
@@ -15,6 +15,7 @@ if (page.isPost && !page.form) return new Response('Origen no permitido.', { sta
 
 const next = safeNext(page.isPost ? formText(page.form, 'next') : Astro.url.searchParams.get('next'), page.self);
 if (page.user && !page.isPost) return Astro.redirect(next, 303);
+if (pendingSecondFactor(Astro) && !page.isPost) return Astro.redirect(`/acceso/verificar?next=${encodeURIComponent(next)}`, 303);
 
 let email = '';
 let error = '';
@@ -50,10 +51,12 @@ if (page.form) {
     if (!password) {
       error = 'Escribe tu contraseña.';
     } else {
-      const { error: e } = await page.supabase.auth.signInWithPassword({ email, password });
+      const { data: signed, error: e } = await page.supabase.auth.signInWithPassword({ email, password });
       if (!e) {
         logAuth('auth_login_ok');
-        return Astro.redirect(next, 303);
+        // Con la verificación en dos pasos activada, falta el código de la app.
+        const twoStep = (signed.user?.factors ?? []).some(f => f.status === 'verified');
+        return Astro.redirect(twoStep ? `/acceso/verificar?next=${encodeURIComponent(next)}` : next, 303);
       }
       logAuth('auth_login_error', e.code);
       error = authErrorMessage(e);

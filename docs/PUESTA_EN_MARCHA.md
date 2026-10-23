@@ -129,7 +129,12 @@ insert into public.platform_admins (user_id)
 select id from auth.users where email = 'tu-correo@…';
 ```
 
-Los privilegios de administrador **solo funcionan con 2FA** (sesión `aal2`); sin 2FA no ve nada de los talleres. La pantalla para activar el 2FA llegará con el panel (Fase 4).
+Los privilegios de administrador **solo funcionan con 2FA** (sesión `aal2`) y, para ver datos, con una **sesión de soporte** abierta con su motivo. Después:
+
+1. Entra en `APP_URL/cuenta/seguridad` y activa la verificación en dos pasos (escanea el código QR con una app como Google Authenticator y escribe el código).
+2. Abre `APP_URL/admin`: verás el resumen de talleres. Para resolver una incidencia, abre allí una sesión de soporte con el motivo (queda registrada y caduca sola).
+
+Detalles en `docs/MULTITALLER.md`.
 
 ### Dar acceso al portal a un cliente
 

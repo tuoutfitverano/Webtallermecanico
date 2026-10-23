@@ -112,7 +112,7 @@ test('web pública: accesibilidad, consola, enlaces y móvil', async ({ page, is
 });
 
 test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobile }) => {
-  test.setTimeout(180_000); // 23 pantallas
+  test.setTimeout(190_000); // 24 pantallas
   const f = await fixtures();
   await login(page, 'propietaria@e2e.test', '/panel');
   await audit(page, [
@@ -120,7 +120,7 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
     '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
     '/panel/planificacion', '/panel/planificacion?vista=semana', '/panel/presupuestos', '/panel/presupuestos/nuevo',
     '/panel/facturas', '/panel/facturas/nueva', '/panel/recordatorios', '/panel/estadisticas',
-    '/panel/mantenimientos', `/panel/vehiculos/${f.vehicle}`, '/panel/copia',
+    '/panel/mantenimientos', `/panel/vehiculos/${f.vehicle}`, '/panel/copia', '/cuenta/seguridad',
   ], isMobile);
 });
 

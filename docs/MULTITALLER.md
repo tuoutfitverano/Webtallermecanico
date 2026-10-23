@@ -84,10 +84,10 @@ Vehículos, órdenes, presupuestos, facturas, cobros, avisos, mantenimientos, et
   - permite diagnosticar vinculaciones (`admin_link_diagnosis(correo)`: queda registrada con el correo enmascarado) y ver el registro de accesos (`admin_access_events`).
 
   La sesión se cierra con `admin_close_support_session()` o caduca sola.
-- **Pendiente:**
-  - la pantalla web de administración;
-  - la pantalla para activar el 2FA. Hoy estas funciones solo se pueden llamar por la API con una sesión `aal2`;
-  - durante una sesión de soporte el acceso de lectura es **global**, no solo del taller indicado (el taller queda anotado para la auditoría). Ver «Riesgos».
+- **Pantalla web `/admin`** (solo la ve quien está en `platform_admins`; al resto le responde «no encontrada»): resumen de talleres, abrir y cerrar la sesión de soporte (motivo, taller y duración), diagnóstico de vinculación por correo y registro de accesos. Sin 2FA solo explica cómo activarla. `admin_status()` le dice a la pantalla si la persona es de la plataforma, si ha entrado con 2FA y si tiene sesión de soporte.
+- **Verificación en dos pasos (cualquier cuenta):** `/cuenta/seguridad` la activa (código QR o clave para la app y un código de 6 cifras para confirmar; Supabase Auth MFA TOTP) y la desactiva (en dos pasos). Con ella activada, tras la contraseña se pide el código en `/acceso/verificar`; mientras falte, el área privada trata la sesión como si no hubiera entrado (`authPage`). Para el personal y los clientes es una comprobación de la web; para la administración de la plataforma, además, la exige la base de datos (`aal2`).
+- Durante una sesión de soporte el acceso de lectura es **global**, no solo del taller indicado (el taller queda anotado para la auditoría). Ver «Riesgos».
+- Si alguien pierde el móvil con la app: la plataforma le retira el factor desde el panel de Supabase (Authentication → Users) tras comprobar su identidad.
 
 ## Pruebas
 
@@ -109,5 +109,5 @@ Vehículos, órdenes, presupuestos, facturas, cobros, avisos, mantenimientos, et
 
 - Una sesión de soporte da lectura **global** mientras dura. Para limitarla a un taller habría que cambiar todas las políticas que usan `is_platform_admin()`.
 - No hay estado propio de «cuenta global» (bloqueada o activa) aparte del de Supabase Auth (`banned_until`, borrado de la cuenta).
-- El cliente no puede retirar él mismo un taller de «Mis talleres»: se lo pide al taller, o al borrar su cuenta se desvincula sola.
+- El cliente **puede dejar de ver un taller** desde «Mis talleres» (`portal_leave_workshop`, en dos pasos). No se borra nada: el taller conserva la ficha y su historial, el historial dice que lo retiró el propio cliente y para volver hace falta una invitación nueva.
 - Directorio público de talleres: no se ha hecho. Se podría construir sobre `workshop_sites` publicados, sin inventar perfiles ni valoraciones.

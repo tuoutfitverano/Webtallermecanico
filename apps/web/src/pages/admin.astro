@@ -1,0 +1,206 @@
+---
+/**
+ * Administración de la plataforma (mínimo privilegio).
+ *
+ *  · Solo para quien está en platform_admins Y ha entrado con la verificación
+ *    en dos pasos. A cualquier otra persona se le responde «no disponible»
+ *    (no se revela que la pantalla existe para ella).
+ *  · Sin sesión de soporte: resumen de talleres sin datos personales.
+ *  · Con sesión de soporte (motivo + caducidad, queda registrada): diagnóstico
+ *    de vinculación por correo y registro de accesos.
+ * Todo lo decide la base de datos (admin_* y RLS); esta pantalla solo lo muestra.
+ */
+import AuthLayout from '../layouts/AuthLayout.astro';
+import Icon from '../components/Icon.astro';
+import { authPage, formText, redirectToLogin } from '../lib/server/auth-page.ts';
+import { logAuth } from '../lib/server/auth.ts';
+import { dbErrorMessage } from '../lib/auth/messages.ts';
+import { formatDateTime } from '../lib/panel/format.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+if (!page.user || !page.supabase) return redirectToLogin(Astro);
+const { supabase, user } = page;
+
+interface Status { mfa: boolean; support_until: string | null; support_reason: string | null; support_workshop_id: string | null }
+async function loadStatus(): Promise<Status | null> {
+  const { data, error } = await supabase.rpc('admin_status');
+  if (error) logAuth('admin_status_error', error.code);
+  return (Array.isArray(data) ? data[0] : null) ?? null;
+}
+let status = await loadStatus();
+if (!status) {
+  Astro.response.status = 404;
+  return Astro.rewrite('/404');
+}
+
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+interface Diagnosis { account_exists: boolean; email_confirmed: boolean; workshop_name: string | null; link_status: string | null; since: string | null }
+let diagnosis: Diagnosis[] | null = null;
+let diagEmail = '';
+
+if (page.form && status.mfa) {
+  const action = formText(page.form, 'action');
+  if (action === 'abrir') {
+    const reason = formText(page.form, 'reason').trim();
+    const ws = formText(page.form, 'workshop_id');
+    const minutes = Number(formText(page.form, 'minutes'));
+    const { error } = await supabase.rpc('admin_open_support_session', {
+      p_reason: reason, p_workshop_id: /^[0-9a-f-]{36}$/i.test(ws) ? ws : null, p_minutes: Number.isInteger(minutes) ? minutes : 30,
+    });
+    if (error) { logAuth('admin_support_open_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
+    else { logAuth('admin_support_open_ok'); flash = { kind: 'ok', text: 'Sesión de soporte abierta. Queda registrada con su motivo.' }; }
+  } else if (action === 'cerrar') {
+    const { error } = await supabase.rpc('admin_close_support_session');
+    if (error) { logAuth('admin_support_close_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; }
+    else flash = { kind: 'ok', text: 'Sesión de soporte cerrada.' };
+  } else if (action === 'diagnostico') {
+    diagEmail = formText(page.form, 'email').trim().toLowerCase().slice(0, 254);
+    const { data, error } = await supabase.rpc('admin_link_diagnosis', { p_email: diagEmail });
+    if (error) { logAuth('admin_diagnosis_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
+    else diagnosis = (data ?? []) as Diagnosis[];
+  }
+  status = (await loadStatus()) ?? status;
+}
+
+interface Workshop { workshop_id: string; slug: string; name: string; status: string; created_at: string; staff_active: number; customers: number; customers_linked: number; pending_invitations: number; site_published: boolean }
+interface AccessEvent { created_at: string; workshop_name: string | null; kind: string; detail: Record<string, unknown> }
+let workshops: Workshop[] = [];
+let events: AccessEvent[] = [];
+const supportOpen = Boolean(status.support_until);
+if (status.mfa) {
+  const [w, e] = await Promise.all([
+    supabase.rpc('admin_workshops_overview'),
+    supportOpen ? supabase.rpc('admin_access_events', { p_limit: 50 }) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (w.error) logAuth('admin_overview_error', w.error.code);
+  workshops = (w.data ?? []) as Workshop[];
+  events = (e.data ?? []) as AccessEvent[];
+}
+const STATUS: Record<string, string> = { demo: 'Demostración', activo: 'Activo', suspendido: 'Suspendido' };
+const LINK: Record<string, string> = { activa: 'Vinculada', invitacion_pendiente: 'Invitación pendiente', invitacion_caducada: 'Invitación caducada', sin_vinculos: 'Sin talleres vinculados' };
+const KIND: Record<string, string> = {
+  miembro_alta: 'Alta en el equipo', miembro_rol: 'Cambio de rol', miembro_activo: 'Empleado reactivado', miembro_inactivo: 'Empleado desactivado',
+  invitacion_equipo_creada: 'Invitación al equipo', invitacion_equipo_revocada: 'Invitación al equipo anulada', invitacion_equipo_aceptada: 'Invitación al equipo aceptada',
+  invitacion_cliente_creada: 'Invitación a cliente', invitacion_cliente_revocada: 'Invitación a cliente anulada', invitacion_cliente_aceptada: 'Invitación a cliente aceptada',
+  cliente_vinculado: 'Cliente vinculado', cliente_desvinculado: 'Acceso de cliente retirado',
+  soporte_abierto: 'Sesión de soporte abierta', soporte_cerrado: 'Sesión de soporte cerrada', soporte_consulta: 'Consulta de soporte',
+};
+---
+<AuthLayout title="Administración" user={user} wide back={{ href: '/cuenta', label: 'Volver a mi cuenta' }}>
+  <header class="account-head">
+    <p class="label">Plataforma</p>
+    <h1 class="account-title heading">Administración</h1>
+    <p class="auth-lead">Sin abrir una sesión de soporte solo ves el resumen de talleres, sin datos personales. Todo lo que haces aquí queda registrado.</p>
+  </header>
+  {flash.text && (
+    <div class={`alert ${flash.kind === 'ok' ? 'alert-ok' : 'alert-bad'}`} role={flash.kind === 'ok' ? 'status' : 'alert'}>
+      <Icon name={flash.kind === 'ok' ? 'check' : 'alert'} /><span>{flash.text}</span>
+    </div>
+  )}
+
+  {!status.mfa ? (
+    <section class="panel liquid-glass" aria-labelledby="mfa-t">
+      <h2 id="mfa-t" class="panel-title heading">Falta la verificación en dos pasos</h2>
+      <p>La administración de la plataforma solo funciona si has entrado con la verificación en dos pasos.</p>
+      <p style="margin-top:12px"><a class="btn btn-primary" href="/cuenta/seguridad">Activar la verificación en dos pasos</a></p>
+    </section>
+  ) : (
+    <>
+      <section class="panel liquid-glass" aria-labelledby="soporte-t">
+        <h2 id="soporte-t" class="panel-title heading">Sesión de soporte</h2>
+        {supportOpen ? (
+          <>
+            <div class="alert alert-warn" role="status"><Icon name="shield" /><span>Abierta hasta las {formatDateTime(status.support_until)} · motivo: «{status.support_reason}». Mientras está abierta puedes leer datos de los talleres para resolver la incidencia.</span></div>
+            <form method="post" style="margin-top:12px" data-busy="Cerrando…">
+              <input type="hidden" name="action" value="cerrar" />
+              <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cerrar la sesión de soporte</span></button>
+            </form>
+          </>
+        ) : (
+          <form method="post" class="auth-form" data-busy="Abriendo…" novalidate>
+            <input type="hidden" name="action" value="abrir" />
+            <div class="field">
+              <label for="reason">Motivo (queda registrado)</label>
+              <input class="input" id="reason" name="reason" minlength="10" maxlength="500" required placeholder="Ej.: El cliente no ve su taller en el portal (incidencia 123)" />
+            </div>
+            <div class="field">
+              <label for="workshop_id">Taller de la incidencia <span class="muted">(opcional)</span></label>
+              <select class="input" id="workshop_id" name="workshop_id">
+                <option value="">— Ninguno en concreto —</option>
+                {workshops.map(w => <option value={w.workshop_id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div class="field">
+              <label for="minutes">Duración</label>
+              <select class="input" id="minutes" name="minutes">
+                <option value="15">15 minutos</option><option value="30" selected>30 minutos</option><option value="60">1 hora</option><option value="120">2 horas</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Abrir sesión de soporte</span></button>
+          </form>
+        )}
+      </section>
+
+      {supportOpen && (
+        <section class="panel liquid-glass" aria-labelledby="diag-t">
+          <h2 id="diag-t" class="panel-title heading">Diagnóstico de vinculación</h2>
+          <form method="post" class="auth-form" data-busy="Consultando…" novalidate>
+            <input type="hidden" name="action" value="diagnostico" />
+            <div class="field">
+              <label for="email">Correo de la persona</label>
+              <input class="input" id="email" name="email" type="email" inputmode="email" maxlength="254" required value={diagEmail} />
+            </div>
+            <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Consultar</span></button>
+          </form>
+          {diagnosis && (
+            diagnosis.length === 0 || !diagnosis[0]!.account_exists ? <p style="margin-top:12px">No hay ninguna cuenta con ese correo.</p> : (
+              <ul class="plain-list" style="margin-top:12px" aria-label="Resultado del diagnóstico">
+                <li>Cuenta: existe · correo {diagnosis[0]!.email_confirmed ? 'confirmado' : 'SIN confirmar'}</li>
+                {diagnosis.map(d => <li>{d.workshop_name ?? '—'} · {LINK[d.link_status ?? ''] ?? d.link_status}{d.since && ` · desde ${formatDateTime(d.since)}`}</li>)}
+              </ul>
+            )
+          )}
+        </section>
+      )}
+
+      <section class="panel liquid-glass" aria-labelledby="talleres-t">
+        <h2 id="talleres-t" class="panel-title heading">Talleres</h2>
+        {workshops.length === 0 ? <p>No hay talleres.</p> : (
+          <div class="table-scroll">
+            <table class="data-table">
+              <caption class="sr-only">Talleres de la plataforma</caption>
+              <thead><tr><th scope="col">Taller</th><th scope="col">Estado</th><th scope="col">Web</th><th scope="col">Equipo</th><th scope="col">Clientes</th><th scope="col">Con cuenta</th><th scope="col">Invitaciones</th><th scope="col">Alta</th></tr></thead>
+              <tbody>
+                {workshops.map(w => (
+                  <tr><th scope="row">{w.name}<br /><span class="muted small mono">{w.slug}</span></th><td>{STATUS[w.status] ?? w.status}</td><td>{w.site_published ? 'Publicada' : 'No'}</td>
+                    <td>{w.staff_active}</td><td>{w.customers}</td><td>{w.customers_linked}</td><td>{w.pending_invitations}</td><td>{formatDateTime(w.created_at)}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {supportOpen && (
+        <section class="panel liquid-glass" aria-labelledby="eventos-t">
+          <h2 id="eventos-t" class="panel-title heading">Registro de accesos</h2>
+          {events.length === 0 ? <p>Sin eventos.</p> : (
+            <ul class="plain-list small">
+              {events.map(e => <li>{formatDateTime(e.created_at)} · {e.workshop_name ?? 'Plataforma'} · {KIND[e.kind] ?? e.kind}</li>)}
+            </ul>
+          )}
+        </section>
+      )}
+    </>
+  )}
+</AuthLayout>
+
+<style>
+  .table-scroll { overflow-x: auto; max-width: 100%; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .data-table th, .data-table td { text-align: left; padding: 8px; border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); vertical-align: top; }
+  .data-table thead th { white-space: nowrap; font-weight: 600; }
+</style>

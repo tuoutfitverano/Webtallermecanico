@@ -39,11 +39,16 @@ if (page.form) {
   if (flash.kind === 'bad') Astro.response.status = 400;
 }
 
-const [{ data: profile }, { data: workshopsData, error: workshopsError }, { data: portalRecords }] = await Promise.all([
+const [{ data: profile }, { data: workshopsData, error: workshopsError }, { data: portalRecords }, { data: factors }, { data: adminRows }] = await Promise.all([
   supabase.from('profiles').select('full_name, phone').eq('id', user.id).maybeSingle(),
   supabase.rpc('my_workshops'),
   supabase.rpc('portal_profile'),
+  supabase.auth.mfa.listFactors(),
+  supabase.rpc('admin_status'),
 ]);
+const twoStep = (factors?.totp ?? []).some(f => f.status === 'verified');
+// Administración de la plataforma: la base de datos solo devuelve fila a quien lo es.
+const isPlatformAdmin = Array.isArray(adminRows) && adminRows.length > 0;
 if (workshopsError) logAuth('account_workshops_error', workshopsError.code);
 const workshops = (workshopsData ?? []) as Workshop[];
 
@@ -85,6 +90,13 @@ const welcome = Astro.url.searchParams.get('bienvenida') === '1';
         <button class="btn btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar</span></button>
       </form>
       <nav class="auth-links"><a href="/cuenta/contrasena">Cambiar la contraseña</a></nav>
+    </section>
+
+    <section class="panel liquid-glass" aria-labelledby="seguridad-t">
+      <h2 id="seguridad-t" class="panel-title heading">Seguridad</h2>
+      <p class="muted">Verificación en dos pasos: <strong>{twoStep ? 'activada' : 'desactivada'}</strong>. {twoStep ? 'Al entrar te pedimos también el código de tu app.' : 'Con ella, además de la contraseña, al entrar se pide un código de una app del móvil.'}</p>
+      <nav class="auth-links"><a href="/cuenta/seguridad">{twoStep ? 'Gestionar la verificación en dos pasos' : 'Activar la verificación en dos pasos'}</a></nav>
+      {isPlatformAdmin && <p style="margin-top:12px"><a class="btn btn-sm" href="/admin">Administración de la plataforma</a></p>}
     </section>
 
     <section class="panel liquid-glass" aria-labelledby="talleres-t">

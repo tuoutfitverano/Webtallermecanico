@@ -149,7 +149,7 @@ let vehicles: Array<{ id: string; plate: string; make: string; model: string }> 
 let orders: Array<{ id: string; number: number; status: RepairStatus; updated_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
 let invitations: Invitation[] = [];
 let prefs = { operational_email: true, marketing_email: false, operational_whatsapp: false, updated_at: null as string | null };
-let linkHistory: Array<{ id: string; status: 'activa' | 'revocada'; origin: string; linked_at: string; revoked_at: string | null }> = [];
+let linkHistory: Array<{ id: string; status: 'activa' | 'revocada'; origin: string; linked_at: string; revoked_at: string | null; revoked_by: string | null; user_id: string | null }> = [];
 let linkStatus: LinkStatus | null = null;
 const mailOn = emailAvailable();
 let consentLog: Array<{ id: number; channel: string; purpose: string; granted: boolean; source: string; created_at: string }> = [];
@@ -166,7 +166,7 @@ if (panel.workshop && isUuid(id)) {
     panel.supabase.from('customer_contact_preferences').select('operational_email, marketing_email, operational_whatsapp, updated_at').eq('customer_id', id).maybeSingle(),
     // Historial de vinculaciones (oficina, por RLS) y estado actual del acceso.
     panel.isOffice
-      ? panel.supabase.from('customer_account_links').select('id, status, origin, linked_at, revoked_at').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('linked_at', { ascending: false }).limit(10)
+      ? panel.supabase.from('customer_account_links').select('id, status, origin, linked_at, revoked_at, revoked_by, user_id').eq('customer_id', id).eq('workshop_id', panel.workshop.id).order('linked_at', { ascending: false }).limit(10)
       : Promise.resolve({ data: [] }),
     panel.supabase.rpc('customer_link_overview', { p_workshop_id: panel.workshop.id }),
     // Registro de consentimientos: solo gestores (RLS «consent log: lectura gestores»).
@@ -301,7 +301,7 @@ const CONSENT_SOURCE: Record<string, string> = { portal: 'por el cliente en su p
               <h2 id="vinculos" class="card-title"><Icon name="history" />Historial de acceso</h2>
               <ul class="plain-list small">
                 {linkHistory.map(l => (
-                  <li>{l.status === 'activa' ? 'Vinculada' : 'Vinculada y después retirada'} · {LINK_ORIGIN[l.origin] ?? l.origin} · desde el {formatDate(l.linked_at)}{l.revoked_at && ` hasta el ${formatDate(l.revoked_at)}`}</li>
+                  <li>{l.status === 'activa' ? 'Vinculada' : l.revoked_by && l.revoked_by === l.user_id ? 'Vinculada y después retirada por el propio cliente' : 'Vinculada y después retirada por el taller'} · {LINK_ORIGIN[l.origin] ?? l.origin} · desde el {formatDate(l.linked_at)}{l.revoked_at && ` hasta el ${formatDate(l.revoked_at)}`}</li>
                 ))}
               </ul>
               <p class="hint" style="margin-top:8px">Retirar el acceso no borra la ficha, los vehículos ni las reparaciones: solo impide que la cuenta los vea.</p>

@@ -1,0 +1,68 @@
+---
+/**
+ * Segundo paso del acceso: el código de 6 cifras de la app de verificación
+ * (Google Authenticator, Microsoft Authenticator, 1Password…). Solo para
+ * cuentas que tienen activada la verificación en dos pasos. Lo comprueba
+ * Supabase Auth (challenge + verify) y la sesión pasa a «aal2».
+ */
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { authPage, formText, needsSecondFactor, redirectToLogin } from '../../lib/server/auth-page.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { safeNext } from '../../lib/auth/redirect.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro, { allowPendingMfa: true });
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+if (!page.user || !page.supabase) return redirectToLogin(Astro);
+const next = safeNext(page.isPost ? formText(page.form, 'next') : Astro.url.searchParams.get('next'), page.self);
+// Ya verificada (o sin verificación en dos pasos): a su destino.
+if (!(await needsSecondFactor(page.supabase, page.user))) return Astro.redirect(next, 303);
+
+let error = '';
+if (page.form) {
+  const code = formText(page.form, 'code').replace(/\s/g, '');
+  if (!/^\d{6}$/.test(code)) {
+    error = 'Escribe las 6 cifras que muestra tu app de verificación.';
+    Astro.response.status = 422;
+  } else {
+    const { data: factors, error: listError } = await page.supabase.auth.mfa.listFactors();
+    const factor = factors?.totp.find(f => f.status === 'verified');
+    if (listError || !factor) {
+      logAuth('mfa_list_error', listError?.code);
+      error = 'No hemos podido comprobar el código. Inténtalo de nuevo.';
+      Astro.response.status = 400;
+    } else {
+      const { error: e } = await page.supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+      if (!e) {
+        logAuth('mfa_verify_ok');
+        return Astro.redirect(next, 303);
+      }
+      logAuth('mfa_verify_error', e.code);
+      error = e.status === 429 ? 'Demasiados intentos. Espera un minuto y vuelve a probar.' : 'Código incorrecto o caducado. Escribe el que aparece ahora en tu app.';
+      Astro.response.status = e.status === 429 ? 429 : 400;
+    }
+  }
+}
+---
+<AuthLayout title="Verificación en dos pasos" user={page.user}>
+  <section class="auth-card liquid-glass-strong" aria-labelledby="titulo">
+    <p class="label">Área de talleres</p>
+    <h1 id="titulo" class="auth-title heading">Código de verificación</h1>
+    <p class="auth-lead">Tu cuenta tiene activada la verificación en dos pasos. Abre tu app de verificación y escribe el código de 6 cifras de AutoValue.</p>
+    {error && <div class="alert alert-bad" role="alert"><Icon name="alert" /><span>{error}</span></div>}
+    <form method="post" class="auth-form" data-busy="Comprobando…" novalidate>
+      <input type="hidden" name="next" value={next} />
+      <div class="field">
+        <label for="code">Código de 6 cifras</label>
+        <input class="input mono" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus />
+      </div>
+      <button class="btn btn-primary btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Verificar</span></button>
+    </form>
+    <p class="hint" style="margin-top:12px">¿Has perdido el móvil? Por seguridad, la verificación solo la puede retirar la administración de la plataforma después de comprobar que eres tú.</p>
+    <form method="post" action="/salir" class="auth-links" data-astro-reload>
+      <button class="btn btn-sm" type="submit">Salir y entrar con otra cuenta</button>
+    </form>
+  </section>
+</AuthLayout>

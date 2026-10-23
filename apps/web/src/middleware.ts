@@ -19,7 +19,7 @@ import { setPrivateHeaders } from './lib/server/auth.ts';
 import { contentSecurityPolicy } from './lib/server/csp.ts';
 
 // /presupuesto/<código>: enlace público con un código secreto: sin caché y sin enviar la dirección a otros sitios.
-const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado|presupuesto)(\/|$)/;
+const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado|presupuesto|admin)(\/|$)/;
 
 function setSecurityHeaders(headers: Headers, https: boolean, csp: string) {
   headers.set('content-security-policy', csp);

@@ -1,0 +1,157 @@
+---
+/**
+ * Verificación en dos pasos (TOTP) de la cuenta, con Supabase Auth MFA:
+ *
+ *  1. «Activar»: se crea el factor (enroll) y se enseña el código QR y la
+ *     clave para la app (solo en esta respuesta; no se guardan en la web).
+ *  2. La persona escribe el código de 6 cifras: challenge + verify. Solo
+ *     entonces queda activada, y la sesión pasa a «aal2».
+ *  3. «Desactivar» (dos pasos): solo con la sesión ya verificada (aal2).
+ *
+ * Obligatoria para la administración de la plataforma (lo exige la base de datos).
+ */
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import Icon from '../../components/Icon.astro';
+import { authPage, formText, redirectToLogin } from '../../lib/server/auth-page.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { formatDate } from '../../lib/panel/format.ts';
+
+export const prerender = false;
+
+const page = await authPage(Astro);
+if (page.isPost && !page.form) return new Response('Origen no permitido.', { status: 403 });
+if (!page.user || !page.supabase) return redirectToLogin(Astro);
+const { supabase, user } = page;
+
+const FRIENDLY_NAME = 'AutoValue (app de verificación)';
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+let setup: { factorId: string; qr: string; secret: string } | null = null;
+let askDisable = false;
+
+async function factorsNow() {
+  const { data, error } = await supabase.auth.mfa.listFactors();
+  if (error) logAuth('mfa_list_error', error.code);
+  return data?.all.filter(f => f.factor_type === 'totp') ?? [];
+}
+
+if (page.form) {
+  const action = formText(page.form, 'action');
+  if (action === 'empezar') {
+    // Los intentos a medias (sin verificar) se descartan antes de empezar otro.
+    for (const f of (await factorsNow()).filter(f => f.status !== 'verified')) {
+      await supabase.auth.mfa.unenroll({ factorId: f.id });
+    }
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: FRIENDLY_NAME });
+    if (error || !data) {
+      logAuth('mfa_enroll_error', error?.code);
+      flash = { kind: 'bad', text: 'No se ha podido empezar la activación. Inténtalo de nuevo en unos minutos.' };
+      Astro.response.status = 400;
+    } else {
+      setup = { factorId: data.id, qr: data.totp.qr_code, secret: data.totp.secret };
+    }
+  } else if (action === 'confirmar') {
+    const factorId = formText(page.form, 'factor_id');
+    const code = formText(page.form, 'code').replace(/\s/g, '');
+    const pending = (await factorsNow()).find(f => f.id === factorId && f.status !== 'verified');
+    if (!pending) {
+      flash = { kind: 'bad', text: 'La activación ha caducado. Empieza de nuevo.' };
+      Astro.response.status = 400;
+    } else if (!/^\d{6}$/.test(code)) {
+      flash = { kind: 'bad', text: 'Escribe las 6 cifras que muestra tu app.' };
+      Astro.response.status = 422;
+    } else {
+      const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code });
+      if (error) {
+        logAuth('mfa_enroll_verify_error', error.code);
+        flash = { kind: 'bad', text: 'El código no es correcto. Empieza de nuevo y escanea el código QR otra vez.' };
+        await supabase.auth.mfa.unenroll({ factorId });
+        Astro.response.status = 400;
+      } else {
+        logAuth('mfa_enroll_ok');
+        flash = { kind: 'ok', text: 'Verificación en dos pasos activada. A partir de ahora, al entrar te pediremos también el código de tu app.' };
+      }
+    }
+  } else if (action === 'pedir-desactivar') {
+    askDisable = true;
+  } else if (action === 'desactivar') {
+    const verified = (await factorsNow()).filter(f => f.status === 'verified');
+    let failed = verified.length === 0;
+    for (const f of verified) {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: f.id });
+      if (error) { logAuth('mfa_unenroll_error', error.code); failed = true; }
+    }
+    flash = failed
+      ? { kind: 'bad', text: 'No se ha podido desactivar. Vuelve a entrar con tu código e inténtalo otra vez.' }
+      : { kind: 'ok', text: 'Verificación en dos pasos desactivada.' };
+    if (!failed) logAuth('mfa_unenroll_ok');
+    else Astro.response.status = 400;
+  }
+}
+
+const active = (await factorsNow()).find(f => f.status === 'verified') ?? null;
+---
+<AuthLayout title="Verificación en dos pasos" user={user} wide back={{ href: '/cuenta', label: 'Volver a mi cuenta' }}>
+  <header class="account-head">
+    <p class="label">Seguridad</p>
+    <h1 class="account-title heading">Verificación en dos pasos</h1>
+    <p class="auth-lead">Además de la contraseña, al entrar se pide un código de 6 cifras que cambia cada 30 segundos en una app de tu móvil. Si alguien averigua tu contraseña, sin tu móvil no puede entrar.</p>
+  </header>
+  {flash.text && (
+    <div class={`alert ${flash.kind === 'ok' ? 'alert-ok' : 'alert-bad'}`} role={flash.kind === 'ok' ? 'status' : 'alert'}>
+      <Icon name={flash.kind === 'ok' ? 'check' : 'alert'} /><span>{flash.text}</span>
+    </div>
+  )}
+
+  <section class="panel liquid-glass" aria-labelledby="estado-t">
+    <h2 id="estado-t" class="panel-title heading">{active ? 'Activada' : setup ? 'Escanea el código' : 'Desactivada'}</h2>
+    {active ? (
+      <>
+        <p>Tu cuenta pide el código de la app al entrar{active.created_at ? ` (activada el ${formatDate(active.created_at)})` : ''}.</p>
+        {askDisable ? (
+          <form method="post" class="confirm" data-busy="Desactivando…">
+            <input type="hidden" name="action" value="desactivar" />
+            <strong>¿Desactivar la verificación en dos pasos?</strong>
+            <span class="hint">Tu cuenta volverá a abrirse solo con la contraseña. Si eres de la administración de la plataforma, perderás el acceso a ella.</span>
+            <div class="pnl-actions">
+              <button class="btn btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, desactivar</span></button>
+              <a class="btn" href="/cuenta/seguridad">Cancelar</a>
+            </div>
+          </form>
+        ) : (
+          <form method="post" style="margin-top:12px"><input type="hidden" name="action" value="pedir-desactivar" /><button class="btn btn-sm btn-danger" type="submit">Desactivar…</button></form>
+        )}
+      </>
+    ) : setup ? (
+      <div class="mfa-setup">
+        <ol class="mfa-steps">
+          <li>Instala una app de verificación en el móvil (Google Authenticator, Microsoft Authenticator, 1Password…).</li>
+          <li>En la app, añade una cuenta y escanea este código:</li>
+        </ol>
+        <img class="mfa-qr" src={setup.qr} alt="Código QR para añadir AutoValue a tu app de verificación" width="200" height="200" />
+        <p class="small">¿No puedes escanearlo? Escribe esta clave en la app: <code class="mono" id="clave-totp">{setup.secret}</code></p>
+        <form method="post" class="auth-form" data-busy="Comprobando…" novalidate>
+          <input type="hidden" name="action" value="confirmar" />
+          <input type="hidden" name="factor_id" value={setup.factorId} />
+          <div class="field">
+            <label for="code">3. Escribe el código de 6 cifras que muestra la app</label>
+            <input class="input mono" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required />
+          </div>
+          <button class="btn btn-primary btn-block" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Activar</span></button>
+        </form>
+        <p class="hint">El código QR y la clave solo se enseñan ahora. Si recargas la página, empieza de nuevo.</p>
+      </div>
+    ) : (
+      <form method="post" data-busy="Preparando…">
+        <input type="hidden" name="action" value="empezar" />
+        <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Activar la verificación en dos pasos</span></button>
+      </form>
+    )}
+  </section>
+</AuthLayout>
+
+<style>
+  .mfa-setup { display: grid; gap: 14px; }
+  .mfa-steps { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+  .mfa-qr { background: #fff; padding: 12px; border-radius: 12px; width: 200px; height: 200px; max-width: 100%; }
+  #clave-totp { word-break: break-all; }
+</style>
