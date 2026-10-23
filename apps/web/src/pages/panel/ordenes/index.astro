@@ -1,15 +1,20 @@
 ---
-/** Órdenes del taller: búsqueda (número, matrícula, cliente) y filtros por estado y empleado. */
+/**
+ * Órdenes del taller: búsqueda (número, matrícula, cliente) y filtros por estado y empleado.
+ * El mecánico ve además las órdenes libres (sin nadie asignado) y puede quedárselas
+ * («Me la quedo», claim_repair_order: lo decide la base de datos).
+ */
 import PanelLayout from '../../../layouts/PanelLayout.astro';
 import Icon from '../../../components/Icon.astro';
 import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import StatusBadge from '../../../components/panel/StatusBadge.astro';
-import { isUuid, loadTeam, memberName, panelPage } from '../../../lib/server/panel.ts';
+import { field, isUuid, loadTeam, memberName, panelPage } from '../../../lib/server/panel.ts';
+import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
 import { formatDateTime } from '../../../lib/panel/format.ts';
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
-import { formatPlate, isRepairStatus, orderLabel, REPAIR_STATUS_LABELS, REPAIR_STATUSES, type RepairStatus } from '@talleres/core';
+import { formatPlate, isRepairStatus, ORDER_PRIORITY_LABELS, orderLabel, REPAIR_STATUS_LABELS, REPAIR_STATUSES, type OrderPriority, type RepairStatus } from '@talleres/core';
 
 export const prerender = false;
 
@@ -17,30 +22,50 @@ const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
 
 interface Row { id: string; number: number; status: RepairStatus; updated_at: string; received_at: string; problem_description: string; assigned_to: string | null; plate: string; make: string; model: string; customer_name: string }
+interface FreeRow { id: string; number: number; status: RepairStatus; priority: OrderPriority; problem_description: string; plate: string; make: string; model: string }
+
+let claimError = '';
+if (panel.form && panel.workshop && field(panel.form, 'action') === 'coger') {
+  const orderId = field(panel.form, 'order_id');
+  const { error } = isUuid(orderId) ? await panel.supabase.rpc('claim_repair_order', { p_order_id: orderId }) : { error: { code: '22023', message: 'Orden no encontrada.' } };
+  if (!error) return Astro.redirect(`/panel/ordenes/${orderId}?cogida=1`, 303);
+  logAuth('panel_order_claim_error', error.code);
+  claimError = dbErrorMessage(error);
+  Astro.response.status = 400;
+}
+
 const params = Astro.url.searchParams;
 const q = (params.get('q') ?? '').trim().slice(0, 100);
 const estadoParam = params.get('estado') ?? '';
 const estado = isRepairStatus(estadoParam) ? estadoParam : null;
 const todas = estadoParam === 'todas';
+const revision = estadoParam === 'revision';
 const empleadoParam = params.get('empleado') ?? '';
 const empleado = isUuid(empleadoParam) ? empleadoParam : null;
 
 let rows: Row[] = [];
 let error = false;
 let team: Awaited<ReturnType<typeof loadTeam>> = [];
+let free: FreeRow[] = [];
+let pending = new Set<string>();
 if (panel.workshop) {
-  const [r, t] = await Promise.all([
+  const [r, t, p, f] = await Promise.all([
     panel.supabase.rpc('search_repair_orders', {
       p_workshop_id: panel.workshop.id, p_query: q, p_status: estado, p_assigned_to: empleado,
-      p_only_active: !estado && !todas, p_limit: 200,
+      p_only_active: !estado && !todas, p_limit: revision ? 1000 : 200,
     }),
     loadTeam(panel),
+    // Trabajos dados por terminados que esperan la revisión del propietario o un administrador.
+    panel.supabase.from('repair_orders').select('id').eq('workshop_id', panel.workshop.id).not('review_requested_at', 'is', null).limit(1000),
+    panel.isOffice ? Promise.resolve({ data: [], error: null }) : panel.supabase.rpc('unassigned_repair_orders', { p_workshop_id: panel.workshop.id }),
   ]);
-  if (r.error) { logAuth('panel_orders_error', r.error.code); error = true; }
-  rows = (r.data ?? []) as Row[];
+  if (r.error || f.error) { logAuth('panel_orders_error', r.error?.code ?? f.error?.code); error = true; }
+  pending = new Set((p.data ?? []).map(x => x.id as string));
+  rows = ((r.data ?? []) as Row[]).filter(o => !revision || pending.has(o.id));
+  free = (f.data ?? []) as FreeRow[];
   team = t;
 }
-const filtered = Boolean(q || estado || todas || empleado);
+const filtered = Boolean(q || estado || todas || empleado || revision);
 ---
 <PanelLayout panel={panel} title="Órdenes" section="ordenes">
   <header class="pnl-head">
@@ -62,6 +87,7 @@ const filtered = Boolean(q || estado || todas || empleado);
           <label for="estado" class="sr-only">Estado</label>
           <select class="select" id="estado" name="estado">
             <option value="">En curso (sin entregar)</option>
+            <option value="revision" selected={revision}>Pendientes de revisión</option>
             {REPAIR_STATUSES.map(s => <option value={s} selected={s === estado}>{REPAIR_STATUS_LABELS[s]}</option>)}
             <option value="todas" selected={todas}>Todas</option>
           </select>
@@ -78,6 +104,33 @@ const filtered = Boolean(q || estado || todas || empleado);
         <button class="btn" type="submit">Filtrar</button>
       </form>
       {error && <Flash kind="bad" text="No hemos podido cargar las órdenes. Recarga la página." />}
+      {claimError && <Flash kind="bad" text={claimError} />}
+      {!panel.isOffice && (
+        <section class="card" aria-labelledby="libres-t" style="margin-bottom:16px">
+          <h2 id="libres-t" class="card-title"><Icon name="clipboard" />Órdenes libres</h2>
+          {free.length === 0 ? <p class="hint">Ahora mismo no hay órdenes sin nadie asignado.</p> : (
+            <>
+              <p class="hint" style="margin-bottom:8px">Nadie las tiene asignadas. Si te quedas una, pasa a ser tuya; no puedes quitarle una orden a un compañero.</p>
+              <ul class="list" aria-label="Órdenes sin asignar">
+                {free.map(o => (
+                  <li class="row">
+                    <span class="row-main">
+                      <span class="row-title"><span class="num">{orderLabel(o.number)}</span><span class="plate">{formatPlate(o.plate)}</span>{o.make} {o.model}</span>
+                      <span class="row-meta">{o.problem_description}</span>
+                      <span class="row-meta">Prioridad {ORDER_PRIORITY_LABELS[o.priority].toLowerCase()} · {REPAIR_STATUS_LABELS[o.status]}</span>
+                    </span>
+                    <form method="post" class="row-side" data-busy="Guardando…">
+                      <input type="hidden" name="action" value="coger" />
+                      <input type="hidden" name="order_id" value={o.id} />
+                      <button class="btn btn-sm btn-primary" type="submit" aria-label={`Me la quedo: ${orderLabel(o.number)}`}><span data-label>Me la quedo</span></button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
       <section class="card" aria-label="Lista de órdenes">
         {rows.length === 0 ? (
           <div class="empty">
@@ -94,7 +147,7 @@ const filtered = Boolean(q || estado || todas || empleado);
                     <span class="row-meta">{o.customer_name} · {o.problem_description}</span>
                     <span class="row-meta">{memberName(team, o.assigned_to, panel.user.id)} · actualizada {formatDateTime(o.updated_at)}</span>
                   </span>
-                  <span class="row-side"><StatusBadge status={o.status} /></span>
+                  <span class="row-side"><StatusBadge status={o.status} />{pending.has(o.id) && <span class="tag-review">Pendiente de revisión</span>}</span>
                 </a>
               </li>
             ))}

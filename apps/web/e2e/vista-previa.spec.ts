@@ -158,12 +158,16 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     { v: 6, c: 5, to: 'listo', problem: 'Revisión anual y ruido en la dirección al girar.', diagnosis: 'Rótula de dirección izquierda con holgura.', work: 'Sustitución de la rótula, alineado y revisión anual.', notes: 'Tu Golf ya está listo. Puedes recogerlo de 9:00 a 19:00.', details: true, worker: true },
     { v: 7, c: 5, to: 'en_reparacion', problem: 'Le cuesta arrancar en frío.', diagnosis: 'Batería agotada y bujías desgastadas.', work: '', notes: 'Estamos cambiando la batería; mañana te contamos.', details: true, worker: true },
     { v: 8, c: 5, to: 'diagnosis', problem: 'Testigo de neumáticos encendido.', diagnosis: '', work: '', notes: '', details: false, worker: true },
+    // Revisión del trabajo: el trabajador la da por terminada (la propietaria la ve pendiente de revisión)…
+    { v: 4, c: 3, to: 'en_reparacion', problem: 'Cambiar los dos neumáticos delanteros.', diagnosis: '', work: 'Montados y equilibrados dos neumáticos delanteros. Presiones revisadas.', notes: '', details: false, worker: true },
+    // …y una orden libre (sin nadie asignado) que cualquier mecánico puede quedarse.
+    { v: 3, c: 3, to: 'recibido', problem: 'Revisar luces traseras y limpiaparabrisas.', diagnosis: '', work: '', notes: '', details: false, free: true },
   ];
   const orders: Array<Record<string, string>> = [];
   for (const j of jobs) {
     const [o] = await rest('POST', '/repair_orders', owner.tok, {
       workshop_id: DEMO, vehicle_id: vehicles[j.v]!.id, customer_id: customers[j.c]!.id, problem_description: j.problem,
-      assigned_to: 'worker' in j || j.c <= 1 ? worker.id : mech.id,
+      assigned_to: 'free' in j ? null : 'worker' in j || j.c <= 1 ? worker.id : mech.id,
     });
     for (const s of flow.slice(1, flow.indexOf(j.to) + 1)) await rest('PATCH', `/repair_orders?id=eq.${o!.id}`, owner.tok, { status: s });
     await rest('PATCH', `/repair_orders?id=eq.${o!.id}`, owner.tok, {
@@ -227,6 +231,8 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   for (const p of plan) {
     await rest('PATCH', `/repair_orders?id=eq.${orders[p.o]!.id}`, owner.tok, { priority: p.priority, scheduled_on: p.scheduled_on, due_at: p.due_at, estimated_minutes: p.estimated_minutes, mileage_in: p.o === 7 ? 151200 : null });
   }
+  // El trabajador da por terminados los neumáticos de la furgoneta (pendiente de revisión).
+  await rest('POST', '/rpc/mark_order_done', worker.tok, { p_order_id: orders[9]!.id });
   // Fichaje real del trabajador en el Citroën (empezar y parar: hora del servidor).
   await rest('POST', '/rpc/start_work', worker.tok, { p_order_id: orders[7]!.id });
   await rest('POST', '/rpc/stop_work', worker.tok, { p_order_id: orders[7]!.id });

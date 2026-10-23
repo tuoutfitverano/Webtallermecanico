@@ -8,8 +8,20 @@ Cómo funciona el día a día del panel (`/panel`). La facturación tiene su pro
 |---|---|---|
 | **Propietario** | Todo, incluido el equipo y la configuración del taller | — |
 | **Administrador** | Lo mismo que el propietario; en el equipo invita, activa y desactiva a mecánicos y recepción | Gestionar a otros administradores o al propietario |
-| **Recepción** | Clientes, vehículos, órdenes (crear, asignar, planificar, entregar), presupuestos, facturas, cobros, solicitudes web, recordatorios | Equipo, datos y ajustes del taller, avisos del taller, rectificativas, anular cobros, borrar solicitudes |
-| **Mecánico** | Ver y trabajar en **sus** órdenes: estado (salvo «entregado»), diagnosis, trabajo, notas internas, líneas y fichaje | Crear o reasignar órdenes, planificar, ver presupuestos, facturas o estadísticas |
+| **Recepción** | Clientes, vehículos, órdenes (crear, asignar, planificar y entregar las ya confirmadas), presupuestos, facturas, cobros, solicitudes web, recordatorios | Confirmar trabajos («Listo para recoger»), equipo, datos y ajustes del taller, avisos del taller, rectificativas, anular cobros, borrar solicitudes |
+| **Mecánico** | Ver y trabajar en **sus** órdenes: estado (salvo «Listo para recoger» y «entregado»), diagnosis, trabajo, notas internas, líneas y fichaje. **Quedarse** una orden libre y **darla por terminada** | Crear órdenes, quitarle una orden a un compañero, confirmar su propio trabajo, planificar, ver presupuestos, facturas o estadísticas |
+
+### Órdenes libres y revisión del trabajo
+
+1. **Órdenes libres:** una orden abierta sin nadie asignado aparece al mecánico en «Órdenes → Órdenes libres» (solo número, vehículo, problema y prioridad). Con **«Me la quedo»** pasa a ser suya (`claim_repair_order`). Si otra persona se adelanta, se le dice; nunca se quita una orden a un compañero.
+2. **Dar por terminada:** quien tiene la orden pulsa **«Dar por terminada»** (`mark_order_done`). Queda **pendiente de revisión**, se para su tiempo en marcha y el historial lo guarda. El estado no cambia: **el cliente no ve nada ni recibe avisos** todavía.
+3. **Revisión (solo propietario o administrador):** en el inicio aparece «trabajos terminados pendientes de tu revisión» y en Órdenes el filtro «Pendientes de revisión». En la orden:
+   - **«Confirmar: listo para recoger»** → la orden pasa a «Listo para recoger» y el cliente recibe el aviso de siempre;
+   - **«Devolver al mecánico»** con un motivo obligatorio (interno) → el mecánico lo ve en la orden y en el historial, y la vuelve a terminar cuando esté.
+   (`review_repair_order`). **Recepción no confirma.**
+4. **Entregar:** recepción (o la gerencia) marca «Entregado», pero solo cuando el trabajo ya está confirmado como «Listo para recoger». El propietario y el administrador pueden poner «Listo para recoger» directamente sin pasar por la revisión.
+
+Todo lo decide la base de datos (`repair_orders_review_guard` y las tres funciones), no los botones: un mecánico no puede poner «Listo para recoger» ni escribiendo directamente en la base de datos. Pruebas: `supabase/tests/22_revision_ordenes.test.sql` y `apps/web/e2e/revision.spec.ts`.
 
 Los permisos los decide la base de datos (RLS y disparadores), no la interfaz: ocultar un botón no da ni quita permisos. Funciones de apoyo: `private.staff_workshop_ids()` (todo el personal), `private.office_workshop_ids()` (propietario, administrador y recepción) y `private.manager_workshop_ids()` (propietario y administrador).
 

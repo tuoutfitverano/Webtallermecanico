@@ -6,6 +6,10 @@
  *
  * El servidor solo envía los campos que el rol puede cambiar, y la base de
  * datos vuelve a comprobarlo (un mecánico no reasigna ni marca "entregado").
+ *
+ * Revisión: quien tiene la orden la da por terminada (mark_order_done) y el
+ * propietario o un administrador la confirma («Listo para recoger») o la
+ * devuelve con un motivo (review_repair_order). Recepción no confirma.
  */
 import PanelLayout from '../../../layouts/PanelLayout.astro';
 import Icon from '../../../components/Icon.astro';
@@ -38,19 +42,20 @@ interface Order {
   delivered_at: string | null; created_by: string | null; customer_notes: string | null; show_details_to_customer: boolean;
   mileage_in: number | null; priority: OrderPriority; scheduled_on: string | null; due_at: string | null; estimated_minutes: number | null;
   approved_quote_id: string | null; approved_at: string | null;
+  review_requested_at: string | null; review_requested_by: string | null; review_note: string | null;
   vehicles: { id: string; plate: string; make: string; model: string } | null;
   customers: { id: string; full_name: string; phone: string | null; email: string | null; user_id: string | null } | null;
 }
 interface Event {
-  id: number; kind: 'creada' | 'estado' | 'asignacion' | 'datos' | 'mensaje'; customer_message: string | null; from_status: RepairStatus | null; to_status: RepairStatus | null;
+  id: number; kind: 'creada' | 'estado' | 'asignacion' | 'datos' | 'mensaje' | 'terminada' | 'devuelta'; customer_message: string | null; note: string | null; from_status: RepairStatus | null; to_status: RepairStatus | null;
   from_assignee: string | null; to_assignee: string | null; changed_fields: string[] | null; actor: string | null; created_at: string;
 }
 
-let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creada') === '1' ? 'Orden creada.' : '' };
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('creada') === '1' ? 'Orden creada.' : Astro.url.searchParams.get('cogida') === '1' ? 'Te has quedado esta orden: ahora es tuya.' : '' };
 let errors: Partial<Record<string, string>> = {};
 let draft: Record<string, string> | null = null;
 
-const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, mileage_in, priority, scheduled_on, due_at, estimated_minutes, approved_quote_id, approved_at, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
+const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, mileage_in, priority, scheduled_on, due_at, estimated_minutes, approved_quote_id, approved_at, review_requested_at, review_requested_by, review_note, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
 const ctx = panel;
 async function loadOrder() {
   if (!ctx.workshop || !isUuid(id)) return null;
@@ -76,6 +81,7 @@ if (order && panel.workshop) {
 if (panel.form && panel.workshop && order) {
   const action = field(panel.form, 'action');
   let update: Record<string, unknown> | null = null;
+  let reload = false;
   if (action === 'estado') {
     const status = field(panel.form, 'status');
     // Mensaje opcional para el cliente junto al cambio de estado (solo gestores).
@@ -157,6 +163,26 @@ if (panel.form && panel.workshop && order) {
     const error = r1.error ?? r2.error;
     if (error) { logAuth('panel_order_services_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
     else flash = { kind: 'ok', text: order.status === 'entregado' ? 'Mantenimientos guardados. El calendario del vehículo ya está actualizado.' : 'Mantenimientos guardados. Al entregar el vehículo se calculará el próximo.' };
+  } else if (action === 'terminar' || action === 'confirmar' || action === 'devolver') {
+    const reason = field(panel.form, 'motivo').trim();
+    if (action === 'devolver' && (!reason || reason.length > 500)) {
+      flash = { kind: 'bad', text: 'Escribe el motivo (máximo 500 caracteres) para que el mecánico sepa qué falta.' };
+      Astro.response.status = 422;
+    } else {
+      const { error } = action === 'terminar'
+        ? await panel.supabase.rpc('mark_order_done', { p_order_id: order.id })
+        : await panel.supabase.rpc('review_repair_order', { p_order_id: order.id, p_approve: action === 'confirmar', p_note: action === 'devolver' ? reason : null });
+      if (error) { logAuth('panel_order_review_error', error.code); flash = { kind: 'bad', text: dbErrorMessage(error) }; Astro.response.status = 400; }
+      else {
+        flash = {
+          kind: 'ok',
+          text: action === 'terminar' ? 'Orden dada por terminada. Ahora la revisa el propietario o un administrador.'
+            : action === 'confirmar' ? 'Trabajo confirmado: la orden está «Listo para recoger».' : 'Orden devuelta al mecánico con el motivo.',
+        };
+        if (action === 'confirmar') await dispatchOrderEmails(Astro, order.id);
+        reload = true;
+      }
+    }
   } else if (action === 'empezar' || action === 'parar') {
     const { error } = await panel.supabase.rpc(action === 'empezar' ? 'start_work' : 'stop_work', { p_order_id: order.id });
     if (error) { logAuth('panel_work_log_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
@@ -180,6 +206,7 @@ if (panel.form && panel.workshop && order) {
       order = await loadOrder();
     }
   }
+  if (reload) order = await loadOrder();
 }
 
 let events: Event[] = [];
@@ -191,7 +218,7 @@ let intervals: Array<{ id: string; name: string; every_months: number | null; ev
 let doneServices = new Set<string>();
 if (order) {
   const [e, t, l, q, i, si, os] = await Promise.all([
-    panel.supabase.from('repair_order_events').select('id, kind, customer_message, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
+    panel.supabase.from('repair_order_events').select('id, kind, customer_message, note, from_status, to_status, from_assignee, to_assignee, changed_fields, actor, created_at').eq('order_id', order.id).order('id', { ascending: false }),
     loadTeam(panel),
     panel.supabase.from('repair_order_work_logs').select('id, user_id, started_at, ended_at').eq('order_id', order.id).order('started_at', { ascending: false }),
     panel.isOffice ? panel.supabase.from('quotes').select('id, number, version, status, total_cents').eq('order_id', order.id).neq('status', 'sustituido').order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
@@ -227,10 +254,17 @@ const describe = (e: Event): string => {
     case 'estado': return `Estado: ${e.from_status ? REPAIR_STATUS_LABELS[e.from_status] : '—'} → ${e.to_status ? REPAIR_STATUS_LABELS[e.to_status] : '—'}`;
     case 'asignacion': return e.to_assignee ? `Asignada a ${who(e.to_assignee)}` : 'Asignación retirada';
     case 'mensaje': return 'Mensaje para el cliente';
+    case 'terminada': return 'Dada por terminada (pendiente de revisión)';
+    case 'devuelta': return 'Devuelta al mecánico';
     default: return `Cambió: ${(e.changed_fields ?? []).map(f => FIELD_LABELS[f] ?? f).join(', ')}`;
   }
 };
-const statusOptions = REPAIR_STATUSES.filter(s => panel.isOffice || s !== 'entregado' || order?.status === 'entregado');
+// «Listo para recoger» solo lo confirman propietario y administrador; recepción entrega lo ya confirmado.
+const statusOptions = REPAIR_STATUSES.filter(s => s === order?.status
+  || (s === 'listo' ? panel.isManager : s === 'entregado' ? panel.isManager || (panel.isOffice && order?.status === 'listo') : true));
+const pendingReview = Boolean(order?.review_requested_at);
+const canFinish = Boolean(order && !panel.isManager && order.assigned_to === panel.user.id && !pendingReview
+  && order.status !== 'listo' && order.status !== 'entregado');
 const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to);
 ---
 <PanelLayout panel={panel} title={order ? orderLabel(order.number) : 'Orden'} section="ordenes">
@@ -253,6 +287,32 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
       {late && <div class="alert alert-warn" role="note"><Icon name="alert" /><span>La fecha prevista de entrega ({formatDateTime(order.due_at)}) ya ha pasado. Replanifica o avisa al cliente.</span></div>}
       {order.approved_quote_id && <div class="alert alert-ok" role="note"><Icon name="check" /><span>Presupuesto aprobado por el cliente el {formatDateTime(order.approved_at)}. <a href={`/panel/presupuestos/${order.approved_quote_id}`}>Ver presupuesto</a></span></div>}
 
+      {pendingReview ? (
+        <section class="card review-card" aria-labelledby="revision-t">
+          <h2 id="revision-t" class="card-title"><Icon name="check" />Pendiente de revisión</h2>
+          <p>{who(order.review_requested_by)} la dio por terminada el {formatDateTime(order.review_requested_at)}.</p>
+          {panel.isManager ? (
+            <div class="review-actions">
+              <form method="post" data-busy="Confirmando…">
+                <input type="hidden" name="action" value="confirmar" />
+                <button class="btn btn-primary" type="submit"><Icon name="check" /><span data-label>Confirmar: listo para recoger</span></button>
+                <p class="hint" style="margin-top:6px">El cliente recibe el aviso de «listo para recoger», como siempre.</p>
+              </form>
+              <form method="post" class="form-stack" data-busy="Devolviendo…" novalidate>
+                <input type="hidden" name="action" value="devolver" />
+                <div class="field">
+                  <label for="motivo">Motivo para devolverla al mecánico <span class="muted small">(interno, el cliente no lo ve)</span></label>
+                  <textarea class="textarea" id="motivo" name="motivo" maxlength="500" rows="2" required placeholder="Ej.: Falta apretar las pinzas y probar en carretera."></textarea>
+                </div>
+                <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Devolver al mecánico</span></button>
+              </form>
+            </div>
+          ) : <p class="hint">La revisa el propietario o un administrador. Si la confirma, pasa a «Listo para recoger»; si falta algo, te la devuelve con el motivo.</p>}
+        </section>
+      ) : order.review_note && (
+        <div class="alert alert-warn" role="note"><Icon name="alert" /><span>Devuelta para revisar: «{order.review_note}»</span></div>
+      )}
+
       <section class="card" aria-labelledby="estado-t">
         <h2 id="estado-t" class="card-title">Estado</h2>
         <form method="post" class="status-picker" data-busy="Guardando…">
@@ -267,7 +327,16 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             <button class="btn btn-sm" type="submit" name="status" value={s} aria-pressed={s === order!.status ? 'true' : 'false'} disabled={s === order!.status}>{REPAIR_STATUS_LABELS[s]}</button>
           ))}
         </form>
-        {!panel.isOffice && <p class="hint" style="margin-top:10px">Marcar como entregado lo hace la oficina del taller (propietario, administrador o recepción).</p>}
+        {canFinish && (
+          <form method="post" style="margin-top:12px" data-busy="Guardando…">
+            <input type="hidden" name="action" value="terminar" />
+            <button class="btn btn-primary" type="submit"><Icon name="check" /><span data-label>Dar por terminada</span></button>
+            <span class="hint" style="display:block;margin-top:6px">Cuando acabes el trabajo. La revisa el propietario o un administrador; el cliente no recibe nada hasta que la confirme.</span>
+          </form>
+        )}
+        {!panel.isManager && order.status !== 'listo' && order.status !== 'entregado' && (
+          <p class="hint" style="margin-top:10px">«Listo para recoger» lo confirma el propietario o un administrador{panel.isOffice ? '; después, recepción puede entregar el vehículo' : ''}.</p>
+        )}
         {wa && (
           <p style="margin-top:12px"><a class="btn btn-sm" href={wa} target="_blank" rel="noopener noreferrer"><Icon name="chat" />Avisar por WhatsApp (mensaje preparado)</a>
           <span class="hint" style="display:block;margin-top:6px">Abre WhatsApp con el estado actual. Enviarlo lo haces tú; aquí no queda como enviado.</span></p>
@@ -456,7 +525,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             {events.length === 0 ? <p class="hint">Sin cambios registrados.</p> : (
               <ol class="timeline">
                 {events.map(e => (
-                  <li><span class="dot" aria-hidden="true"></span><span><span>{describe(e)}</span>{e.customer_message && <><br /><span class="muted small">Al cliente: «{e.customer_message}»</span></>}<br /><span class="when">{who(e.actor)} · {formatDateTime(e.created_at)}</span></span></li>
+                  <li><span class="dot" aria-hidden="true"></span><span><span>{describe(e)}</span>{e.note && <><br /><span class="muted small">Motivo: «{e.note}»</span></>}{e.customer_message && <><br /><span class="muted small">Al cliente: «{e.customer_message}»</span></>}<br /><span class="when">{who(e.actor)} · {formatDateTime(e.created_at)}</span></span></li>
                 ))}
               </ol>
             )}

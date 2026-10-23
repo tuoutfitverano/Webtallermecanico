@@ -29,6 +29,8 @@ let newRequests: number | null = null;
 interface Attention { presupuestos_sin_respuesta_3d: number; facturas_vencidas: number; ordenes_sin_asignar: number; recordatorios_pendientes: number }
 let attention: Attention | null = null;
 let late = 0;
+let toReview = 0;
+let freeOrders: number | null = null;
 if (panel.workshop) {
   const id = panel.workshop.id;
   const today = todayMadrid();
@@ -45,6 +47,14 @@ if (panel.workshop) {
       ? panel.supabase.rpc('workshop_stats', { p_workshop_id: id, p_from: today, p_to: today })
       : Promise.resolve({ data: null, error: null }),
   ]);
+  // Revisión de trabajos terminados (propietario y administrador) y órdenes libres (mecánicos).
+  if (panel.isManager) {
+    const { count } = await panel.supabase.from('repair_orders').select('id', { count: 'exact', head: true }).eq('workshop_id', id).not('review_requested_at', 'is', null);
+    toReview = count ?? 0;
+  } else if (!panel.isOffice) {
+    const { data } = await panel.supabase.rpc('unassigned_repair_orders', { p_workshop_id: id });
+    freeOrders = Array.isArray(data) ? data.length : null;
+  }
   newRequests = w.count;
   const stats = (st.data ?? null) as { atencion: Attention; ordenes: { retrasadas: number } } | null;
   attention = stats?.atencion ?? null;
@@ -63,6 +73,7 @@ const kpis = summary ? [
   { value: summary.pending_diagnosis, label: 'Pendientes de diagnosis', href: '/panel/ordenes?estado=diagnosis' },
   { value: summary.waiting_parts, label: 'Esperando recambios', href: '/panel/ordenes?estado=esperando_recambios' },
   { value: summary.ready, label: 'Listos para recoger', href: '/panel/ordenes?estado=listo' },
+  ...(freeOrders !== null ? [{ value: freeOrders, label: 'Órdenes libres para quedarte', href: '/panel/ordenes#libres-t' }] : []),
   ...(newRequests !== null ? [{ value: newRequests, label: 'Solicitudes web sin atender', href: '/panel/solicitudes' }] : []),
 ] : [];
 ---
@@ -96,6 +107,7 @@ const kpis = summary ? [
 
       {attention && (() => {
         const items = [
+          { n: toReview, text: 'trabajos terminados pendientes de tu revisión', href: '/panel/ordenes?estado=revision' },
           { n: late, text: 'trabajos pasados de la fecha prevista', href: '/panel/planificacion' },
           { n: Number(attention.ordenes_sin_asignar), text: 'órdenes abiertas sin mecánico asignado', href: '/panel/planificacion' },
           { n: Number(attention.presupuestos_sin_respuesta_3d), text: 'presupuestos sin respuesta desde hace más de 3 días', href: '/panel/presupuestos?estado=pendientes' },
