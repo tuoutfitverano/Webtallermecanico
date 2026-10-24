@@ -2,6 +2,7 @@
  * JavaScript del panel (opcional: sin él todo funciona con formularios normales).
  *  · Bloquea el botón al enviar y muestra un texto de espera (evita dobles envíos).
  *  · El selector de taller cambia al elegir, sin pulsar "Cambiar".
+ *  · Las cifras de las tarjetas (.kpi-value) llenan el ancho de su tarjeta sin salirse.
  * Con la navegación de Astro (ClientRouter) se vuelve a preparar en cada página.
  */
 function init() {
@@ -58,5 +59,38 @@ function init() {
   }
 }
 
+// Cifras de las tarjetas: el mayor tamaño (hasta --kpi-max) que cabe en el ancho de la tarjeta.
+// Sin JavaScript queda el tamaño relativo de la hoja de estilos (más prudente).
+function fitKpi(el: HTMLElement) {
+  const card = el.parentElement;
+  if (!card) return;
+  const style = getComputedStyle(card);
+  const room = card.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const max = getComputedStyle(el).getPropertyValue('--kpi-max').trim() || '3rem';
+  el.style.fontSize = max;
+  const size = parseFloat(getComputedStyle(el).fontSize);
+  const width = el.scrollWidth;
+  if (room > 0 && width > room) el.style.fontSize = `${Math.floor(size * (room / width) * 0.97 * 10) / 10}px`;
+}
+
+let observer: ResizeObserver | undefined;
+function fitKpis() {
+  const values = document.querySelectorAll<HTMLElement>('.kpi-value');
+  if (!values.length) return;
+  observer ??= new ResizeObserver(entries => {
+    for (const entry of entries) {
+      const value = (entry.target as HTMLElement).querySelector<HTMLElement>('.kpi-value');
+      if (value) fitKpi(value);
+    }
+  });
+  for (const value of values) {
+    fitKpi(value);
+    if (value.parentElement) observer.observe(value.parentElement);
+  }
+}
+
 document.addEventListener('astro:page-load', init);
+document.addEventListener('astro:page-load', fitKpis);
 init();
+fitKpis();
+void document.fonts?.ready.then(fitKpis);
