@@ -27,7 +27,8 @@ export default defineConfig({
   // Sin el servicio de imágenes de Cloudflare (de pago por transformación): la web
   // ya sirve imágenes optimizadas (WebP) y no usa <Image> de Astro.
   adapter: cloudflare({ imageService: 'passthrough' }),
-  ...(WEB_EXPORT ? { outDir: './dist-exportar', integrations: [webExport] } : {}),
+  // Carpetas y cachés propias: generar una copia no estorba a un `astro dev` abierto.
+  ...(WEB_EXPORT ? { outDir: './dist-exportar', cacheDir: './node_modules/.astro-exportar', integrations: [webExport] } : {}),
   // La barra de desarrollo de Astro tapa la barra de pestañas del panel en las
   // pruebas de navegador; en producción no existe.
   devToolbar: { enabled: process.env.E2E !== '1' },
@@ -36,6 +37,9 @@ export default defineConfig({
     // Nada en línea: los scripts propios van como archivos (la CSP solo admite
     // en línea los de lib/inline-scripts.ts, por su huella).
     build: { assetsInlineLimit: 0 },
+    ...(WEB_EXPORT ? { cacheDir: './node_modules/.vite-exportar' } : {}),
+    // El servidor de desarrollo no vigila la copia generada (recargaría las páginas abiertas).
+    server: { watch: { ignored: ['**/dist-exportar/**'] } },
     // Ver lib/site/export.ts. Fuera de la exportación quedan vacíos (y su código se elimina).
     define: {
       'import.meta.env.WEB_EXPORT': JSON.stringify(WEB_EXPORT ? '1' : ''),
