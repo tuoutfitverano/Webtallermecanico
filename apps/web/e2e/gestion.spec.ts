@@ -70,7 +70,7 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await login(page, 'propietaria@e2e.test');
     await page.goto('/panel/taller');
     await page.getByLabel(/Razón social/).fill('Talleres Demo E2E SL');
-    await page.getByLabel(/NIF \/ CIF/).fill('B12345678');
+    await page.getByLabel(/NIF \/ CIF/).fill('B12345674');
     await page.getByLabel(/^Dirección \(sale/).fill('Calle de Prueba 1');
     await page.getByLabel('Código postal').fill('28001');
     await page.getByLabel('Localidad').fill('Madrid');
@@ -160,7 +160,7 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await page.getByRole('link', { name: 'Imprimir o guardar PDF' }).click();
     await expect(page.getByRole('heading', { name: 'Factura' })).toBeVisible();
     await expect(page.locator('main')).toContainText('Talleres Demo E2E SL');
-    await expect(page.locator('main')).toContainText('B12345678');
+    await expect(page.locator('main')).toContainText('B12345674');
     await expect(page.locator('main')).toContainText('217,80');
     await expect(page.locator('main')).toContainText('VERI*FACTU');
 

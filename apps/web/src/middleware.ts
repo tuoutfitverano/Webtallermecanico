@@ -6,6 +6,8 @@
  *    y los scripts en línea conocidos (CSP con huellas, lib/server/csp.ts),
  *    sin incrustar la web en otras (clickjacking), sin adivinar tipos de
  *    archivo, sin cámara/micrófono/ubicación, HTTPS obligatorio en producción.
+ *  · Peticiones con un cuerpo declarado mayor que MAX_POST_BYTES: 413 sin
+ *    leerlas (cada endpoint y formulario aplica además su propio límite).
  *  · Área privada: si APP_URL está definido, el acceso y la cuenta solo se
  *    sirven en ese dominio (las webs de los talleres no guardan sesiones), y
  *    ninguna caché guarda páginas con datos de la sesión.
@@ -17,6 +19,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { appOrigin } from './lib/server/config.ts';
 import { setPrivateHeaders } from './lib/server/auth.ts';
 import { contentSecurityPolicy } from './lib/server/csp.ts';
+import { MAX_POST_BYTES, declaredTooLarge } from './lib/server/body.ts';
 
 // /presupuesto/<código>: enlace público con un código secreto: sin caché y sin enviar la dirección a otros sitios.
 const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado|presupuesto|admin)(\/|$)/;
@@ -46,6 +49,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const https = context.url.protocol === 'https:';
   const isPrivate = PRIVATE_PATHS.test(context.url.pathname);
   const csp = await contentSecurityPolicy();
+
+  if (context.request.method !== 'GET' && context.request.method !== 'HEAD' && declaredTooLarge(context.request, MAX_POST_BYTES)) {
+    const tooLarge = new Response('Petición demasiado grande.', { status: 413, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+    return withHeaders(tooLarge, h => setSecurityHeaders(h, https, csp));
+  }
 
   if (isPrivate) {
     const app = appOrigin();

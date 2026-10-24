@@ -27,7 +27,16 @@ export type SendOutcome =
   /** Rechazo definitivo: no se reintenta solo. */
   | { kind: 'permanente'; code: SendErrorCode };
 
-export type SendErrorCode = 'no_disponible' | 'limite_proveedor' | 'credenciales' | 'rechazado' | 'conflicto' | 'error';
+/**
+ * `sin_confirmacion`: el proveedor respondió 2xx pero sin el identificador del
+ * mensaje. No se da por enviado (no se podría seguir su entrega).
+ */
+export type SendErrorCode = 'no_disponible' | 'limite_proveedor' | 'credenciales' | 'rechazado' | 'conflicto' | 'sin_confirmacion' | 'error';
+
+/** Identificador del proveedor utilizable: texto no vacío, sin espacios raros y de longitud razonable. */
+export function validMessageId(id: unknown): id is string {
+  return typeof id === 'string' && /^[\x21-\x7e]{1,200}$/.test(id);
+}
 
 export interface ChannelSender {
   /** Identificador interno (minúsculas): se guarda con cada aviso. */

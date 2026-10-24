@@ -15,7 +15,7 @@ Nunca uses la base de datos de producción para pruebas, ni copies datos reales 
 
 ## 2. Requisitos
 
-- Node 22 (ver `.nvmrc`).
+- Node 22.22.3 (ver `.nvmrc`; mínimo real de Astro y del linter).
 - Cuenta de Cloudflare (Workers) y de Supabase.
 - Dominio para el área privada (`APP_URL`, p. ej. `https://app.tudominio.es`) y dominio de cada taller.
 

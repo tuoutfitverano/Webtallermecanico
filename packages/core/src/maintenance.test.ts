@@ -29,6 +29,9 @@ describe('serviceDueState', () => {
   const today = '2026-10-22';
   it('vencido por fecha o por km, pronto si queda poco, al día si no', () => {
     expect(serviceDueState({ dueOn: '2026-10-21', dueKm: null }, today, null)).toBe('vencido');
+    // Auditoría H07: el mismo día ya «le toca» (antes salía «Pronto»); el día anterior, «Pronto».
+    expect(serviceDueState({ dueOn: today, dueKm: 95000 }, today, 90000)).toBe('vencido');
+    expect(serviceDueState({ dueOn: today, dueKm: null }, today, null)).toBe('vencido');
     expect(serviceDueState({ dueOn: '2027-10-22', dueKm: 95000 }, today, 95000)).toBe('vencido');
     expect(serviceDueState({ dueOn: '2026-11-10', dueKm: null }, today, null)).toBe('pronto');
     expect(serviceDueState({ dueOn: '2027-10-22', dueKm: 95000 }, today, 94500)).toBe('pronto');

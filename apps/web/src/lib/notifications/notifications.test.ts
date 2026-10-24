@@ -81,7 +81,14 @@ describe('Resend (fetch simulado)', () => {
     expect(outcomeFromResend(401, '')).toEqual({ kind: 'temporal', code: 'credenciales' });
     expect(outcomeFromResend(422, '{"message":"Invalid `to` field"}')).toEqual({ kind: 'permanente', code: 'rechazado' });
     expect(outcomeFromResend(409, '')).toEqual({ kind: 'permanente', code: 'conflicto' });
-    expect(outcomeFromResend(200, 'no-json')).toEqual({ kind: 'aceptado', messageId: '' });
+    expect(outcomeFromResend(200, '{"id":"49a3999c-0ce1-4ea6-ab68-afcd6dc2e794"}')).toEqual({ kind: 'aceptado', messageId: '49a3999c-0ce1-4ea6-ab68-afcd6dc2e794' });
+  });
+
+  it('2xx sin identificador NO cuenta como enviado (auditoría H01): se reintenta con la misma clave', () => {
+    for (const body of ['no-json', '', '{}', '{"id":""}', '{"id":42}', '{"id":"a b"}', JSON.stringify({ id: 'x'.repeat(201) })]) {
+      expect(outcomeFromResend(200, body)).toEqual({ kind: 'temporal', code: 'sin_confirmacion' });
+    }
+    expect(outcomeFromResend(202, '{}')).toEqual({ kind: 'temporal', code: 'sin_confirmacion' });
   });
 
   it('tiempo agotado o red caída → temporal (se reintentará)', async () => {

@@ -23,7 +23,7 @@ select set_config('tests.f1', public.create_invoice_draft(current_setting('tests
 select tests.eq((select count(*) from public.invoice_items where invoice_id = current_setting('tests.f1')::uuid), 2::bigint, 'el borrador copia las líneas de la orden');
 select tests.throws($$select public.issue_invoice(current_setting('tests.f1')::uuid)$$, 'sin NIF del taller no se emite', '%NIF del taller%');
 reset role;
-update public.workshops set legal_name = 'Taller Alcarria S.L.', tax_id = 'B12345678' where id = 'aaaaaaaa-0000-0000-0000-000000000000';
+update public.workshops set legal_name = 'Taller Alcarria S.L.', tax_id = 'B12345674' where id = 'aaaaaaaa-0000-0000-0000-000000000000';
 update public.customers set tax_id = '12345678Z', address_line = 'Calle Mayor 1', postal_code = '19001', city = 'Guadalajara' where id = 'c1000000-0000-0000-0000-00000000000a';
 
 select tests.login('00000000-0000-0000-0000-0000000000a4');
@@ -31,7 +31,7 @@ set local role authenticated;
 select tests.throws($$update public.invoices set total_cents = 1 where id = current_setting('tests.f1')::uuid$$, 'los importes no se escriben a mano', '%permission denied%');
 select tests.eq(public.issue_invoice(current_setting('tests.f1')::uuid), 'F' || extract(year from current_date) || '-0001', 'primera factura de la serie: F<año>-0001');
 select tests.eq((select total_cents::text || '|' || tax_cents || '|' || (recipient ->> 'tax_id') || '|' || (issuer ->> 'tax_id') from public.invoices where id = current_setting('tests.f1')::uuid),
-  '8470|1470|12345678Z|B12345678', 'importes calculados (5000 + 2000 + 21 %) y datos fijados al emitir');
+  '8470|1470|12345678Z|B12345674', 'importes calculados (5000 + 2000 + 21 %) y datos fijados al emitir');
 select tests.throws($$update public.invoices set notes = 'x' where id = current_setting('tests.f1')::uuid$$, 'una factura emitida no se modifica', '%rectificativa%');
 select tests.throws($$delete from public.invoice_items where invoice_id = current_setting('tests.f1')::uuid$$, 'ni sus líneas', '%rectificativa%');
 select tests.eq(tests.affected($$delete from public.invoices where id = current_setting('tests.f1')::uuid$$), 0::bigint, 'ni se borra');

@@ -71,7 +71,7 @@ select set_config('request.headers', '', true);
 reset role;
 
 -- ===================== 4 y 11. Facturas de otro cliente =====================
-update public.workshops set legal_name = 'Taller Alcarria S.L.', tax_id = 'B12345678' where id = 'aaaaaaaa-0000-0000-0000-000000000000';
+update public.workshops set legal_name = 'Taller Alcarria S.L.', tax_id = 'B12345674' where id = 'aaaaaaaa-0000-0000-0000-000000000000';
 update public.customers set tax_id = '12345678Z', address_line = 'Calle Mayor 1', postal_code = '19001', city = 'Guadalajara' where id = 'c1000000-0000-0000-0000-00000000000a';
 select tests.login('00000000-0000-0000-0000-0000000000a1');
 set local role authenticated;

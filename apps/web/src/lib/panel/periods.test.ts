@@ -19,6 +19,10 @@ describe('Periodos de las estadísticas', () => {
     expect(p('desde=2026-02-30&hasta=2026-03-01').error).toBe('Fechas no válidas.');
     expect(p('desde=2026-03-10&hasta=2026-03-01').error).toMatch(/después/);
     expect(p('desde=2020-01-01&hasta=2026-01-01').error).toMatch(/como mucho/);
+    // Auditoría H06: 400 días contando los dos extremos; 401 ya no.
+    expect(p('desde=2025-01-01&hasta=2026-02-04')).toMatchObject({ id: 'custom', error: null });
+    expect(p('desde=2025-01-01&hasta=2026-02-05').error).toMatch(/400 días como mucho/);
+    expect(p('desde=2026-03-29&hasta=2026-03-29')).toMatchObject({ id: 'custom', from: '2026-03-29', to: '2026-03-29', error: null });
     expect(p('desde=x&hasta=y').from).toBe('2026-03-01');
   });
 });

@@ -51,7 +51,11 @@ describe('Envío con la API de WhatsApp Business (simulada)', () => {
     expect(await sender.send({ id: 'a', to: '34600000001', params: ['a', 'b', 'c'] })).toEqual({ kind: 'temporal', code: 'no_disponible' });
   });
   it('traduce las respuestas de Meta', () => {
-    expect(outcomeFromMeta(200, '{}')).toEqual({ kind: 'aceptado', messageId: '' });
+    expect(outcomeFromMeta(200, JSON.stringify({ messages: [{ id: 'wamid.HBgLMzQ2MDAwMDAwMDAVAgARGBI' }] }))).toEqual({ kind: 'aceptado', messageId: 'wamid.HBgLMzQ2MDAwMDAwMDAVAgARGBI' });
+    // 2xx sin identificador (auditoría H01): no se da por enviado ni se reintenta solo (Meta no tiene idempotencia).
+    for (const body of ['{}', 'sin JSON', '', '{"messages":[]}', '{"messages":[{"id":""}]}', '{"messages":[{"id":7}]}']) {
+      expect(outcomeFromMeta(200, body)).toEqual({ kind: 'permanente', code: 'sin_confirmacion' });
+    }
     expect(outcomeFromMeta(429, '')).toEqual({ kind: 'temporal', code: 'limite_proveedor' });
     expect(outcomeFromMeta(400, JSON.stringify({ error: { code: 131056 } }))).toEqual({ kind: 'temporal', code: 'limite_proveedor' });
     expect(outcomeFromMeta(401, JSON.stringify({ error: { code: 190 } }))).toEqual({ kind: 'temporal', code: 'credenciales' });

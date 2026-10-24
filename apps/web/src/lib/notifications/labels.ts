@@ -31,6 +31,7 @@ export const ERROR_LABELS: Readonly<Record<string, string>> = {
   credenciales: 'Configuración del proveedor incorrecta',
   rechazado: 'El proveedor lo rechazó (dirección o número no válido)',
   conflicto: 'Envío duplicado detectado',
+  sin_confirmacion: 'El proveedor respondió sin justificante: comprueba si llegó antes de reintentar',
   error: 'Error inesperado',
   reintentos_agotados: 'Se agotaron los reintentos',
   rebotado: 'La dirección rechazó el email (rebote)',

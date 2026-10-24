@@ -6,6 +6,7 @@
 import type { APIRoute } from 'astro';
 import { recordEmailDelivery, resendWebhookSecret } from '../../../lib/server/config.ts';
 import { parseResendEvent, verifySvix } from '../../../lib/notifications/webhook.ts';
+import { readBodyText } from '../../../lib/server/body.ts';
 
 export const prerender = false;
 
@@ -15,8 +16,8 @@ const json = (status: number, body: unknown) =>
 export const POST: APIRoute = async ({ request }) => {
   const secret = resendWebhookSecret();
   if (!secret) return json(404, { ok: false });
-  const body = await request.text();
-  if (body.length > 64_000) return json(413, { ok: false });
+  const body = await readBodyText(request, 64_000).catch(() => null);
+  if (body === null) return json(413, { ok: false });
   const valid = await verifySvix(secret, {
     id: request.headers.get('svix-id'),
     timestamp: request.headers.get('svix-timestamp'),

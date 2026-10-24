@@ -12,6 +12,7 @@
 import type { APIRoute } from 'astro';
 import { recordWhatsappDelivery, whatsappWebhookSecrets } from '../../../lib/server/config.ts';
 import { metaChallenge, parseMetaStatuses, verifyMetaSignature } from '../../../lib/notifications/whatsapp.ts';
+import { readBodyText } from '../../../lib/server/body.ts';
 
 export const prerender = false;
 
@@ -30,8 +31,8 @@ export const GET: APIRoute = ({ url }) => {
 export const POST: APIRoute = async ({ request }) => {
   const { appSecret } = whatsappWebhookSecrets();
   if (!appSecret) return json(404, { ok: false });
-  const body = await request.text();
-  if (body.length > 256_000) return json(413, { ok: false });
+  const body = await readBodyText(request, 256_000).catch(() => null);
+  if (body === null) return json(413, { ok: false });
   if (!(await verifyMetaSignature(appSecret, request.headers.get('x-hub-signature-256'), body))) return json(401, { ok: false });
 
   let statuses: ReturnType<typeof parseMetaStatuses>;

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEMO_SITE } from '../site/demo.ts';
 import type { PublicSite } from '../site/content.ts';
 import type { CaptchaVerifier } from './antispam.ts';
-import { clientFingerprint, createTurnstileVerifier } from './antispam.ts';
+import { clientFingerprint, createTurnstileVerifier, isTurnstileTestSecret } from './antispam.ts';
 import { handleSubmission, type SubmissionDeps, type SubmissionInput } from './handler.ts';
 import { StoreError, type RequestStore } from './store.ts';
 
@@ -192,7 +192,8 @@ describe('antispam', () => {
   });
 
   it('Turnstile: acepta, rechaza y detecta errores de red', async () => {
-    const ok = createTurnstileVerifier('s', vi.fn(async () => new Response(JSON.stringify({ success: true, hostname: 'demo.localhost', action: 'solicitud' }))));
+    const ts = new Date().toISOString();
+    const ok = createTurnstileVerifier('s', vi.fn(async () => new Response(JSON.stringify({ success: true, hostname: 'demo.localhost', action: 'solicitud', challenge_ts: ts }))));
     expect(await ok.verify('t', null, 'demo.localhost')).toBe('ok');
     const otroHost = createTurnstileVerifier('s', vi.fn(async () => new Response(JSON.stringify({ success: true, hostname: 'otra.web' }))));
     expect(await otroHost.verify('t', null, 'demo.localhost')).toBe('invalid');
@@ -201,5 +202,29 @@ describe('antispam', () => {
     const caido = createTurnstileVerifier('s', vi.fn(async () => { throw new Error('red'); }));
     expect(await caido.verify('t', null, 'demo.localhost')).toBe('error');
     expect(await ok.verify('', null, 'demo.localhost')).toBe('invalid');
+  });
+
+  it('Turnstile: sin dominio, sin formulario o con un código viejo no se acepta (auditoría H04)', async () => {
+    const now = Date.parse('2026-10-24T10:00:00Z');
+    const reply = (body: unknown) => createTurnstileVerifier('s', vi.fn(async () => new Response(JSON.stringify(body))), () => now);
+    const fresh = '2026-10-24T09:58:00Z';
+    const base = { success: true, hostname: 'demo.localhost', action: 'solicitud', challenge_ts: fresh };
+    expect(await reply(base).verify('t', null, 'demo.localhost')).toBe('ok');
+    expect(await reply(base).verify('t', null, 'DEMO.localhost')).toBe('ok');
+    expect(await reply({ success: true }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, hostname: undefined }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, action: undefined }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, action: 'login' }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, challenge_ts: undefined }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, challenge_ts: '2026-10-24T09:50:00Z' }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, challenge_ts: '2026-10-24T10:05:00Z' }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply({ ...base, success: 'true' }).verify('t', null, 'demo.localhost')).toBe('invalid');
+    expect(await reply(['no', 'es', 'un', 'objeto']).verify('t', null, 'demo.localhost')).toBe('invalid');
+  });
+
+  it('Turnstile: las claves de prueba de Cloudflare se reconocen (y en producción no se usan)', () => {
+    expect(isTurnstileTestSecret('1x0000000000000000000000000000000AA')).toBe(true);
+    expect(isTurnstileTestSecret('2x0000000000000000000000000000000AA')).toBe(true);
+    expect(isTurnstileTestSecret('0x4AAAAAAAAbbbbbCCCCCddddd')).toBe(false);
   });
 });

@@ -62,12 +62,85 @@ export const REMINDER_STATUS_LABELS: Readonly<Record<string, string>> = {
   descartado: 'Descartado',
 };
 
-/** NIF/NIE/CIF: mayúsculas y sin espacios ni guiones; solo se comprueba la forma (no el dígito de control). */
+/** NIF/NIE/CIF: mayúsculas y sin espacios, puntos ni guiones. */
 export function normalizeTaxId(text: string): string {
   return text.toUpperCase().replace(/[\s.-]/g, '');
 }
+/** Solo la forma general (8 a 12 letras y números). Para validar de verdad, `checkTaxId`. */
 export function isTaxIdShape(text: string): boolean {
   return /^[A-Z0-9]{8,12}$/.test(text);
+}
+
+const NIF_LETTERS = 'TRWAGMYFPDXBNJZSQVHLCKE';
+const CIF_LETTERS = 'JABCDEFGHI';
+/**
+ * Prefijos de país admitidos para identificadores EXTRANJEROS (NIF-IVA de la UE
+ * y otros habituales). Con prefijo no se puede comprobar el control: se acepta la forma.
+ */
+export const FOREIGN_TAX_PREFIXES = [
+  'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'EL', 'FI', 'FR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
+  'XI', 'GB', 'CH', 'NO', 'IS', 'LI', 'AD', 'MC', 'SM', 'GI', 'MA', 'US',
+] as const;
+
+export type TaxIdCheck =
+  | { ok: true; kind: 'nif' | 'nie' | 'cif' | 'extranjero'; value: string }
+  | { ok: false; reason: 'formato' | 'control' | 'extranjero' };
+
+/**
+ * Comprueba un identificador fiscal. Los españoles (DNI/NIF, NIF K/L/M, NIE y
+ * CIF, también con prefijo «ES») se validan con su letra o dígito de control;
+ * los extranjeros solo con `allowForeign` y con el prefijo del país delante.
+ * Misma regla en la base de datos: `private.tax_id_check` (hay prueba de paridad).
+ */
+export function checkTaxId(input: string, opts: { allowForeign?: boolean } = {}): TaxIdCheck {
+  let v = normalizeTaxId(input);
+  if (/^ES[A-Z0-9]{9}$/.test(v)) v = v.slice(2);
+  if (/^\d{8}[A-Z]$/.test(v)) {
+    return NIF_LETTERS[Number(v.slice(0, 8)) % 23] === v[8] ? { ok: true, kind: 'nif', value: v } : { ok: false, reason: 'control' };
+  }
+  if (/^[KLM]\d{7}[A-Z]$/.test(v)) {
+    return NIF_LETTERS[Number(v.slice(1, 8)) % 23] === v[8] ? { ok: true, kind: 'nif', value: v } : { ok: false, reason: 'control' };
+  }
+  if (/^[XYZ]\d{7}[A-Z]$/.test(v)) {
+    const n = Number(String('XYZ'.indexOf(v[0]!)) + v.slice(1, 8));
+    return NIF_LETTERS[n % 23] === v[8] ? { ok: true, kind: 'nie', value: v } : { ok: false, reason: 'control' };
+  }
+  if (/^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/.test(v)) {
+    const digits = v.slice(1, 8);
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = Number(digits[i]);
+      if (i % 2 === 0) {
+        const twice = d * 2;
+        sum += Math.floor(twice / 10) + (twice % 10);
+      } else {
+        sum += d;
+      }
+    }
+    const control = (10 - (sum % 10)) % 10;
+    const last = v[8]!;
+    const first = v[0]!;
+    // Cifra obligatoria: A, B, E, H. Letra: P, Q, R, S, N, W y los no residentes (provincia 00). El resto, cualquiera.
+    const mustDigit = 'ABEH'.includes(first);
+    const mustLetter = !mustDigit && ('PQRSNW'.includes(first) || digits.startsWith('00'));
+    const okDigit = last === String(control);
+    const okLetter = last === CIF_LETTERS[control];
+    const ok = mustLetter ? okLetter : mustDigit ? okDigit : okDigit || okLetter;
+    return ok ? { ok: true, kind: 'cif', value: v } : { ok: false, reason: 'control' };
+  }
+  if (/^[A-Z]{2}[A-Z0-9]{2,14}$/.test(v) && (FOREIGN_TAX_PREFIXES as readonly string[]).includes(v.slice(0, 2))) {
+    return opts.allowForeign ? { ok: true, kind: 'extranjero', value: v } : { ok: false, reason: 'extranjero' };
+  }
+  return { ok: false, reason: 'formato' };
+}
+
+/** Mensaje para el formulario (sin detalles técnicos). */
+export function taxIdMessage(reason: 'formato' | 'control' | 'extranjero', opts: { allowForeign?: boolean } = {}): string {
+  if (reason === 'control') return 'La letra o el dígito de control no coincide: revisa el NIF/NIE/CIF.';
+  if (reason === 'extranjero') return 'Aquí hace falta un NIF, NIE o CIF español.';
+  return opts.allowForeign
+    ? 'No es un NIF, NIE ni CIF español. Si es extranjero, escríbelo con el código del país delante (p. ej. FR…, PT…).'
+    : 'No es un NIF, NIE ni CIF español válido.';
 }
 /** VIN (bastidor): 17 caracteres sin I, O ni Q. */
 export function normalizeVin(text: string): string {

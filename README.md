@@ -26,7 +26,7 @@ demo/              Prototipo comercial anterior
 
 ## Requisitos
 
-- Node.js 22.12 o superior (`.nvmrc`).
+- Node.js 22.22.3 o superior en la rama 22 (o 24.16+ ; `.nvmrc` fija 22.22.3). Lo exigen Astro 7 y las herramientas de revisión de código.
 - Para la base de datos local completa: Docker y `npx supabase start`.
 - Para las pruebas de permisos sin Docker: PostgreSQL 16 o 17.
 

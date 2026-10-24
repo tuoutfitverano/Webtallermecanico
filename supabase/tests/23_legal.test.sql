@@ -6,7 +6,7 @@ begin;
 -- ===================== Datos legales en la web pública =====================
 select tests.login('00000000-0000-0000-0000-0000000000a3');
 set local role authenticated;
-select tests.eq(tests.affected($$update public.workshops set legal_name = 'Talleres Alcarria SL', tax_id = 'B19000000', address_line = 'Calle Mayor 1',
+select tests.eq(tests.affected($$update public.workshops set legal_name = 'Talleres Alcarria SL', tax_id = 'B19000009', address_line = 'Calle Mayor 1',
   postal_code = '19001', city = 'Guadalajara', province = 'Guadalajara', registry_info = 'Registro Mercantil de Guadalajara, tomo 1, folio 1',
   legal_email = 'legal@alcarria.test' where id = 'aaaaaaaa-0000-0000-0000-000000000000'$$), 1::bigint, 'la gerencia guarda los datos legales del taller');
 select tests.throws($$update public.workshops set legal_email = 'no-es-correo' where id = 'aaaaaaaa-0000-0000-0000-000000000000'$$,

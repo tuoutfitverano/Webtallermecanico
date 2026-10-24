@@ -28,7 +28,8 @@ export function resolvePeriod(params: URLSearchParams, today: string): { id: Per
   if (from || to) {
     if (!valid(from) || !valid(to)) return { ...resolvePeriod(new URLSearchParams(), today), error: 'Fechas no válidas.' };
     if (from > to) return { ...resolvePeriod(new URLSearchParams(), today), error: 'La fecha de inicio va después de la de fin.' };
-    if ((utc(to).getTime() - utc(from).getTime()) / 86_400_000 > MAX_PERIOD_DAYS) {
+    // Días contando los dos extremos (del 1 al 1 es 1 día): como mucho MAX_PERIOD_DAYS (auditoría H06).
+    if ((utc(to).getTime() - utc(from).getTime()) / 86_400_000 + 1 > MAX_PERIOD_DAYS) {
       return { ...resolvePeriod(new URLSearchParams(), today), error: `Elige un periodo de ${MAX_PERIOD_DAYS} días como mucho.` };
     }
     return { id: 'custom', from, to, error: null };

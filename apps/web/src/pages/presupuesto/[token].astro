@@ -16,6 +16,7 @@ import Icon from '../../components/Icon.astro';
 import { quoteByToken, respondQuoteByToken, type PublicQuote } from '../../lib/server/config.ts';
 import { documentTotals, formatCents, LINE_KIND_LABELS, quoteLabel } from '@talleres/core';
 import { formatDay } from '../../lib/panel/format.ts';
+import { readFormLimited } from '../../lib/server/body.ts';
 
 export const prerender = false;
 const token = (Astro.params.token ?? '').toLowerCase();
@@ -26,7 +27,7 @@ let name = '';
 let comment = '';
 if (Astro.request.method === 'POST') {
   const origin = Astro.request.headers.get('origin');
-  const form = await Astro.request.formData().catch(() => null);
+  const form = await readFormLimited(Astro.request);
   if (!form || (origin && origin !== Astro.url.origin)) {
     return new Response('Envío no permitido.', { status: 403 });
   }

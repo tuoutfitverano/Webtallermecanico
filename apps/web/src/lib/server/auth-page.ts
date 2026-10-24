@@ -5,6 +5,7 @@ import type { AstroGlobal } from 'astro';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { authOrigin, createAuthClient, getSessionUser, isSameOriginPost, requestOrigin, type SessionUser } from './auth.ts';
 import { currentPath, loginUrl } from '../auth/redirect.ts';
+import { readFormLimited } from './body.ts';
 
 export interface AuthPage {
   /** null si Supabase no está configurado: las páginas lo dicen y no simulan nada. */
@@ -64,7 +65,8 @@ export async function authPage(Astro: AstroGlobal, opts: { allowPendingMfa?: boo
   const isPost = Astro.request.method === 'POST';
   let form: FormData | null = null;
   if (isPost && isSameOriginPost(Astro.request)) {
-    form = await Astro.request.formData().catch(() => null);
+    // Con límite de tamaño (lib/server/body.ts): uno mayor se trata como petición no válida.
+    form = await readFormLimited(Astro.request);
   }
   return { supabase, user, origin: authOrigin(Astro.request, Astro.url), self: requestOrigin(Astro.request, Astro.url), isPost, form, extraHeaders };
 }

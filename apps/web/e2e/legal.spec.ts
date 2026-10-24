@@ -29,7 +29,7 @@ test('los datos legales del taller salen en su aviso legal y su privacidad', asy
   test.setTimeout(150_000);
   await login(page, 'gestora@e2e.test', '/panel/taller');
   await page.getByLabel(/Razón social/).fill('Talleres Demo E2E SL');
-  await page.getByLabel(/NIF \/ CIF/).fill('B12345678');
+  await page.getByLabel(/NIF \/ CIF/).fill('B12345674');
   await page.getByLabel(/^Dirección \(sale/).fill('Calle de Prueba 1');
   await page.getByLabel('Código postal').fill('28001');
   await page.getByLabel('Localidad').fill('Madrid');
@@ -48,7 +48,7 @@ test('los datos legales del taller salen en su aviso legal y su privacidad', asy
   }, { timeout: 75_000, intervals: [3000] }).toContain('legal@demo-e2e.test');
   const main = page.locator('main');
   await expect(main).toContainText('Talleres Demo E2E SL');
-  await expect(main).toContainText('NIF: B12345678');
+  await expect(main).toContainText('NIF: B12345674');
   await expect(main).toContainText('Calle de Prueba 1, 28001 Madrid');
   await expect(main).toContainText('Registro Mercantil de Madrid (prueba)');
   await expect(main.locator('.legal-missing')).toHaveCount(0);
@@ -116,7 +116,7 @@ test('resguardo de depósito imprimible desde la orden', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Resguardo de depósito' })).toBeVisible();
   await expect(page.locator('main')).toContainText('Presenta este resguardo para recoger el vehículo.');
   await expect(page.locator('main')).toContainText('Real Decreto 1457/1986');
-  await expect(page.locator('main')).toContainText('NIF B12345678');
+  await expect(page.locator('main')).toContainText('NIF B12345674');
   await expect(page.locator('main')).toContainText('Ruido en la suspensión');
   await expect(page.locator('main')).toContainText('123.456');
   await expect(page.getByText('Firma del cliente')).toBeVisible();

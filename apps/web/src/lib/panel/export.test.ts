@@ -10,6 +10,17 @@ describe('toCsv', () => {
   it('no deja fórmulas: una celda que empieza por = + - @ va como texto', () => {
     expect(toCsv([{ a: '=HYPERLINK("x")', b: '+34 600', c: -5 }]).split('\r\n')[1]).toBe(`"'=HYPERLINK(""x"")";'+34 600;-5`);
   });
+  it('tampoco detrás de espacios, invisibles o con signos de ancho completo (auditoría H05)', () => {
+    const row = (v: string) => toCsv([{ v }]).split('\r\n')[1];
+    for (const v of [' =1+2', '  @SUM(A1)', '\u00a0=1+2', '\u200b=1+2', '\ufeff+1', '\u3000-1', '\uff1d1+2', '\uff0b1', '\t=1', '\r=1', '\n=1']) {
+      const out = row(v)!;
+      expect(out.replace(/^"/, '').startsWith("'"), JSON.stringify(v)).toBe(true);
+    }
+    // Lo normal queda igual.
+    expect(row('Ana López')).toBe('Ana López');
+    expect(row('1234 ABC')).toBe('1234 ABC');
+    expect(toCsv([{ n: -5 }]).split('\r\n')[1]).toBe('-5');
+  });
   it('sin filas: solo la marca BOM y una línea vacía', () => {
     expect(toCsv([])).toBe('\uFEFF\r\n');
   });

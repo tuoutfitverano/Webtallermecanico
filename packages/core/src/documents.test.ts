@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTaxIdShape, isVin, normalizeTaxId, normalizeVin, quoteLabel, whatsappLink, whatsappNumber } from './documents.ts';
+import { checkTaxId, isTaxIdShape, isVin, normalizeTaxId, normalizeVin, quoteLabel, whatsappLink, whatsappNumber } from './documents.ts';
 
 describe('documentos', () => {
   it('etiqueta de presupuesto con versión', () => {
@@ -30,5 +30,36 @@ describe('WhatsApp (igual que la base de datos)', () => {
   it('enlace con el texto codificado', () => {
     expect(whatsappLink('600000001', 'Hola & adiós')).toBe('https://wa.me/34600000001?text=Hola%20%26%20adi%C3%B3s');
     expect(whatsappLink('912345678', 'x')).toBeNull();
+  });
+});
+
+describe('NIF/NIE/CIF con control (auditoría H03)', () => {
+  it('acepta identificadores españoles correctos', () => {
+    for (const [id, kind] of [
+      ['12345678Z', 'nif'], ['00000000T', 'nif'], ['K1234567L', 'nif'],
+      ['X1234567L', 'nie'], ['Y1234567X', 'nie'], ['Z1234567R', 'nie'],
+      ['B12345674', 'cif'], ['Q2826000H', 'cif'], ['A28015865', 'cif'], ['B00000000', 'cif'],
+    ] as const) {
+      expect(checkTaxId(id), id).toEqual({ ok: true, kind, value: id });
+    }
+    expect(checkTaxId(' es-b12.345.674 ')).toEqual({ ok: true, kind: 'cif', value: 'B12345674' });
+  });
+
+  it('rechaza los que tienen la forma correcta pero el control mal', () => {
+    for (const id of ['12345678A', '00000000A', 'K1234567A', 'X1234567A', 'Z1234567X', 'B12345678', 'B1234567D', 'Q2826000A', 'Q28260008', 'A2801586E']) {
+      expect(checkTaxId(id), id).toEqual({ ok: false, reason: 'control' });
+    }
+  });
+
+  it('formatos imposibles', () => {
+    for (const id of ['', '1234', 'ABCDEFGHI', '123456789', 'I1234567A', 'AA1234567', 'ES123']) {
+      expect(checkTaxId(id, { allowForeign: true }).ok, id).toBe(false);
+    }
+  });
+
+  it('extranjeros: solo con el prefijo del país y solo donde se permiten', () => {
+    expect(checkTaxId('FR12345678901', { allowForeign: true })).toEqual({ ok: true, kind: 'extranjero', value: 'FR12345678901' });
+    expect(checkTaxId('PT123456789', { allowForeign: true }).ok).toBe(true);
+    expect(checkTaxId('FR12345678901')).toEqual({ ok: false, reason: 'extranjero' });
   });
 });

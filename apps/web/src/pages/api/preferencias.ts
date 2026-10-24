@@ -12,13 +12,14 @@ import { PANEL_COLOR_COOKIE, isPanelColor } from '../../lib/panel/colors.ts';
 import { THEME_COOKIE, isTheme } from '../../lib/theme.ts';
 import { CONSENT_COOKIE, CONSENT_MAX_AGE, PREFERENCE_COOKIES, consentFrom } from '../../lib/consent.ts';
 import { safeNext } from '../../lib/auth/redirect.ts';
+import { readFormLimited } from '../../lib/server/body.ts';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, cookies, url }) => {
   const origin = request.headers.get('origin');
   if (origin && origin !== url.origin) return new Response('Envío no permitido.', { status: 403 });
-  const form = await request.formData().catch(() => null);
+  const form = await readFormLimited(request, 4096);
   const color = form?.get('color');
   const theme = form?.get('tema');
   // Volver a la página desde la que se pulsó. safeNext no deja volver a /acceso o /registro

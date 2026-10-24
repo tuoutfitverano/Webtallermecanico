@@ -30,7 +30,8 @@ const err = (k: string) => errors[k];
     <p class="hint">Hacen falta para una factura completa (empresa o autónomo). Para particulares basta con el nombre.</p>
     <div class={`field ${err('taxId') ? 'has-error' : ''}`}>
       <label for="tax_id">NIF, NIE o CIF</label>
-      <input class="input" id="tax_id" name="tax_id" maxlength="20" autocomplete="off" autocapitalize="characters" value={values.tax_id ?? ''} aria-invalid={err('taxId') ? 'true' : undefined} />
+      <input class="input" id="tax_id" name="tax_id" maxlength="20" autocomplete="off" autocapitalize="characters" value={values.tax_id ?? ''} aria-invalid={err('taxId') ? 'true' : undefined} aria-describedby="tax_id-hint" />
+      <p class="hint" id="tax_id-hint">Se comprueba la letra o el dígito de control. Si es extranjero, con el código del país delante (FR…, PT…).</p>
       {err('taxId') && <p class="field-error">{err('taxId')}</p>}
     </div>
     <div class={`field ${err('addressLine') ? 'has-error' : ''}`}>

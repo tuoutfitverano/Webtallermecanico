@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createPublicClient, createServiceClient } from '../supabase.ts';
 import { resolveSite } from '../site/resolve.ts';
 import type { PublicSite } from '../site/content.ts';
-import { clientFingerprint, createTurnstileVerifier } from '../requests/antispam.ts';
+import { clientFingerprint, createTurnstileVerifier, isTurnstileTestSecret } from '../requests/antispam.ts';
 import { createSupabaseStore } from '../requests/store.ts';
 import type { SubmissionDeps } from '../requests/handler.ts';
 import { createOpenapiProvider } from '../vehicle-lookup/openapi.ts';
@@ -98,7 +98,8 @@ export function submissionDeps(): SubmissionDeps {
   return {
     resolveSite: siteForHost,
     store: service ? createSupabaseStore(service) : null,
-    captcha: turnstileSecret ? createTurnstileVerifier(turnstileSecret) : null,
+    // Una clave de PRUEBA de Cloudflare en producción equivale a no tener antispam (503), nunca a aprobar todo.
+    captcha: turnstileSecret && (isDev || !isTurnstileTestSecret(turnstileSecret)) ? createTurnstileVerifier(turnstileSecret) : null,
     requireCaptcha: !isDev,
     fingerprint: ip => clientFingerprint(ip, hashSecret, madridToday()),
     today: madridToday,

@@ -3,6 +3,7 @@
  * Las usa el servidor para decidir; la base de datos vuelve a comprobar lo esencial.
  */
 import { z } from 'zod';
+import { checkTaxId, normalizeTaxId, taxIdMessage } from './documents.ts';
 
 const optText = (max: number) =>
   z.string().trim().max(max, `Máximo ${max} caracteres.`).nullish().transform(v => (v ? v : null));
@@ -22,8 +23,10 @@ export const customerInputSchema = z
     province: optText(80),
   })
   .superRefine((v, ctx) => {
-    if (v.taxId && !/^[A-Z0-9]{8,12}$/.test(v.taxId.toUpperCase().replace(/[\s.-]/g, ''))) {
-      ctx.addIssue({ code: 'custom', path: ['taxId'], message: 'NIF/NIE/CIF no válido (8 a 12 letras y números).' });
+    if (v.taxId) {
+      // Con letra o dígito de control (auditoría H03); extranjeros con el prefijo del país.
+      const tax = checkTaxId(v.taxId, { allowForeign: true });
+      if (!tax.ok) ctx.addIssue({ code: 'custom', path: ['taxId'], message: taxIdMessage(tax.reason, { allowForeign: true }) });
     }
     if (v.postalCode && !/^\d{5}$/.test(v.postalCode)) {
       ctx.addIssue({ code: 'custom', path: ['postalCode'], message: 'El código postal tiene 5 cifras.' });
@@ -38,7 +41,7 @@ export const customerInputSchema = z
       ctx.addIssue({ code: 'custom', path: ['email'], message: 'Correo electrónico no válido.' });
     }
   })
-  .transform(v => ({ ...v, email: v.email ? v.email.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase().replace(/[\s.-]/g, '') : null }));
+  .transform(v => ({ ...v, email: v.email ? v.email.toLowerCase() : null, taxId: v.taxId ? normalizeTaxId(v.taxId).replace(/^ES(?=[A-Z0-9]{9}$)/, '') : null }));
 
 export type CustomerData = z.output<typeof customerInputSchema>;
 
@@ -133,8 +136,10 @@ export const workshopProfileSchema = z
     if (v.postalCode && !/^\d{5}$/.test(v.postalCode)) {
       ctx.addIssue({ code: 'custom', path: ['postalCode'], message: 'El código postal tiene 5 cifras.' });
     }
-    if (v.taxId && !/^[A-Z0-9]{8,12}$/.test(v.taxId.toUpperCase().replace(/[\s.-]/g, ''))) {
-      ctx.addIssue({ code: 'custom', path: ['taxId'], message: 'NIF/CIF no válido (8 a 12 letras y números).' });
+    if (v.taxId) {
+      // El taller factura en España: NIF, NIE o CIF español con su control.
+      const tax = checkTaxId(v.taxId);
+      if (!tax.ok) ctx.addIssue({ code: 'custom', path: ['taxId'], message: taxIdMessage(tax.reason) });
     }
     if (v.contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.contactEmail)) {
       ctx.addIssue({ code: 'custom', path: ['contactEmail'], message: 'Correo electrónico no válido.' });
@@ -149,7 +154,7 @@ export const workshopProfileSchema = z
       ctx.addIssue({ code: 'custom', path: ['logoUrl'], message: 'Debe ser una dirección que empiece por https://' });
     }
   })
-  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, legalEmail: v.legalEmail ? v.legalEmail.toLowerCase() : null, taxId: v.taxId ? v.taxId.toUpperCase().replace(/[\s.-]/g, '') : null }));
+  .transform(v => ({ ...v, contactEmail: v.contactEmail ? v.contactEmail.toLowerCase() : null, legalEmail: v.legalEmail ? v.legalEmail.toLowerCase() : null, taxId: v.taxId ? normalizeTaxId(v.taxId).replace(/^ES(?=[A-Z0-9]{9}$)/, '') : null }));
 
 export type WorkshopProfileData = z.output<typeof workshopProfileSchema>;
 

@@ -7,9 +7,15 @@ describe('clientes', () => {
     expect(r).toEqual({ fullName: 'Ana García', phone: null, email: 'ana@correo.es', internalNotes: null, taxId: null, addressLine: null, postalCode: null, city: null, province: null });
   });
   it('rechaza teléfonos y correos no válidos, y nombres vacíos', () => {
-    const fiscal = customerInputSchema.parse({ fullName: 'Talleres Pérez SL', taxId: 'b-12.345.678', postalCode: '28001', city: 'Madrid' });
-    expect(fiscal).toMatchObject({ taxId: 'B12345678', postalCode: '28001', city: 'Madrid', addressLine: null });
+    const fiscal = customerInputSchema.parse({ fullName: 'Talleres Pérez SL', taxId: 'b-12.345.674', postalCode: '28001', city: 'Madrid' });
+    expect(fiscal).toMatchObject({ taxId: 'B12345674', postalCode: '28001', city: 'Madrid', addressLine: null });
     expect(customerInputSchema.safeParse({ fullName: 'Ana', taxId: '12', postalCode: '2800' }).success).toBe(false);
+    // Auditoría H03: forma correcta pero letra de control equivocada → error; extranjero con prefijo → admitido.
+    const wrong = customerInputSchema.safeParse({ fullName: 'Ana', taxId: '12345678A' });
+    expect(wrong.success).toBe(false);
+    expect(wrong.error?.issues[0]?.message).toMatch(/control/);
+    expect(customerInputSchema.parse({ fullName: 'Ana', taxId: '12345678z' }).taxId).toBe('12345678Z');
+    expect(customerInputSchema.parse({ fullName: 'Client SARL', taxId: 'FR 123 456 789 01' }).taxId).toBe('FR12345678901');
     const r = customerInputSchema.safeParse({ fullName: 'A', phone: '123', email: 'no-es-correo' });
     expect(r.success).toBe(false);
     const errors = fieldErrors(r.error!);
@@ -70,9 +76,11 @@ describe('datos del taller', () => {
     expect(r.registryInfo).toBe('RM Madrid, tomo 1');
   });
   it('normaliza correo y NIF', () => {
-    const r = workshopProfileSchema.parse({ name: 'Taller', contactEmail: 'Hola@Taller.ES', taxId: 'b12345678' });
+    const r = workshopProfileSchema.parse({ name: 'Taller', contactEmail: 'Hola@Taller.ES', taxId: 'b12345674' });
     expect(r.contactEmail).toBe('hola@taller.es');
-    expect(r.taxId).toBe('B12345678');
+    expect(r.taxId).toBe('B12345674');
+    expect(workshopProfileSchema.safeParse({ name: 'Taller', taxId: 'B12345678' }).success).toBe(false);
+    expect(workshopProfileSchema.safeParse({ name: 'Taller', taxId: 'FR12345678901' }).success).toBe(false);
   });
   it('ajustes de facturación con los límites de la base de datos', () => {
     const ok = billingSettingsSchema.parse({ defaultTaxRate: 21, quoteValidityDays: 30, labourRateCents: 4500, invoiceSeries: ' f ', rectifyingSeries: 'r', paymentTermsDays: 0 });

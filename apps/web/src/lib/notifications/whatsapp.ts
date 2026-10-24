@@ -19,7 +19,7 @@
  */
 import { isKnownTemplate, type ClaimedNotification } from './templates.ts';
 import type { DispatchSummary } from './dispatcher.ts';
-import type { SendOutcome } from './types.ts';
+import { validMessageId, type SendOutcome } from './types.ts';
 
 export const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 export const WHATSAPP_TEMPLATE = 'reparacion_estado_v1';
@@ -91,7 +91,10 @@ export function outcomeFromMeta(status: number, body: string): SendOutcome {
   }
   if (status >= 200 && status < 300) {
     const id = json.messages?.[0]?.id;
-    return { kind: 'aceptado', messageId: typeof id === 'string' && id.length <= 200 ? id : '' };
+    // Sin id no hay justificante. Meta no admite clave de idempotencia: reintentar
+    // solo podría duplicar el mensaje, así que queda «fallido» con este motivo y la
+    // gerencia decide (puede comprobarlo y reintentarlo a mano).
+    return validMessageId(id) ? { kind: 'aceptado', messageId: id } : { kind: 'permanente', code: 'sin_confirmacion' };
   }
   const code = typeof json.error?.code === 'number' ? json.error.code : null;
   // Límites de envío (por número, por cuenta o de la plataforma).

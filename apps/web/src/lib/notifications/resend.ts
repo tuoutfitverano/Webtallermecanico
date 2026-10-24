@@ -7,7 +7,7 @@
  *
  * Solo se usa en el servidor: la clave nunca llega al navegador.
  */
-import type { ChannelSender, SendOutcome } from './types.ts';
+import { validMessageId, type ChannelSender, type SendOutcome } from './types.ts';
 
 export const RESEND_API_URL = 'https://api.resend.com';
 
@@ -59,8 +59,9 @@ export function outcomeFromResend(status: number, body: string): SendOutcome {
     } catch {
       id = undefined;
     }
-    // Sin id no podemos seguir la entrega, pero el proveedor lo ha aceptado.
-    return { kind: 'aceptado', messageId: typeof id === 'string' && id.length <= 200 ? id : '' };
+    // Sin id no hay justificante: no se da por enviado. Se reintenta con la MISMA
+    // clave de idempotencia (Resend no duplica el email si ya lo había aceptado).
+    return validMessageId(id) ? { kind: 'aceptado', messageId: id } : { kind: 'temporal', code: 'sin_confirmacion' };
   }
   if (status === 429) return { kind: 'temporal', code: 'limite_proveedor' };
   // Clave o dominio mal configurados: se reintenta (con espera) por si se corrige.

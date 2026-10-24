@@ -18,11 +18,18 @@ export const CSV_TABLES = {
 export type CsvTable = keyof typeof CSV_TABLES;
 export const isCsvTable = (v: string): v is CsvTable => Object.hasOwn(CSV_TABLES, v);
 
-/** Una celda de CSV: comillas cuando hace falta y sin fórmulas (una celda que empieza por = + - @ se abriría como fórmula). */
+/**
+ * Texto que una hoja de cálculo podría ejecutar como fórmula: empieza por = + - @
+ * (o sus versiones de ancho completo) o por tabulador/salto, AUNQUE vaya detrás
+ * de espacios o caracteres invisibles (auditoría H05).
+ */
+const FORMULA_START = /^[\p{Z}\p{Cc}\p{Cf}\s]*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]|^[\t\r\n]/u;
+
+/** Una celda de CSV: comillas cuando hace falta y nunca una fórmula (se antepone «'», que la deja como texto). */
 function cell(value: unknown): string {
   if (value === null || value === undefined) return '';
   let text = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  if (/^[=+\-@\t\r]/.test(text) && !(typeof value === 'number')) text = `'${text}`;
+  if (typeof value !== 'number' && typeof value !== 'bigint' && FORMULA_START.test(text)) text = `'${text}`;
   return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

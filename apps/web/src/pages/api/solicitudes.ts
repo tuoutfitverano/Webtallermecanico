@@ -7,6 +7,7 @@
 import type { APIRoute } from 'astro';
 import { handleSubmission } from '../../lib/requests/handler.ts';
 import { submissionDeps } from '../../lib/server/config.ts';
+import { readBodyText } from '../../lib/server/body.ts';
 
 export const prerender = false;
 
@@ -23,10 +24,9 @@ export const POST: APIRoute = async ({ request }) => {
   const isJson = contentType.includes('application/json');
   const isForm = contentType.includes('application/x-www-form-urlencoded');
 
-  const declared = Number(request.headers.get('content-length') ?? 0);
-  if (declared > MAX_BODY_BYTES) return json({ ok: false, error: 'bad_request', message: 'El formulario es demasiado grande.' }, 413);
-  const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) return json({ ok: false, error: 'bad_request', message: 'El formulario es demasiado grande.' }, 413);
+  // Límite en BYTES y antes de leerlo entero (lib/server/body.ts).
+  const text = await readBodyText(request, MAX_BODY_BYTES).catch(() => null);
+  if (text === null) return json({ ok: false, error: 'bad_request', message: 'El formulario es demasiado grande.' }, 413);
 
   let body: unknown = null;
   if (isJson) {

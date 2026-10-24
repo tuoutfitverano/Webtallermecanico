@@ -48,7 +48,8 @@ export function serviceDueState(
 ): ServiceDueState {
   const daysLeft = next.dueOn ? Math.round((Date.parse(next.dueOn) - Date.parse(today)) / 86_400_000) : null;
   const kmLeft = next.dueKm !== null && mileage !== null ? next.dueKm - mileage : null;
-  if ((daysLeft !== null && daysLeft < 0) || (kmLeft !== null && kmLeft <= 0)) return 'vencido';
+  // «Le toca ya» desde el mismo día (igual que con los km: al llegar a la cifra). Auditoría H07.
+  if ((daysLeft !== null && daysLeft <= 0) || (kmLeft !== null && kmLeft <= 0)) return 'vencido';
   if ((daysLeft !== null && daysLeft <= soon.days) || (kmLeft !== null && kmLeft <= soon.km)) return 'pronto';
   return 'al_dia';
 }
