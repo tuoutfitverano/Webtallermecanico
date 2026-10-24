@@ -1,5 +1,7 @@
 # Checklist de lanzamiento (19-10-2026)
 
+> **Histórico.** La lista vigente es [`CHECKLIST_LANZAMIENTO.md`](../CHECKLIST_LANZAMIENTO.md) en la raíz del proyecto (24-10-2026).
+
 **Estados:**
 
 - ✅ **Verificado**: con pruebas ejecutadas localmente en este repositorio.

@@ -202,6 +202,16 @@ test.describe('Servidor y permisos', () => {
     expect(other.status()).toBe(201);
   });
 
+  test('un cuerpo enorme se rechaza por tamaño (en bytes) sin guardarlo (auditoría H02)', async ({ request }) => {
+    const name = unique('Grande');
+    // 10.000 «ñ» = 20.000 bytes: antes pasaba porque se contaban caracteres.
+    const res = await post(request, { data: valid({ name, message: 'ñ'.repeat(10_000) }) });
+    expect(res.status()).toBe(413);
+    // (Una longitud declarada falsa no se puede enviar desde aquí: el cliente la recalcula.
+    // La cubre la prueba unitaria de lib/server/body.ts.)
+    expect(await rowsNamed(name)).toHaveLength(0);
+  });
+
   test('rechaza envíos desde otra web', async ({ request }) => {
     const res = await post(request, { data: valid(), headers: { origin: 'https://malicioso.example' } });
     expect(res.status()).toBe(403);

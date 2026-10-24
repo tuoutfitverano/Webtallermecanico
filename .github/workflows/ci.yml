@@ -45,6 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/test-db.sh
+      - name: Concurrencia (facturas, cobros, presupuestos y órdenes a la vez)
+        run: bash scripts/test-concurrencia.sh
       # pg_dump tiene que ser de la misma versión que el servidor (17) y age cifra la copia.
       - name: Cliente de PostgreSQL 17 y age
         run: |

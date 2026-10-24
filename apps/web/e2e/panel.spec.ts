@@ -107,6 +107,12 @@ test.describe('Panel · propietaria', () => {
     await page.getByRole('button', { name: 'Guardar cliente' }).click();
     await expect(page.getByText('Correo electrónico no válido.')).toBeVisible();
     await page.getByLabel(/Correo electrónico/).fill('');
+    // NIF con la letra de control equivocada (auditoría H03): se avisa y no se guarda.
+    await page.locator('summary', { hasText: 'Datos para facturar' }).click();
+    await page.getByLabel('NIF, NIE o CIF').fill('12345678A');
+    await page.getByRole('button', { name: 'Guardar cliente' }).click();
+    await expect(page.getByText(/letra o el dígito de control no coincide/)).toBeVisible();
+    await page.getByLabel('NIF, NIE o CIF').fill('12345678-z');
     await page.getByRole('button', { name: 'Guardar cliente' }).click();
     await expect(page.getByRole('heading', { name })).toBeVisible();
 
