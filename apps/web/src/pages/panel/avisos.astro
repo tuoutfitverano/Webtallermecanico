@@ -67,8 +67,12 @@ if (panel.form && panel.workshop && panel.isManager) {
       flash = { kind: 'bad', text: error.message && error.code !== '22023' ? dbErrorMessage(error) : error.message || 'No se puede reintentar este aviso.' };
       Astro.response.status = 400;
     } else {
-      const order = field(form, 'order');
-      if (isUuid(order)) await dispatchOrderEmails(Astro, order);
+      // La orden se lee de la base de datos (con los permisos del usuario), nunca del formulario:
+      // el envío inmediato usa la clave secreta y solo debe tocar avisos de este taller.
+      const { data: retried } = await panel.supabase.from('notifications').select('order_id')
+        .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle();
+      const order = (retried as { order_id: string | null } | null)?.order_id ?? null;
+      if (order) await dispatchOrderEmails(Astro, order);
       const ready = field(form, 'canal') === 'whatsapp' ? canWhatsapp : canEmail;
       flash = { kind: 'ok', text: ready ? 'Reintento enviado. Revisa el estado en la lista.' : 'Reintento programado: saldrá cuando el canal esté configurado.' };
     }
@@ -180,7 +184,6 @@ if (panel.workshop && panel.isManager) {
                         <form method="post" data-busy="Reintentando…">
                           <input type="hidden" name="action" value="reintentar" /><input type="hidden" name="id" value={n.id} />
                           <input type="hidden" name="canal" value={n.channel} />
-                          {n.order_id && <input type="hidden" name="order" value={n.order_id} />}
                           <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Reintentar</span></button>
                         </form>
                       )}
