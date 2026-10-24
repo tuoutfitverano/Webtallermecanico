@@ -1,17 +1,18 @@
 /**
- * Modo claro u oscuro, elegido por cada persona (botón con sol/luna en la web,
- * el acceso, el panel y el portal). Se guarda en este dispositivo (cookie «tema»
+ * Modo claro u oscuro, elegido por cada persona (botón con sol/luna en el
+ * acceso, el panel y el portal). La web pública es SIEMPRE oscura (sin botón). Se guarda en este dispositivo (cookie «tema»
  * y, para la vista previa sin servidor, localStorage); no es un dato personal.
  *
  * Se mantiene en todas las páginas durante la visita; con las cookies de
  * preferencias aceptadas, 1 año (lib/consent.ts).
  *
- * Sin elección, cada zona usa el suyo: el área privada (acceso, panel del
- * taller y portal del cliente), claro; la web pública, oscuro.
+ * Sin elección, el área privada (acceso, panel del taller y portal del
+ * cliente) es clara.
  */
 export const THEMES = ['oscuro', 'claro'] as const;
 export type Theme = (typeof THEMES)[number];
-export const THEME_COOKIE = 'tema';
+/** «modo» (antes «tema»): con el nombre nuevo se descartan elecciones antiguas hechas en la web pública. */
+export const THEME_COOKIE = 'modo';
 
 /** Modo predeterminado de cada zona cuando la persona no ha elegido. */
 export const DEFAULT_THEME = { web: 'oscuro', panel: 'claro', portal: 'claro', acceso: 'claro' } as const satisfies Record<string, Theme>;

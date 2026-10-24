@@ -15,10 +15,8 @@ import '@fontsource-variable/archivo/standard.css';
 import AuthLayout from '../layouts/AuthLayout.astro';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Icon from '../components/Icon.astro';
-import ThemeToggle from '../components/ThemeToggle.astro';
 import { siteForHost } from '../lib/server/config.ts';
 import { telHref } from '../lib/site/content.ts';
-import { DEFAULT_THEME, THEME_COOKIE, themeFor } from '../lib/theme.ts';
 export const prerender = false;
 Astro.response.status = 404;
 Astro.response.headers.set('cache-control', 'no-store');
@@ -26,7 +24,6 @@ Astro.response.headers.set('cache-control', 'no-store');
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
 const raw = decodeURIComponent(Astro.url.pathname);
 const path = raw.length > 60 ? `${raw.slice(0, 57)}…` : raw;
-const theme = themeFor(Astro.cookies.get(THEME_COOKIE)?.value, DEFAULT_THEME.web);
 const tel = site ? telHref(site.content.phone) : '';
 const canAsk = Boolean(site?.sections.solicitudes);
 ---
@@ -35,7 +32,6 @@ const canAsk = Boolean(site?.sections.solicitudes);
     <div class="nf">
       <header class="nf-top">
         <a href="/" class="nf-brand">{site.name}</a>
-        <ThemeToggle current={theme} class="round-btn liquid-glass" />
       </header>
       <main class="nf-main" aria-labelledby="nf-t">
         <p class="nf-code" aria-hidden="true">404</p>

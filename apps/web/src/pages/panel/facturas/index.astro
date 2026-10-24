@@ -68,8 +68,8 @@ const tone = { pendiente: 'pill-warn', parcial: 'pill-warn', cobrada: 'pill-ok' 
       <div class="alert alert-warn" role="note"><Icon name="alert" /><span>Facturación operativa: <strong>no es un sistema VERI*FACTU certificado</strong>. Antes de usarla para facturar de verdad, revísalo con tu asesoría (ver la guía de facturación).</span></div>
       {loadError && <Flash kind="bad" text="No se han podido cargar las facturas. Recarga la página." />}
       <section class="kpis" aria-label="Resumen de cobros">
-        <a class="kpi" href="/panel/facturas?estado=pendientes"><span class="kpi-value">{formatCents(totals.pending)}</span><span class="kpi-label">Pendiente de cobro</span></a>
-        <a class="kpi" href="/panel/facturas?estado=vencidas"><span class="kpi-value">{formatCents(totals.overdue)}</span><span class="kpi-label">Vencido</span></a>
+        <a class="kpi" href="/panel/facturas?estado=pendientes"><span class="kpi-value is-money">{formatCents(totals.pending)}</span><span class="kpi-label">Pendiente de cobro</span></a>
+        <a class="kpi" href="/panel/facturas?estado=vencidas"><span class="kpi-value is-money">{formatCents(totals.overdue)}</span><span class="kpi-label">Vencido</span></a>
       </section>
       <nav class="filter-tabs" aria-label="Estado">
         {FILTERS.map(f => <a href={`/panel/facturas?estado=${f.id}`} aria-current={f.id === filter ? 'page' : undefined}>{f.label}</a>)}

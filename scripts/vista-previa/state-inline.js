@@ -13,17 +13,17 @@
   };
   const read = f => { try { return f(); } catch { return null; } };
   const fromUrl = parse(read(() => new URLSearchParams(location.search).get('vp')));
-  const fromName = parse(read(() => (window.name.startsWith('vp:') ? window.name.slice(3) : '')));
-  const fromVisit = parse(read(() => sessionStorage.getItem('vp')));
+  const fromName = parse(read(() => (window.name.startsWith('vp2:') ? window.name.slice(4) : '')));
+  const fromVisit = parse(read(() => sessionStorage.getItem('vp2')));
   // Lo guardado en el dispositivo solo cuenta si se aceptaron las cookies.
-  const fromStorage = parse(read(() => localStorage.getItem('vp')));
+  const fromStorage = parse(read(() => localStorage.getItem('vp2')));
   if (fromStorage.k !== 'aceptadas') for (const key of ['t', 'c']) delete fromStorage[key];
   const state = {};
   for (const key of ['t', 'c', 'k']) {
     const v = fromUrl[key] ?? fromName[key] ?? fromVisit[key] ?? fromStorage[key];
     if (v) state[key] = v;
   }
-  if (state.t) root.dataset.theme = state.t;
+  if (state.t && !root.hasAttribute('data-theme-fixed')) root.dataset.theme = state.t;
   if (state.c && root.hasAttribute('data-color')) root.dataset.color = state.c;
   if (state.k) root.dataset.cookies = state.k;
   window.__vp = state;

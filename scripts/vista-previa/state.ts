@@ -8,6 +8,8 @@
  * pestaña). En la web
  * desplegada no hace falta nada de esto: lo guarda el servidor (cookies).
  * Solo se guarda en localStorage si se han aceptado las cookies de preferencias.
+ * La clave es «vp2»: así no se aplican elecciones antiguas (de cuando la web
+ * pública tenía botón de modo). La web pública es siempre oscura (data-theme-fixed).
  * El script en línea de state-inline.js lo aplica antes de pintar cada página.
  */
 type State = { t?: string; c?: string; k?: string };
@@ -18,9 +20,9 @@ const hasState = () => Boolean(state.t || state.c || state.k);
 
 function save() {
   const v = encode();
-  try { window.name = `vp:${v}`; } catch { /* sin window.name: queda el enlace */ }
-  try { sessionStorage.setItem('vp', v); } catch { /* sin almacenamiento de la visita */ }
-  try { if (state.k === 'aceptadas') localStorage.setItem('vp', v); else localStorage.removeItem('vp'); } catch { /* sin almacenamiento */ }
+  try { window.name = `vp2:${v}`; } catch { /* sin window.name: queda el enlace */ }
+  try { sessionStorage.setItem('vp2', v); } catch { /* sin almacenamiento de la visita */ }
+  try { if (state.k === 'aceptadas') localStorage.setItem('vp2', v); else localStorage.removeItem('vp2'); } catch { /* sin almacenamiento */ }
 }
 
 /** El enlace (o la dirección) con la elección actual, para la siguiente página. */

@@ -4,9 +4,9 @@ import { buildCsp, contentSecurityPolicy, sha256Base64 } from './csp.ts';
 import { INLINE_SCRIPTS, PANEL_COLOR_SCRIPT, THEME_SCRIPT } from '../inline-scripts.ts';
 
 /** Ejecuta un script en línea con un documento mínimo y devuelve los data-* que ha puesto. */
-function run(script: string, cookie: string, session: Record<string, string> = {}) {
+function run(script: string, cookie: string, session: Record<string, string> = {}, attrs: string[] = []) {
   const dataset: Record<string, string> = {};
-  const document = { cookie, documentElement: { dataset }, addEventListener() {} };
+  const document = { cookie, documentElement: { dataset, hasAttribute: (a: string) => attrs.includes(a) }, addEventListener() {} };
   const storage = (m: Record<string, string>) => ({ getItem: (k: string) => m[k] ?? null });
   new Function('document', 'sessionStorage', 'localStorage', script)(document, storage(session), storage({}));
   return dataset;
@@ -30,9 +30,17 @@ describe('CSP', () => {
 
 describe('scripts en línea', () => {
   it('el modo y el consentimiento se aplican desde la cookie, y un valor desconocido no cambia nada', () => {
-    expect(run(THEME_SCRIPT, 'tema=claro; consentimiento=rechazadas')).toEqual({ theme: 'claro', cookies: 'rechazadas' });
-    expect(run(THEME_SCRIPT, 'tema=rosa')).toEqual({});
-    expect(run(THEME_SCRIPT, '', { tema: 'oscuro' })).toEqual({ theme: 'oscuro' });
+    expect(run(THEME_SCRIPT, 'modo=claro; consentimiento=rechazadas')).toEqual({ theme: 'claro', cookies: 'rechazadas' });
+    expect(run(THEME_SCRIPT, 'modo=rosa')).toEqual({});
+    expect(run(THEME_SCRIPT, '', { modo: 'oscuro' })).toEqual({ theme: 'oscuro' });
+  });
+
+  it('una elección antigua con el nombre «tema» ya no se aplica', () => {
+    expect(run(THEME_SCRIPT, 'tema=oscuro', { tema: 'oscuro' })).toEqual({});
+  });
+
+  it('en la web pública (siempre oscura) no cambia el modo, pero sí aplica el consentimiento', () => {
+    expect(run(THEME_SCRIPT, 'modo=claro; consentimiento=aceptadas', {}, ['data-theme-fixed'])).toEqual({ cookies: 'aceptadas' });
   });
 
   it('el color del panel solo acepta colores de la lista', () => {

@@ -7,7 +7,7 @@
  *
  * Nunca metas aquí datos que cambien por petición (la huella cambiaría).
  */
-import { THEMES } from './theme.ts';
+import { THEME_COOKIE, THEMES } from './theme.ts';
 import { CONSENTS } from './consent.ts';
 import { PANEL_COLORS } from './panel/colors.ts';
 
@@ -16,6 +16,7 @@ import { PANEL_COLORS } from './panel/colors.ts';
  * cookie, manda ella (es lo que ha pintado el servidor); sin cookie, lo de esta
  * visita (sessionStorage) o, con cookies aceptadas, localStorage (vista previa
  * sin servidor). Un valor viejo guardado sin consentimiento no se impone.
+ * Con data-theme-fixed (web pública, siempre oscura) no se toca el modo.
  */
 export const THEME_SCRIPT = `(()=>{
 const themes=${JSON.stringify(THEMES)},consents=${JSON.stringify(CONSENTS)};
@@ -25,7 +26,7 @@ const fromCookie=name=>read(()=>new RegExp('(?:^|;\\\\s*)'+name+'=([^;]*)').exec
 const consent=()=>fromCookie('consentimiento')??read(()=>localStorage.getItem('consentimiento'));
 const preference=name=>fromCookie(name)??read(()=>sessionStorage.getItem(name))??(consent()==='aceptadas'?read(()=>localStorage.getItem(name)):null);
 const apply=()=>{
-const t=preference('tema');if(t&&themes.includes(t))root.dataset.theme=t;
+if(!root.hasAttribute('data-theme-fixed')){const t=preference(${JSON.stringify(THEME_COOKIE)});if(t&&themes.includes(t))root.dataset.theme=t;}
 const c=consent();if(c&&consents.includes(c))root.dataset.cookies=c;
 };
 apply();

@@ -70,8 +70,9 @@
 }
 [data-area='app'] .kpi-value {
   font-family: var(--font-display); font-style: normal; font-stretch: 112%;
-  font-weight: 800; font-size: 2.5rem; letter-spacing: -.02em;
+  font-weight: 800; font-size: min(2.5rem, 22cqi); letter-spacing: -.02em;
 }
+[data-area='app'] .kpi-value.is-money { font-size: min(2.5rem, 12cqi); }
 [data-area='app'] .kpi-label { font-size: .8125rem; letter-spacing: .02em; }
 
 /* ---------- Botones ---------- */
