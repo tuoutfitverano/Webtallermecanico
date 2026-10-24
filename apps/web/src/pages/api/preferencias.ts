@@ -21,7 +21,11 @@ export const POST: APIRoute = async ({ request, cookies, url }) => {
   const form = await request.formData().catch(() => null);
   const color = form?.get('color');
   const theme = form?.get('tema');
-  const next = safeNext(form?.get('next'), url.origin, '/');
+  // Volver a la página desde la que se pulsó. safeNext no deja volver a /acceso o /registro
+  // (evita bucles al iniciar sesión), pero aquí sí hay que volver a ellas.
+  const rawNext = form?.get('next');
+  const authBack = typeof rawNext === 'string' && /^\/(acceso|registro|recuperar)(\/[\w-]+)?(\?[\w=&%.-]*)?$/.test(rawNext) ? rawNext : null;
+  const next = authBack ?? safeNext(rawNext, url.origin, '/');
   const options = { path: '/', maxAge: 60 * 60 * 24 * 365, sameSite: 'lax', secure: url.protocol === 'https:', httpOnly: false } as const;
   const answer = consentFrom(form?.get('cookies'));
   if (answer) {

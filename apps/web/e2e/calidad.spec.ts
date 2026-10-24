@@ -493,13 +493,18 @@ test('cabeceras de seguridad en la web pública y en el área privada', async ()
   expect(priv.headers.get('cache-control')).toContain('no-store');
 });
 
-test('CSP: los scripts en línea propios funcionan y uno inyectado no se ejecuta', async ({ page, context }) => {
+test('CSP: los scripts en línea propios funcionan y uno inyectado no se ejecuta', async ({ page }) => {
   const violations: string[] = [];
   page.on('console', m => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
-  await context.addCookies([{ name: 'modo', value: 'claro', url: `http://${HOST}` }]);
-  await page.goto('/');
-  // El script del modo (en línea, con huella) ha funcionado y el de la web pública también.
+  // El script del modo (en línea, con huella) funciona: sin cookie, aplica lo elegido en la visita.
+  await page.goto('/acceso');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'claro');
+  await page.evaluate(() => sessionStorage.setItem('modo', 'oscuro'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'oscuro');
+  // La web pública: su script propio funciona y es siempre oscura.
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'oscuro');
   await expect(page.locator('html')).toHaveClass(/pm-js/);
   expect(violations, 'ningún script propio bloqueado').toEqual([]);
   // Un script inyectado (como haría un ataque XSS) queda bloqueado.
