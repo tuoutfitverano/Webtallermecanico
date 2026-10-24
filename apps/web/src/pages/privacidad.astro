@@ -8,6 +8,7 @@ import LegalDoc from '../components/LegalDoc.astro';
 import LegalValue from '../components/LegalValue.astro';
 import { emailAvailable, siteForHost, vehicleLookupAvailable, whatsappAvailable } from '../lib/server/config.ts';
 import { PLATFORM_LEGAL, SUBPROCESSORS, workshopMissing } from '../lib/legal/platform.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 export const prerender = false;
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
 if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
@@ -17,6 +18,38 @@ const on = { email: emailAvailable(), whatsapp: whatsappAvailable(), matricula: 
 const providers = SUBPROCESSORS.filter(p => p.when === 'siempre' || on[p.when]);
 ---
 <LegalDoc site={site} title="Política de privacidad" missing={workshopMissing(l, site.content.email)}>
+{WEB_EXPORT ? (
+<>
+  <h2>1. Quién trata tus datos</h2>
+  <p>El responsable es el taller titular de esta web:</p>
+  <ul>
+    <li><LegalValue value={l.legalName} label="nombre o razón social" /> ({site.name}), NIF <LegalValue value={l.taxId} label="NIF" /></li>
+    <li>Domicilio: <LegalValue value={l.address} label="domicilio" /></li>
+    <li>Correo para cualquier asunto de privacidad: <LegalValue value={email} label="correo de contacto" /></li>
+  </ul>
+
+  <h2>2. Qué datos, para qué, por qué y cuánto tiempo</h2>
+  <p>Esta web solo muestra información: <strong>no tiene formularios ni área de clientes y no usa cookies</strong>. Tus datos solo nos llegan si nos llamas o nos escribes.</p>
+  <div class="table-scroll">
+    <table class="legal-table">
+      <thead><tr><th scope="col">Qué</th><th scope="col">Para qué</th><th scope="col">Base legal (RGPD art. 6)</th><th scope="col">Cuánto tiempo</th></tr></thead>
+      <tbody>
+        <tr><td>Si nos llamas o escribes (por teléfono, WhatsApp o correo): tu nombre, tu teléfono o correo y lo que nos cuentes</td><td>Contestarte y darte cita o presupuesto</td><td>Aplicar medidas precontractuales que tú pides (6.1.b)</td><td>El tiempo necesario para atenderte. Si pasas a ser cliente, se guarda en tu ficha</td></tr>
+        <tr><td>Si eres cliente: ficha (nombre, teléfono, correo, datos fiscales si pides factura), vehículos, reparaciones, presupuestos, facturas y pagos</td><td>Hacer las reparaciones, darte presupuestos y facturas y atender la garantía</td><td>Contrato (6.1.b) y obligaciones legales del taller (6.1.c)</td><td>Mientras seas cliente. Facturas y documentos contables: 6 años (Código de Comercio, art. 30)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>No se toman decisiones automatizadas sobre ti ni se hacen perfiles.</p>
+
+  <h2>3. Quién más los ve</h2>
+  <p>Nadie fuera del taller, salvo obligación legal (por ejemplo, Hacienda o un juzgado). La empresa que aloja esta web puede registrar datos técnicos de cada visita, como la dirección IP, solo para servirla y protegerla. Si nos escribes por WhatsApp o por correo, esos servicios tratan los datos según sus propias condiciones.</p>
+
+  <h2>4. Tus derechos</h2>
+  <p>Puedes pedir <strong>acceder</strong> a tus datos, <strong>rectificarlos</strong>, <strong>suprimirlos</strong>, <strong>oponerte</strong> o <strong>limitar</strong> su uso, <strong>llevártelos</strong> (portabilidad) y <strong>retirar tu consentimiento</strong> cuando quieras. Escribe a <LegalValue value={email} label="correo de contacto" /> indicando qué pides; si hay dudas sobre tu identidad, te pediremos que la acredites. Te contestaremos en un mes como máximo.</p>
+  <p>Si no estás conforme, puedes reclamar ante la Agencia Española de Protección de Datos (aepd.es).</p>
+</>
+) : (
+<>
   <h2>1. Quién trata tus datos</h2>
   <p>El responsable es el taller titular de esta web:</p>
   <ul>
@@ -56,4 +89,6 @@ const providers = SUBPROCESSORS.filter(p => p.when === 'siempre' || on[p.when]);
   <h2>4. Tus derechos</h2>
   <p>Puedes pedir <strong>acceder</strong> a tus datos, <strong>rectificarlos</strong>, <strong>suprimirlos</strong>, <strong>oponerte</strong> o <strong>limitar</strong> su uso, <strong>llevártelos</strong> (portabilidad) y <strong>retirar tu consentimiento</strong> cuando quieras. Escribe a <LegalValue value={email} label="correo de contacto" /> indicando qué pides; si hay dudas sobre tu identidad, te pediremos que la acredites. Te contestaremos en un mes como máximo.</p>
   <p>Si no estás conforme, puedes reclamar ante la Agencia Española de Protección de Datos (aepd.es).</p>
+</>
+)}
 </LegalDoc>

@@ -1,0 +1,47 @@
+# Copia de la web de un taller que se la lleva (contrato de web, docs/EXPORTAR_WEB.md).
+# Solo se lanza a mano (Actions → «Exportar la web de un taller» → Run workflow).
+# Lee la base de datos real en SOLO LECTURA: no cambia nada. El resultado (un .zip
+# con la web, ya probada sin la plataforma) se descarga desde la propia ejecución.
+name: Exportar la web de un taller
+
+on:
+  workflow_dispatch:
+    inputs:
+      taller:
+        description: 'Identificador del taller (slug), p. ej. taller-garcia'
+        required: true
+
+concurrency:
+  group: exportar-web-${{ inputs.taller }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      TALLER: ${{ inputs.taller }}
+      ASTRO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Generar y comprobar la copia
+        run: bash scripts/exportar-web/desde-bd.sh
+      # GitHub la comprime al descargarla: el .zip que baja es la web, lista para entregar.
+      - name: Guardar la copia para descargarla
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ inputs.taller }}
+          path: web-exportada/${{ inputs.taller }}/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

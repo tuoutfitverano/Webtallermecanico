@@ -11,6 +11,7 @@ import CookieBanner from '../components/CookieBanner.astro';
 import { CONSENT_COOKIE, consentFrom } from '../lib/consent.ts';
 import { DEFAULT_THEME, THEME_BAR } from '../lib/theme.ts';
 import type { PublicSite } from '../lib/site/content.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 
 interface Props {
   site: PublicSite;
@@ -26,7 +27,8 @@ const rootStyle = [`--accent:${site.accent}`, premium && site.colors.background 
 // La web pública es SIEMPRE oscura (decisión del propietario): no hay botón y la
 // elección hecha en el área privada no se aplica aquí (data-theme-fixed).
 const theme = DEFAULT_THEME.web;
-const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
+// La copia exportada no usa cookies: ni aviso ni lectura (lib/site/export.ts).
+const consent = WEB_EXPORT ? null : consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
 const darkBar = premium && site.colors.background ? site.colors.background : THEME_BAR.oscuro;
 // Una web de demostración no debe aparecer en buscadores.
 const robots = noindex || site.isDemoContent ? 'noindex, nofollow' : 'index, follow';
@@ -52,6 +54,6 @@ const robots = noindex || site.isDemoContent ? 'noindex, nofollow' : 'index, fol
   </head>
   <body>
     <slot />
-    <CookieBanner consent={consent} />
+    {!WEB_EXPORT && <CookieBanner consent={consent} />}
   </body>
 </html>

@@ -10,6 +10,8 @@ import Services from './Services.astro';
 import ScrollStage from './ScrollStage.astro';
 import HowItWorks from './HowItWorks.astro';
 import RequestForms from './RequestForms.astro';
+import ContactButtons from './ContactButtons.astro';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 import ContactInfo from './ContactInfo.astro';
 import SiteFooter from './SiteFooter.astro';
 import type { PublicSite } from '../lib/site/content.ts';
@@ -36,7 +38,7 @@ const { site, turnstileSiteKey, noJsResult } = Astro.props;
     </>
   )}
   <HowItWorks />
-  <RequestForms site={site} turnstileSiteKey={turnstileSiteKey} noJsResult={noJsResult} />
+  {WEB_EXPORT ? <ContactButtons site={site} /> : <RequestForms site={site} turnstileSiteKey={turnstileSiteKey} noJsResult={noJsResult} />}
   <ContactInfo site={site} />
 </main>
 <SiteFooter site={site} />

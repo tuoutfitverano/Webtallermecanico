@@ -1,0 +1,48 @@
+---
+/**
+ * En la copia de la web que se lleva un taller (lib/site/export.ts) no hay
+ * formularios: necesitan la plataforma para guardarse. En su lugar, botones
+ * para llamar, escribir por WhatsApp o por correo, que funcionan en cualquier
+ * alojamiento. Mismo sitio (#solicitar) y mismo aspecto que los formularios.
+ */
+import Icon from './Icon.astro';
+import BlurText from './BlurText.astro';
+import { telHref, type PublicSite } from '../lib/site/content.ts';
+import { whatsappLink } from '@talleres/core';
+
+interface Props {
+  site: PublicSite;
+  kicker?: string;
+  title?: string;
+  class?: string;
+}
+const { site, kicker = '// Cita, presupuesto o consulta', title = 'Cuéntanos qué necesitas', class: extra = '' } = Astro.props;
+const c = site.content;
+const tel = c.phone ? telHref(c.phone) : '';
+const whatsapp = whatsappLink(c.whatsapp || c.phone, `Hola, ${site.name}: quería pedir cita o presupuesto.`);
+const mail = c.email ? `mailto:${c.email}?subject=${encodeURIComponent('Cita o presupuesto')}` : '';
+const any = Boolean(tel || whatsapp || mail);
+---
+<section class:list={['section glow glow-accent', extra]} id="solicitar">
+  <div class="wrap">
+    <header class="section-head">
+      <p class="label">{kicker}</p>
+      <BlurText as="h2" text={title} class="display-sm heading" />
+    </header>
+    <div class="contact-ways">
+      <p class="booking-lead">
+        {any
+          ? 'Llámanos o escríbenos y te contestamos para darte cita o presupuesto. Pedir cita no es una reserva: te confirmamos el día.'
+          : 'Ven a vernos al taller y te atendemos.'}
+      </p>
+      {any && (
+        <div class="contact-ways-actions">
+          {tel && <a class="btn btn-primary" href={tel}><Icon name="phone" />Llamar al {c.phone}</a>}
+          {whatsapp && <a class="btn" href={whatsapp} target="_blank" rel="noopener"><Icon name="chat" />Escribir por WhatsApp</a>}
+          {mail && <a class="btn" href={mail}><Icon name="mail" />Escribir un correo</a>}
+        </div>
+      )}
+      {c.address && <p class="contact-ways-where"><Icon name="pin" /><span>{c.address}</span></p>}
+    </div>
+  </div>
+</section>

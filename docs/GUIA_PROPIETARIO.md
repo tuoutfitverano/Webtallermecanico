@@ -210,6 +210,21 @@ Compruébalo antes de activarlo.
 
 Si más adelante quitas una clave de GitHub, el Worker conserva la última que se publicó. Para apagar un canal, desactívalo en **Avisos** de cada taller o borra el secreto en Cloudflare (Workers → `autovalue-web` → Settings → Variables).
 
+## 7. Si un taller deja el programa: se queda su web
+
+Un taller que ha pagado su web se la queda aunque deje de pagar el programa. Se la das así:
+
+1. GitHub → **Actions** → **«Exportar la web de un taller»** → *Run workflow*.
+2. Escribe el identificador del taller (p. ej. `taller-garcia`) y pulsa el botón verde.
+3. A los 5 minutos, abre la ejecución y descarga **`web-<taller>`**. Ese .zip es su web: se lo mandas y lo sube a cualquier alojamiento. Dentro va un `LEEME.txt` con las instrucciones.
+
+- Solo **lee** la base de datos: no cambia nada y no cuesta nada.
+- Antes de dártela, comprueba que la web funciona sola, sin tu plataforma.
+- La copia no lleva formularios (pasan a ser botones de llamar, WhatsApp y correo) ni el área de clientes.
+- Si al taller le faltan sus datos legales, no se genera: primero tiene que completarlos en Panel → Taller.
+
+Detalles y el texto para el contrato: [`EXPORTAR_WEB.md`](EXPORTAR_WEB.md).
+
 ## Fuentes (consultadas en octubre de 2026)
 
 - Supabase: correo propio (SMTP) por la API de gestión, `supabase/supabase` → `apps/docs/content/guides/auth/auth-smtp.mdx`.

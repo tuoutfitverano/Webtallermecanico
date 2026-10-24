@@ -1,5 +1,6 @@
 ---
 import type { PublicSite } from '../lib/site/content.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 interface Props { site: PublicSite }
 const { site } = Astro.props;
 ---
@@ -10,7 +11,7 @@ const { site } = Astro.props;
       <a href="/aviso-legal">Aviso legal</a>
       <a href="/privacidad">Política de privacidad</a>
       <a href="/cookies">Cookies</a>
-      <a href="/area-cliente" rel="nofollow">Área de clientes y talleres</a>
+      {!WEB_EXPORT && <a href="/area-cliente" rel="nofollow">Área de clientes y talleres</a>}
     </nav>
     <span>© {new Date().getFullYear()} {site.name}</span>
   </div>

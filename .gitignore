@@ -1,6 +1,8 @@
 # Dependencias y compilaciones
 node_modules/
 dist/
+dist-exportar/
+web-exportada/
 .astro/
 .wrangler/
 coverage/

@@ -6,6 +6,7 @@ import { getSecret } from 'astro:env/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createPublicClient, createServiceClient } from '../supabase.ts';
 import { resolveSite } from '../site/resolve.ts';
+import { WEB_EXPORT, exportedSite } from '../site/export.ts';
 import type { PublicSite } from '../site/content.ts';
 import { clientFingerprint, createTurnstileVerifier, isTurnstileTestSecret } from '../requests/antispam.ts';
 import { createSupabaseStore } from '../requests/store.ts';
@@ -50,6 +51,8 @@ function getServiceClient(): SupabaseClient | null {
 }
 
 export function siteForHost(host: string): Promise<PublicSite | null> {
+  // Al generar la copia de la web de un taller (lib/site/export.ts), siempre ese taller.
+  if (WEB_EXPORT) return Promise.resolve(exportedSite());
   return resolveSite(host, { supabase: getPublicClient(), dev: isDev });
 }
 

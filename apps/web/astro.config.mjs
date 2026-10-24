@@ -2,6 +2,23 @@
 import { defineConfig, envField } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
 import tailwindcss from '@tailwindcss/vite';
+import { readFileSync } from 'node:fs';
+
+// Copia de la web de UN taller para que se la lleve (scripts/exportar-web/).
+// Solo con WEB_EXPORT=1: las páginas públicas se generan como archivos HTML y
+// los datos del taller se fijan al compilar. En producción no se usa nunca.
+const WEB_EXPORT = process.env.WEB_EXPORT === '1';
+const EXPORT_PAGES = ['index', 'aviso-legal', 'privacidad', 'cookies', '404'].map(p => `src/pages/${p}.astro`);
+const exportSite = WEB_EXPORT ? readFileSync(process.env.WEB_EXPORT_SITE_FILE ?? '', 'utf8') : '';
+/** @type {import('astro').AstroIntegration} */
+const webExport = {
+  name: 'exportar-web',
+  hooks: {
+    'astro:route:setup': ({ route }) => {
+      if (EXPORT_PAGES.includes(route.component)) route.prerender = true;
+    },
+  },
+};
 
 // Las webs de los talleres se generan en el momento según el dominio que
 // visita el usuario (una sola aplicación sirve a todos los talleres).
@@ -10,6 +27,7 @@ export default defineConfig({
   // Sin el servicio de imágenes de Cloudflare (de pago por transformación): la web
   // ya sirve imágenes optimizadas (WebP) y no usa <Image> de Astro.
   adapter: cloudflare({ imageService: 'passthrough' }),
+  ...(WEB_EXPORT ? { outDir: './dist-exportar', integrations: [webExport] } : {}),
   // La barra de desarrollo de Astro tapa la barra de pestañas del panel en las
   // pruebas de navegador; en producción no existe.
   devToolbar: { enabled: process.env.E2E !== '1' },
@@ -18,6 +36,11 @@ export default defineConfig({
     // Nada en línea: los scripts propios van como archivos (la CSP solo admite
     // en línea los de lib/inline-scripts.ts, por su huella).
     build: { assetsInlineLimit: 0 },
+    // Ver lib/site/export.ts. Fuera de la exportación quedan vacíos (y su código se elimina).
+    define: {
+      'import.meta.env.WEB_EXPORT': JSON.stringify(WEB_EXPORT ? '1' : ''),
+      'import.meta.env.WEB_EXPORT_SITE': JSON.stringify(exportSite),
+    },
   },
   // Variables de entorno. Todas se leen en el SERVIDOR en tiempo de ejecución
   // (access: 'secret'), así se pueden cambiar en Cloudflare sin recompilar y

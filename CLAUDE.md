@@ -20,6 +20,7 @@ Plataforma multiempresa para talleres mecánicos multimarca en España: una sola
 - Guía del propietario (pasos de GitHub, legal, contraseñas, copias, correo y WhatsApp): `docs/GUIA_PROPIETARIO.md`
 - Cuentas de cliente multitaller (una cuenta, varios talleres, entrada desde la web del taller, soporte de la plataforma): `docs/MULTITALLER.md`
 - Información legal (aviso legal, privacidad, cookies, condiciones, encargo RGPD art. 28, resguardo de depósito, VERI*FACTU): `docs/LEGAL.md`
+- Copia de la web que se lleva un taller (web pagada = se la queda; funciona sin la plataforma; texto del contrato): `docs/EXPORTAR_WEB.md`, `scripts/exportar-web/`
 
 ## Estructura
 
@@ -82,6 +83,8 @@ npm run test:concurrencia  # varias sesiones a la vez: numeración, cobros, pres
 npm run test:e2e     # navegador → web → Supabase Auth real + PostgREST → PostgreSQL con RLS
 npm run test:mcp     # comprueba el servidor Playwright MCP
 npm run taller:sql -- talleres/x.json   # comprueba el archivo de un taller y escribe su SQL (no lo ejecuta)
+npm run web:exportar -- talleres/x.json # copia de la web de un taller en archivos, probada sin la plataforma
+npm run test:exportar                   # la copia de AutoValue desde su archivo y desde una base local
 ```
 
 Vista previa navegable para el propietario (panel y portal con datos de demostración, sin servidor): `VISTA_PREVIA_DIR=<carpeta> bash scripts/test-e2e.sh e2e/vista-previa.spec.ts --project escritorio` y después `scripts/vista-previa/build.py` (instrucciones en ese archivo). **Tras CADA petición del propietario, vuelve a publicar la vista previa completa (web + panel + portal) en el mismo artifact; nunca le mandes capturas en su lugar.**
@@ -136,6 +139,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Sección comercial («Quiero digitalizar mi taller», tipo `digitalizacion`): solo con `sections.comercial` + `isDemoContent`; la base de datos solo la acepta si `workshops.status = 'demo'`. Sin datos comerciales inventados ni promesas de resultados.
 - El software se enseña con capturas REALES (`public/plataforma/capturas`, recorrido en `lib/site/software.ts`). Matrícula y email muestran su estado real (`vehicleLookupAvailable()`, `emailAvailable()`); no hay agenda de citas y no se dice que la haya.
 - Las fases 1–8 son etapas internas: no se presentan como módulos en la web.
+- **Copia de la web** (`docs/EXPORTAR_WEB.md`): con `WEB_EXPORT` (`lib/site/export.ts`, fijado al compilar) la web pública sale como archivos que funcionan en cualquier alojamiento. Todo lo nuevo de la web pública que dependa de la plataforma (formularios, `/api`, área de clientes, cookies, software) va tras `!WEB_EXPORT` con una alternativa que funcione sola. `npm run test:exportar` la prueba con todo lo de fuera bloqueado. Datos reales: `private.exported_site(slug)` (solo lectura, también con la web sin publicar o el taller suspendido); un taller real sin datos legales completos no recibe la copia.
 - Legal (`docs/LEGAL.md`): `get_public_site` devuelve los datos del titular (`legal`), públicos por la LSSI; proveedores en `SUBPROCESSORS` (`lib/legal/platform.ts`), y la privacidad solo nombra los activados. Aceptación de condiciones + encargo SOLO por la propietaria (`accept_platform_terms`, `workshop_legal_acceptances`, inmutable); subir `LEGAL_VERSION` vuelve a pedirla. Resguardo de depósito en `/panel/ordenes/[id]/resguardo` (oficina); garantía del RD 1457/1986 en las facturas de reparaciones. Las solicitudes web se borran a los 12 meses (`run_maintenance`).
 
 ## Acceso, cuentas y equipos (Fase 3)

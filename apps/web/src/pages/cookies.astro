@@ -11,6 +11,7 @@ import CookiesInfo from '../components/CookiesInfo.astro';
 import PlatformLegalDoc from '../components/PlatformLegalDoc.astro';
 import { siteForHost } from '../lib/server/config.ts';
 import { LEGAL_DATE, LEGAL_VERSION } from '../lib/legal/platform.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 export const prerender = false;
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
 ---
@@ -22,7 +23,12 @@ const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.ho
         <BackLink href="/" label="Volver a la web" />
         <p class="label">// Información legal</p>
         <h1 class="heading">Cookies</h1>
-        <CookiesInfo site />
+        {WEB_EXPORT ? (
+          <>
+            <p>Esta web <strong>no usa cookies</strong> ni guarda nada en tu navegador (tampoco en su almacenamiento local): no hay publicidad, analítica, inicio de sesión ni formularios. Por eso no te pide aceptar nada.</p>
+            <p>Si el taller añade algo que las use (por ejemplo, un mapa o un formulario de otra empresa), lo indicará aquí antes.</p>
+          </>
+        ) : <CookiesInfo site />}
         <p class="legal-version">Versión {LEGAL_VERSION} · {LEGAL_DATE}</p>
         <p><a href="/">Volver a la web</a></p>
       </div>

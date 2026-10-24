@@ -40,6 +40,10 @@ Si falta un dato obligatorio, la página lo dice arriba y marca el hueco con **�
 
 Las facturas son **operativas, NO certificadas VERI*FACTU** (Real Decreto 1007/2023). Según el Real Decreto-ley 15/2025, será obligatorio el **1 de enero de 2027** para sociedades y el **1 de julio de 2027** para el resto (autónomos). Hasta adaptar y certificar el programa (declaración responsable del fabricante y envío de registros a la AEAT), los talleres deben emitir sus facturas legales con un programa certificado. Las condiciones del servicio lo dicen expresamente.
 
+## Copia de la web (taller que se va)
+
+Un taller que ha pagado su web recibe una copia que funciona sin la plataforma (`docs/EXPORTAR_WEB.md`). En la copia, el aviso legal, la privacidad y las cookies cambian: no hay formularios, ni área de clientes, ni cookies; el responsable es el taller y su alojamiento puede registrar datos técnicos. Si al taller le faltan datos legales, la copia no se genera. El texto propuesto para el contrato de web (cláusula 4) está en ese documento y también debe revisarlo un abogado.
+
 ## Conservación
 
 - Solicitudes de la web: **12 meses** (las borra `run_maintenance`).

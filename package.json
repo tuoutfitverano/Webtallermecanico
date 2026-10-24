@@ -23,7 +23,9 @@
     "test:e2e": "bash scripts/test-e2e.sh",
     "lint": "eslint .",
     "test:bundle": "node scripts/check-client-bundle.mjs",
-    "taller:sql": "node scripts/taller/sql.ts"
+    "taller:sql": "node scripts/taller/sql.ts",
+    "web:exportar": "node scripts/exportar-web/exportar.mjs",
+    "test:exportar": "node scripts/exportar-web/exportar.mjs talleres/autovalue.json --sin-zip && bash scripts/exportar-web/test-local.sh"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

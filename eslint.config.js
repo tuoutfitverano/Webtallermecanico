@@ -11,7 +11,7 @@ import globals from 'globals';
 export default tseslint.config(
   {
     ignores: [
-      '**/node_modules/**', '**/dist/**', '**/.astro/**', '**/.wrangler/**',
+      '**/node_modules/**', '**/dist/**', '**/dist-exportar/**', 'web-exportada/**', '**/.astro/**', '**/.wrangler/**',
       'demo/**', 'atrium-mtl/**', '.cache/**', '.playwright-mcp/**', 'test-results/**', 'playwright-report/**',
     ],
   },

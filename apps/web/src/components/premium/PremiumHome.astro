@@ -17,6 +17,8 @@ import DemoNotice from '../DemoNotice.astro';
 import ScrollStage from '../ScrollStage.astro';
 import FadingVideo from '../FadingVideo.astro';
 import RequestForms from '../RequestForms.astro';
+import ContactButtons from '../ContactButtons.astro';
+import { WEB_EXPORT } from '../../lib/site/export.ts';
 import PmHeader from './PmHeader.astro';
 import PmHero from './PmHero.astro';
 import PmAbout from './PmAbout.astro';
@@ -94,7 +96,9 @@ const demoForms = site.isDemoContent
     {sales && <PmSales site={site} turnstileSiteKey={turnstileSiteKey} result={salesResult} status={status} />}
     {s.solicitudes && (
       <div class="pm-forms">
-        <RequestForms site={site} turnstileSiteKey={turnstileSiteKey} noJsResult={noJsResult} kicker={demoForms.kicker} title={demoForms.title} lead={demoForms.lead} />
+        {WEB_EXPORT
+          ? <ContactButtons site={site} kicker="Cita, presupuesto o consulta" title="Cuéntanos qué necesitas" />
+          : <RequestForms site={site} turnstileSiteKey={turnstileSiteKey} noJsResult={noJsResult} kicker={demoForms.kicker} title={demoForms.title} lead={demoForms.lead} />}
       </div>
     )}
     {showContact && <PmContact site={site} />}

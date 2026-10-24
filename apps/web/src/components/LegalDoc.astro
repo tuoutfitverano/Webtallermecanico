@@ -10,6 +10,7 @@ import SiteFooter from './SiteFooter.astro';
 import BackLink from './BackLink.astro';
 import type { PublicSite } from '../lib/site/content.ts';
 import { LEGAL_DATE, LEGAL_VERSION } from '../lib/legal/platform.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 interface Props { site: PublicSite; title: string; missing?: string[] }
 const { site, title, missing = [] } = Astro.props;
 ---
@@ -24,7 +25,7 @@ const { site, title, missing = [] } = Astro.props;
         <div class="alert alert-warn" role="note"><span><strong>Web de demostración.</strong> Los datos del titular son ficticios: esta web no pertenece a un taller real.</span></div>
       )}
       {missing.length > 0 && (
-        <div class="alert alert-warn" role="note"><span><strong>Faltan datos del titular:</strong> {missing.join(', ')}. El taller debe completarlos en su panel (Taller → Datos legales) antes de publicar la web.</span></div>
+        <div class="alert alert-warn" role="note"><span><strong>Faltan datos del titular:</strong> {missing.join(', ')}. {WEB_EXPORT ? 'El taller debe completarlos' : 'El taller debe completarlos en su panel (Taller → Datos legales)'} antes de publicar la web.</span></div>
       )}
       <slot />
       <p class="legal-version">Versión {LEGAL_VERSION} · {LEGAL_DATE}</p>

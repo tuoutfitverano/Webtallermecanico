@@ -72,6 +72,34 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:mcp
 
+  exportar-web:
+    name: Copia de la web de un taller (funciona sin la plataforma)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      ASTRO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Copia de AutoValue desde su archivo y desde la base de datos, probada sin la plataforma
+        run: npm run test:exportar
+
   e2e:
     name: Formularios y acceso de extremo a extremo (Supabase Auth y base de datos reales)
     runs-on: ubuntu-latest

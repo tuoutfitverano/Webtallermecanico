@@ -4,6 +4,7 @@ import LegalDoc from '../components/LegalDoc.astro';
 import LegalValue from '../components/LegalValue.astro';
 import { siteForHost } from '../lib/server/config.ts';
 import { PLATFORM_LEGAL, workshopMissing } from '../lib/legal/platform.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 export const prerender = false;
 const site = await siteForHost(Astro.request.headers.get('host') ?? Astro.url.host).catch(() => null);
 if (!site) return new Response('Esta web no existe o no está publicada.', { status: 404 });
@@ -23,8 +24,14 @@ const email = l.email || site.content.email || null;
   </ul>
 
   <h2>2. Para qué sirve esta web</h2>
-  <p>Informar de los servicios del taller y permitir pedir cita, presupuesto o contactar. Pedir una cita por la web <strong>no es una cita confirmada</strong>: el taller te contesta para confirmarla. Los precios y plazos definitivos son los del presupuesto que te entregue el taller.</p>
-  <p>Desde aquí también se entra al <strong>área de clientes</strong>, donde quien sea cliente del taller ve sus vehículos, reparaciones, presupuestos y facturas.</p>
+  {WEB_EXPORT ? (
+    <p>Informar de los servicios del taller y de cómo contactar con él (teléfono, WhatsApp o correo). Pedir una cita <strong>no es una cita confirmada</strong>: el taller te contesta para confirmarla. Los precios y plazos definitivos son los del presupuesto que te entregue el taller.</p>
+  ) : (
+    <>
+      <p>Informar de los servicios del taller y permitir pedir cita, presupuesto o contactar. Pedir una cita por la web <strong>no es una cita confirmada</strong>: el taller te contesta para confirmarla. Los precios y plazos definitivos son los del presupuesto que te entregue el taller.</p>
+      <p>Desde aquí también se entra al <strong>área de clientes</strong>, donde quien sea cliente del taller ve sus vehículos, reparaciones, presupuestos y facturas.</p>
+    </>
+  )}
 
   <h2>3. Condiciones de uso</h2>
   <ul>
@@ -34,7 +41,11 @@ const email = l.email || site.content.email || null;
   </ul>
 
   <h2>4. Propiedad intelectual</h2>
-  <p>Los textos, imágenes, logotipos y marcas del taller son de su titular o se usan con permiso. El programa con el que funciona la web y el área de clientes es de {PLATFORM_LEGAL.brand}, que lo presta al taller. No se pueden copiar ni reutilizar sin autorización.</p>
+  {WEB_EXPORT ? (
+    <p>Los textos, imágenes, logotipos y marcas del taller son de su titular o se usan con permiso. El diseño y el código de esta web son de {PLATFORM_LEGAL.brand}, que autoriza al taller a usarlos para su propia web. No se pueden copiar ni reutilizar sin autorización.</p>
+  ) : (
+    <p>Los textos, imágenes, logotipos y marcas del taller son de su titular o se usan con permiso. El programa con el que funciona la web y el área de clientes es de {PLATFORM_LEGAL.brand}, que lo presta al taller. No se pueden copiar ni reutilizar sin autorización.</p>
+  )}
 
   <h2>5. Responsabilidad</h2>
   <p>El taller procura que la información sea correcta y esté al día, pero es orientativa. Los enlaces a otras webs (por ejemplo, mapas o redes sociales) llevan a sitios que el taller no controla.</p>
@@ -43,5 +54,5 @@ const email = l.email || site.content.email || null;
   <p>Si no estás conforme con un servicio, puedes escribir al correo de arriba o pedir la hoja de reclamaciones en el propio taller. Esta web se rige por la ley española. Si eres consumidor, puedes reclamar ante los juzgados de tu domicilio.</p>
 
   <h2>7. Datos personales y cookies</h2>
-  <p>Cómo se tratan tus datos: <a href="/privacidad">política de privacidad</a>. Qué se guarda en tu navegador: <a href="/cookies">cookies</a>.</p>
+  <p>Cómo se tratan tus datos: <a href="/privacidad">política de privacidad</a>. {WEB_EXPORT ? <>Esta web no usa cookies: <a href="/cookies">más información</a>.</> : <>Qué se guarda en tu navegador: <a href="/cookies">cookies</a>.</>}</p>
 </LegalDoc>

@@ -1,11 +1,16 @@
 ---
 /** Proceso: los seis estados reales de una orden y el texto que ve el cliente en su portal. */
 import { REPAIR_STATUSES, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS } from '@talleres/core';
+import { WEB_EXPORT } from '../../lib/site/export.ts';
+// La copia que se lleva el taller no tiene portal del cliente (lib/site/export.ts).
+const lead = WEB_EXPORT
+  ? 'Así avanza tu coche en el taller, paso a paso, desde que lo recibimos hasta que te lo llevas.'
+  : 'Son los mismos pasos que registra el sistema del taller y que el cliente ve en su portal, con el mismo texto.';
 ---
 <section class="pm-section pm-process" id="proceso" aria-labelledby="proc-t">
   <p class="pm-kicker">Proceso</p>
   <h2 id="proc-t" class="pm-h2 reveal" data-reveal><span class="pm-line">De la recepción</span> <span class="pm-line">a la entrega.</span></h2>
-  <p class="pm-lead pm-measure">Son los mismos pasos que registra el sistema del taller y que el cliente ve en su portal, con el mismo texto.</p>
+  <p class="pm-lead pm-measure">{lead}</p>
   <ol class="pm-steps" data-pm-progress>
     {REPAIR_STATUSES.map((s, i) => (
       <li class="pm-step reveal" data-reveal style={`--d:${i * 0.06}s`}>

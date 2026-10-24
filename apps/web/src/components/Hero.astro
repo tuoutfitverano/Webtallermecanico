@@ -3,6 +3,7 @@ import Icon from './Icon.astro';
 import BlurText from './BlurText.astro';
 import FadingVideo from './FadingVideo.astro';
 import type { PublicSite } from '../lib/site/content.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 interface Props {
   site: PublicSite;
   /** Dentro del escenario del coche (ScrollStage): sin fondo propio. */
@@ -26,8 +27,17 @@ const c = site.content;
   <div class="hero-content">
     <div class="hero-main">
       <p class="badge liquid-glass reveal" data-reveal style="--d:.4s">
-        <b>Cita online</b>
-        <span>Pídela desde la web · te contactamos para confirmarla</span>
+        {WEB_EXPORT ? (
+          <>
+            <b>Pide cita</b>
+            <span>Llámanos o escríbenos · te contactamos para confirmarla</span>
+          </>
+        ) : (
+          <>
+            <b>Cita online</b>
+            <span>Pídela desde la web · te contactamos para confirmarla</span>
+          </>
+        )}
       </p>
 
       <BlurText text="Tu coche en buenas manos. Pide cita en un minuto." class="hero-title heading" />
@@ -36,7 +46,9 @@ const c = site.content;
 
       <div class="hero-actions reveal" data-reveal style="--d:1.1s">
         <a href="#solicitar" class="btn-glass liquid-glass-strong">Solicitar cita <Icon name="arrowUpRight" /></a>
-        <a href="#solicitar-presupuesto" class="btn-plain" data-open-tab="presupuesto"><Icon name="clipboard" /> Pedir presupuesto</a>
+        {WEB_EXPORT
+          ? <a href="#solicitar" class="btn-plain"><Icon name="clipboard" /> Pedir presupuesto</a>
+          : <a href="#solicitar-presupuesto" class="btn-plain" data-open-tab="presupuesto"><Icon name="clipboard" /> Pedir presupuesto</a>}
       </div>
 
       {(c.city || c.brands) && (

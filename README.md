@@ -41,6 +41,7 @@ npm run build        # compilar para Cloudflare
 npm run lint         # revisión de estilo y errores (ESLint)
 npm run test:db      # pruebas de base de datos y permisos
 npm run taller:sql -- talleres/x.json  # comprueba el archivo de un taller y genera su SQL
+npm run web:exportar -- talleres/x.json  # copia de la web de un taller que funciona sin la plataforma (docs/EXPORTAR_WEB.md)
 npm run test:e2e     # formularios en navegador contra una base de datos real
 npm run test:mcp     # comprueba que el navegador de Claude (Playwright MCP) funciona
 ```

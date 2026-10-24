@@ -2,6 +2,7 @@
 /** Pie del diseño premium. */
 import type { PublicSite } from '../../lib/site/content.ts';
 import { telHref } from '../../lib/site/content.ts';
+import { WEB_EXPORT } from '../../lib/site/export.ts';
 interface Props { site: PublicSite }
 const { site } = Astro.props;
 const c = site.content;
@@ -30,7 +31,7 @@ const tel = telHref(c.phone);
     )}
     <div>
       <p class="pm-kicker">Más</p>
-      <p><a href="/area-cliente" rel="nofollow">Área de clientes</a></p>
+      {!WEB_EXPORT && <p><a href="/area-cliente" rel="nofollow">Área de clientes</a></p>}
       {site.salesEnabled && <p><a href="#digitalizar">Para propietarios de talleres</a></p>}
       <p><a href="/aviso-legal">Aviso legal</a> · <a href="/privacidad">Privacidad</a> · <a href="/cookies">Cookies</a></p>
     </div>

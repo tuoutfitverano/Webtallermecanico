@@ -590,6 +590,12 @@ html.anim-done .blur-word {
 .booking-aside li { display: flex; gap: 14px; align-items: flex-start; font-size: .9375rem; font-weight: 300; color: var(--fg-80); line-height: 1.45; }
 .booking-aside li .ico { margin-top: 2px; color: var(--accent-soft); }
 .booking-aside strong { color: var(--fg); font-weight: 600; }
+/* Copia exportada de la web (sin formularios): botones de llamar, WhatsApp y correo. */
+.contact-ways { display: grid; gap: 24px; max-width: 720px; }
+.contact-ways-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.contact-ways-actions .btn { gap: 10px; }
+.contact-ways-where { display: flex; gap: 12px; align-items: flex-start; margin: 0; color: var(--fg-80); }
+.contact-ways-where .ico { margin-top: 3px; color: var(--accent-soft); }
 
 .req { padding: 28px; border-radius: 1.5rem; min-width: 0; background: rgb(var(--fg-rgb) / .025); }
 @media (max-width: 560px) { .req { padding: 20px 16px; } }

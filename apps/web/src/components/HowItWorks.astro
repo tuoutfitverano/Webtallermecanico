@@ -1,7 +1,11 @@
 ---
 import BlurText from './BlurText.astro';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 const steps = [
-  { title: 'Envía tu solicitud', text: 'Cuéntanos qué necesitas desde la web, por teléfono o por WhatsApp.' },
+  // La copia que se lleva el taller no tiene formularios (lib/site/export.ts).
+  WEB_EXPORT
+    ? { title: 'Cuéntanos qué necesitas', text: 'Llámanos o escríbenos por WhatsApp o por correo.' }
+    : { title: 'Envía tu solicitud', text: 'Cuéntanos qué necesitas desde la web, por teléfono o por WhatsApp.' },
   { title: 'Te confirmamos', text: 'Revisamos tu solicitud y te contactamos para confirmar el día y la hora.' },
   { title: 'Diagnóstico y presupuesto', text: 'Revisamos el vehículo y te explicamos qué necesita antes de empezar.' },
   { title: 'Recoges tu coche', text: 'Te avisamos cuando está listo para que pases a recogerlo.' },

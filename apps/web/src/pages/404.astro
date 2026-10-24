@@ -17,6 +17,7 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 import Icon from '../components/Icon.astro';
 import { siteForHost } from '../lib/server/config.ts';
 import { telHref } from '../lib/site/content.ts';
+import { WEB_EXPORT } from '../lib/site/export.ts';
 export const prerender = false;
 Astro.response.status = 404;
 Astro.response.headers.set('cache-control', 'no-store');
@@ -37,13 +38,15 @@ const canAsk = Boolean(site?.sections.solicitudes);
         <p class="nf-code" aria-hidden="true">404</p>
         <p class="label">Error 404</p>
         <h1 id="nf-t" class="nf-title">Esta página no existe</h1>
-        <p class="nf-lead">No encontramos <code class="nf-path">{path}</code>. Puede que la dirección esté mal escrita o que la página ya no exista.</p>
+        {WEB_EXPORT
+          ? <p class="nf-lead">Puede que la dirección esté mal escrita o que la página ya no exista.</p>
+          : <p class="nf-lead">No encontramos <code class="nf-path">{path}</code>. Puede que la dirección esté mal escrita o que la página ya no exista.</p>}
         <nav class="nf-actions" aria-label="Qué puedes hacer">
           <a class="btn btn-primary" href="/"><Icon name="arrow" class="nf-back" />Volver al inicio</a>
           {canAsk && <a class="btn" href="/#solicitar">Pedir cita</a>}
           {tel && <a class="btn" href={tel}><Icon name="phone" />Llamar al {site.content.phone}</a>}
         </nav>
-        <p class="nf-more">¿Eres cliente o trabajas en el taller? <a href="/acceso" rel="nofollow">Entra en tu área</a>.</p>
+        {!WEB_EXPORT && <p class="nf-more">¿Eres cliente o trabajas en el taller? <a href="/acceso" rel="nofollow">Entra en tu área</a>.</p>}
       </main>
     </div>
   </SiteLayout>

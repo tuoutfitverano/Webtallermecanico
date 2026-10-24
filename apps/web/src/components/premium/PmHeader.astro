@@ -1,6 +1,7 @@
 ---
 /** Cabecera del diseño premium: logotipo o nombre, secciones y llamada principal (la web pública es siempre oscura). */
 import type { PublicSite } from '../../lib/site/content.ts';
+import { WEB_EXPORT } from '../../lib/site/export.ts';
 
 interface Props {
   site: PublicSite;
@@ -15,7 +16,7 @@ const links = [
   site.sections.proceso && { href: '#proceso', label: 'Proceso' },
   site.salesEnabled && { href: '#digitalizar', label: 'Para talleres' },
   showContact && { href: '#contacto', label: 'Contacto' },
-  { href: '/area-cliente', label: 'Área de clientes', rel: 'nofollow' },
+  !WEB_EXPORT && { href: '/area-cliente', label: 'Área de clientes', rel: 'nofollow' },
 ].filter(Boolean) as { href: string; label: string; rel?: string }[];
 const cta = site.salesEnabled
   ? { href: '#digitalizar', label: 'Digitalizar mi taller' }
