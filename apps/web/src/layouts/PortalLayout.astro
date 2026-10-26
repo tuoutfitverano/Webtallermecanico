@@ -66,6 +66,11 @@ const consent = consentFrom(Astro.cookies.get(CONSENT_COOKIE)?.value);
     <meta name="color-scheme" content={theme === 'claro' ? 'light' : 'dark'} />
     <ThemeScript />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- «Añadir a la pantalla de inicio» (en iPhone es lo que permite recibir notificaciones). -->
+    <link rel="manifest" href="/portal-app/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/portal-app/icono-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Mi taller" />
     <!-- Color elegido: también en localStorage (vista previa sin servidor o sin cookies). -->
     <script is:inline set:html={PANEL_COLOR_SCRIPT}></script>
     <ClientRouter fallback="none" />

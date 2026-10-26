@@ -201,6 +201,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Avisos operativos ≠ comerciales. Lo comercial exige consentimiento del PROPIO cliente (`set_contact_preferences` desde el portal); el taller solo puede retirarlo. Lo impone `notifications_guard`.
 - El contenido del aviso solo lleva lo que el cliente ya ve en su portal. Los textos de estado de `private.status_customer_text` deben coincidir con `REPAIR_STATUS_CUSTOMER_TEXT` (lo comprueba una prueba).
 - En e2e el email es SIMULADO (`scripts/e2e/email-provider-mock.mjs`): no lo presentes como envío real.
+- Notificaciones en el móvil (Web Push, gratis; `docs/NOTIFICACIONES.md` §8 bis): «toque» VACÍO firmado con VAPID (`lib/notifications/webpush.ts`); el móvil (`public/sw.js`) pide el aviso a `/api/notificaciones/movil` con su sesión. Cola `push_outbox` por disparador sobre `notifications` (solo `app` operativos); dispositivos en `push_subscriptions` (solo por funciones). Claves `VAPID_*` (las crea «Publicar» la primera vez). En e2e el servicio es SIMULADO (`scripts/e2e/push-service-mock.mjs`).
 - WhatsApp (`lib/notifications/whatsapp.ts`, API oficial de Meta, plantilla aprobada `reparacion_estado_v1`): el cliente elige en «Mis datos» portal (siempre) + email y/o WhatsApp. WhatsApp solo lo PIDE el propio cliente (`set_contact_preferences` de 4 argumentos desde el portal) y necesita móvil (`private.whatsapp_number`); el taller solo lo retira. Nunca comercial por WhatsApp. En e2e es SIMULADO (`scripts/e2e/whatsapp-provider-mock.mjs`).
 
 ## Auditoría y producción (Fase 8)
@@ -224,6 +225,7 @@ Antes de dar por terminado un cambio: `npm run lint && npm run check && npm test
 - Avisos nuevos con `private.enqueue_notice(...)` (plantilla `aviso_v1`, `link_path` solo `/portal/…`, `dedupe_key`). Recordatorios en `private.generate_reminders()` dentro de `run_maintenance`; los de revisión solo si el cliente lo pidió (`set_service_reminders` desde el portal).
 - Estadísticas solo con datos reales (`workshop_stats`, `security invoker`). Nunca números de ejemplo en producción.
 - Enlaces `wa.me` (`whatsappLink`) solo PREPARAN el mensaje: nunca se registran como enviados.
+- Planes y extras (`20261108090000_planes_y_consumo.sql`): `workshop_plans` (sin fila = Profesional; solo `private.set_workshop_plan` desde el SQL Editor) y `extras_tariff` (céntimos con IVA; Premium con precio rebajado hasta un límite al mes). Cuentan los WhatsApp con `sent_at` y las consultas `encontrado`/`no_encontrado` del mes en hora de Madrid. El taller ve su consumo (`workshop_usage`, gerencia) en Panel → Taller; la plataforma, el de todos (`admin_usage`, 2FA) en `/admin`. El programa calcula; no cobra.
 
 ## Formularios y solicitudes (Fase 2)
 

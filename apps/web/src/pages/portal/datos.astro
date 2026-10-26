@@ -18,6 +18,7 @@ import { portalPage } from '../../lib/server/portal.ts';
 import { field, isUuid } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
 import { formatDate } from '../../lib/panel/format.ts';
+import { pushKeys } from '../../lib/server/config.ts';
 
 export const prerender = false;
 
@@ -69,6 +70,8 @@ if (portal.records.length > 0) {
   prefs = (data ?? []) as Prefs[];
   reminderPrefs = (rem.data ?? []) as typeof reminderPrefs;
 }
+// Notificaciones en el móvil (Web Push): solo si la plataforma tiene sus claves.
+const pushPublicKey = pushKeys()?.publicKey ?? '';
 const prefsOf = (customerId: string) => prefs.find(p => p.customer_id === customerId);
 const remindersOn = (customerId: string) => reminderPrefs.some(p => p.customer_id === customerId && p.enabled);
 ---
@@ -79,6 +82,26 @@ const remindersOn = (customerId: string) => reminderPrefs.some(p => p.customer_i
     <h2 id="cuenta" class="card-title"><Icon name="shield" />Tu cuenta</h2>
     <dl class="facts"><dt>Correo de acceso</dt><dd>{portal.user.email}</dd></dl>
     <nav class="auth-links" style="justify-content:flex-start"><a href="/cuenta/contrasena">Cambiar la contraseña</a><a href="/cuenta">Mi cuenta</a></nav>
+  </section>
+  <section class="card push-card" aria-labelledby="movil-t" data-push data-key={pushPublicKey}>
+    <h2 id="movil-t" class="card-title"><Icon name="bell" />Notificaciones en este móvil</h2>
+    <p>Un aviso en la pantalla de tu móvil cada vez que tu taller cambie el estado de tu coche, como los de una app. Es gratis y solo vale para este dispositivo.</p>
+    {pushPublicKey ? (
+      <>
+        <p class="hint" data-push-state="nojs">Para activarlas, tu navegador tiene que permitir JavaScript.</p>
+        <p class="hint" data-push-state="unsupported" hidden>Este navegador no admite notificaciones. Prueba con Chrome, Safari, Firefox o Edge actualizados.</p>
+        <p class="hint" data-push-state="ios" hidden>En iPhone: toca <strong>Compartir</strong> y después <strong>Añadir a pantalla de inicio</strong>. Abre el portal desde ese icono y vuelve aquí para activarlas.</p>
+        <p class="hint" data-push-state="denied" hidden>Las notificaciones están bloqueadas para esta web. Permítelas en los ajustes del navegador y vuelve a intentarlo.</p>
+        <p class="hint" data-push-state="on" hidden role="status"><strong>Activadas en este dispositivo.</strong></p>
+        <p class="hint" data-push-state="error" hidden role="alert">No se han podido activar. Inténtalo de nuevo en un momento.</p>
+        <div class="pnl-actions">
+          <button class="btn btn-primary" type="button" data-push-on hidden><span class="spinner" aria-hidden="true"></span><span data-label>Activar en este móvil</span></button>
+          <button class="btn" type="button" data-push-off hidden><span class="spinner" aria-hidden="true"></span><span data-label>Desactivar en este móvil</span></button>
+        </div>
+      </>
+    ) : (
+      <p class="hint">Todavía no están disponibles. Mientras, tienes todos los avisos aquí, en tu portal.</p>
+    )}
   </section>
   {portal.records.length === 0 ? <div style="margin-top:16px"><NotLinked loadError={portal.loadError} /></div> : portal.records.map(r => {
     const p = prefsOf(r.customer_id);
@@ -135,7 +158,13 @@ const remindersOn = (customerId: string) => reminderPrefs.some(p => p.customer_i
   })}
 </PortalLayout>
 
+<script>
+  import { setupPush } from '../../scripts/push.ts';
+  setupPush();
+</script>
+
 <style>
+  .push-card .pnl-actions { margin-top: 8px; }
   .channels { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
   .channels legend { padding: 0; font-weight: 600; margin-bottom: 2px; }
   .channels .hint { margin: 0 0 4px; }

@@ -156,6 +156,8 @@ Con talleres reales, conviene el plan de pago, que da una copia diaria guardada 
 
 ## 6. Enviar correos y WhatsApp (además de los avisos en el portal)
 
+**Notificaciones en el móvil: gratis y sin hacer nada.** Al publicar la versión real se activan solas. Cada cliente las enciende en su portal (Mis datos → Notificaciones en este móvil) y le llega un aviso en la pantalla, como el de una app, cada vez que cambia el estado de su coche. En iPhone tiene que añadir antes el portal a la pantalla de inicio (Compartir → Añadir a pantalla de inicio).
+
 Hoy los clientes ven los avisos **en su portal**. Correo y WhatsApp están programados y probados con proveedores **simulados**, y se activan poniendo las claves reales.
 
 **Ninguno se ha contratado.**
@@ -239,6 +241,22 @@ Un taller que ha pagado su web se la queda aunque deje de pagar el programa. Se 
 - Si al taller le faltan sus datos legales, no se genera: primero tiene que completarlos en Panel → Taller.
 
 Detalles y el texto para el contrato: [`EXPORTAR_WEB.md`](EXPORTAR_WEB.md).
+
+## 9. Planes y extras: WhatsApp y matrículas, a cargo del taller
+
+Los avisos por WhatsApp y las consultas por matrícula **cuestan dinero a la plataforma** (Meta y Openapi cobran por cada uno). Por eso no van incluidos en la cuota: se cobran al taller por uso, y el plan Premium tiene precio rebajado hasta un límite al mes.
+
+| Extra (IVA incluido) | Profesional | Premium |
+|---|---|---|
+| Aviso por WhatsApp | 0,06 € cada uno | 0,04 € los 300 primeros del mes; después, 0,06 € |
+| Consulta por matrícula | 0,75 € cada una | 0,60 € las 60 primeras del mes; después, 0,75 € |
+
+- **Qué cuenta:** los WhatsApp que Meta acepta y las consultas que el proveedor contesta (encontrado o no encontrado). Repetir la misma matrícula en 24 h, los errores o «no disponible» no cuentan porque no cuestan nada.
+- **El taller lo ve** en Panel → Taller → «Consumo de este mes» (solo propietaria y administración). **Tú** lo ves de todos los talleres en `/admin` → «Consumo del mes», para cobrarlo con su cuota.
+- **Cambiar el plan de un taller** (Supabase → SQL Editor): `select private.set_workshop_plan('<identificador>', 'premium');` (o `'profesional'`). Sin hacerlo, todo taller es Profesional.
+- **Cambiar los precios** (SQL Editor): `update public.extras_tariff set discounted_cents = 4, discounted_limit = 300 where plan = 'premium' and kind = 'whatsapp';` — los importes van en céntimos con IVA.
+- **Rentable:** a los costes publicados por terceros (WhatsApp de utilidad en España ≈ 0,0166 €; Openapi 0,40 € + IVA ≈ 0,48 € por consulta), cada unidad deja margen incluso al precio rebajado. Comprueba las tarifas vigentes antes de activar: si suben, sube los precios con la orden de arriba.
+- **La plataforma no cobra sola:** el programa calcula el importe; la factura al taller la haces tú (no hay pagos en línea).
 
 ## Fuentes (consultadas en octubre de 2026)
 

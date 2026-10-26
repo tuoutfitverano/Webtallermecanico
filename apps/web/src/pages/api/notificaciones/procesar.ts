@@ -1,5 +1,5 @@
 /**
- * POST /api/notificaciones/procesar — envía los emails y WhatsApp pendientes y los reintentos, y
+ * POST /api/notificaciones/procesar — envía los emails, WhatsApp y notificaciones al móvil pendientes y los reintentos, y
  * hace el mantenimiento programado (borrar huellas antispam caducadas, etc.).
  *
  * Lo llama un aviso programado cada minuto (Supabase Cron + pg_net, ver
@@ -8,7 +8,7 @@
  * limitado por llamada: no hay bucles infinitos.
  */
 import type { APIRoute } from 'astro';
-import { dispatchPendingEmails, dispatchPendingWhatsapp, notificationsCronSecret, runMaintenance } from '../../../lib/server/config.ts';
+import { dispatchPendingEmails, dispatchPendingPush, dispatchPendingWhatsapp, notificationsCronSecret, runMaintenance } from '../../../lib/server/config.ts';
 import { bearerMatches } from '../../../lib/notifications/auth.ts';
 
 export const prerender = false;
@@ -20,12 +20,13 @@ export const POST: APIRoute = async ({ request }) => {
   const secret = notificationsCronSecret();
   if (!secret) return json(404, { ok: false });
   if (!bearerMatches(request.headers.get('authorization'), secret)) return json(401, { ok: false });
-  const [summary, whatsapp, maintenance] = await Promise.all([
+  const [summary, whatsapp, push, maintenance] = await Promise.all([
     dispatchPendingEmails({ limit: 50 }),
     dispatchPendingWhatsapp({ limit: 50 }),
+    dispatchPendingPush({ limit: 100 }),
     runMaintenance(),
   ]);
-  return json(200, { ok: true, ...summary, whatsapp, maintenance });
+  return json(200, { ok: true, ...summary, whatsapp, push, maintenance });
 };
 
 export const ALL: APIRoute = () => json(405, { ok: false });

@@ -5,7 +5,9 @@ Estado:
 - **Avisos dentro del portal:** funcionan.
 - **Email:** implementado y probado con un proveedor **simulado**. Hacen falta cuenta y credenciales de Resend para enviar correos reales.
 - **WhatsApp:** implementado y probado con un proveedor **simulado** (API oficial de WhatsApp Business de Meta). Hacen falta cuenta de empresa verificada, número dedicado y plantilla aprobada para enviar mensajes reales (ver §8).
-- **SMS:** no implementado.
+- **A cargo del taller:** cada WhatsApp aceptado por Meta (`sent_at`) se cobra al taller según su plan (`extras_tariff`: Profesional 0,06 €; Premium 0,04 € los 300 primeros del mes). Consumo en Panel → Taller y en `/admin` (`workshop_usage`, `admin_usage`); ver `docs/GUIA_PROPIETARIO.md` §9.
+
+**SMS:** no implementado.
 
 **Qué elige el cliente** (portal → «Mis datos»): los avisos de sus reparaciones le llegan **siempre en el portal** y, si quiere, **también por email, por WhatsApp o por los dos**. Cada canal externo es una casilla independiente.
 
@@ -252,6 +254,18 @@ Lo que falta para enviar mensajes reales (**no se ha contratado nada**):
 - Dar de alta el webhook en Meta: URL `https://<dominio de la app>/api/notificaciones/whatsapp`, token de verificación = `WHATSAPP_VERIFY_TOKEN`, suscripción a «messages».
 
 **SMS:** no implementado. Haría falta un proveedor con remitente alfanumérico registrado (en España, según la normativa vigente de identificación de remitentes), coste por mensaje, un adaptador como el de WhatsApp, un valor nuevo en `notification_channel` (migración), preferencias y pruebas.
+
+## 8 bis. Notificaciones en el móvil (Web Push, gratis)
+
+El cliente las activa en su portal (**Mis datos → Notificaciones en este móvil**); el navegador le pide permiso y valen solo para ese dispositivo. En iPhone hay que añadir antes el portal a la pantalla de inicio (desde iOS 16.4).
+
+- **Gratis:** no hay proveedor de pago. El servidor envía un «toque» VACÍO, firmado con VAPID (`lib/notifications/webpush.ts`), al servicio de notificaciones del navegador (Google, Apple, Mozilla, Microsoft).
+- **Sin datos fuera:** al recibirlo, el móvil (`public/sw.js`) pide a la web el último aviso de la persona con su sesión (`GET /api/notificaciones/movil` → `portal_push_preview`). Sin sesión, enseña un texto general.
+- **Solo operativos** (cambios de estado, presupuestos, recordatorios que el cliente pidió), nunca comerciales.
+- **Base de datos** (`20261107090000_notificaciones_movil.sql`, prueba `29_notificaciones_movil.test.sql`): `push_subscriptions` (dispositivos; 10 por persona), `push_outbox` (cola: un disparador en `notifications` añade cada aviso `app` operativo de un cliente con dispositivos). El servidor reserva (`claim_push_deliveries`), envía y anota (`record_push_result`: 2xx enviado; 404/410 quita el dispositivo; 3 intentos por aviso).
+- **Cuándo sale:** al guardar un cambio en una orden (`lib/server/notify.ts`) y en cada pasada del proceso programado (`/api/notificaciones/procesar`).
+- **Claves:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (secreta) y `VAPID_SUBJECT`. «Publicar versión real» las crea sola la primera vez y no las cambia (si cambiaran, cada cliente tendría que volver a activarlas). A mano: `node scripts/push/claves.mjs`. Sin claves, el portal dice que aún no están disponibles.
+- **Pruebas:** `webpush.test.ts` (la firma se comprueba con la clave pública) y `e2e/push.spec.ts` con un servicio de notificaciones SIMULADO (`scripts/e2e/push-service-mock.mjs`, que comprueba la firma VAPID como los de verdad). El navegador de la prueba no puede suscribirse a Google o Apple: no se ha probado con un móvil real.
 
 ## 9. Citas
 

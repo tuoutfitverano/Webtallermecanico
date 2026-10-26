@@ -99,6 +99,7 @@ Los registros (`console`) solo guardan códigos de evento y resultado: ni matrí
 - Reutilizar la consulta de menos de 24 h del mismo taller, un doble clic o pulsar Intro **no** generan otra llamada.
 - El tope de 100 consultas diarias por taller limita el gasto máximo a unos 40 € + IVA al día por taller. Ajústalo cuando sepas el uso real.
 - El navegador nunca llama al proveedor: todo pasa por el servidor, con sesión y permisos.
+- **A cargo del taller:** cada consulta contestada (`encontrado` o `no_encontrado`) se cobra al taller según su plan (`extras_tariff`: Profesional 0,75 €; Premium 0,60 € las 60 primeras del mes). Lo calculan `workshop_usage` (el taller) y `admin_usage` (la plataforma) en `20261108090000_planes_y_consumo.sql`; ver `docs/GUIA_PROPIETARIO.md` §9.
 
 ## 7. Para activarlo en producción (pendiente)
 

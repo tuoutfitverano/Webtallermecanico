@@ -5,3 +5,8 @@
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /plataforma/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# El «service worker» de las notificaciones del portal: siempre la versión nueva.
+/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /

@@ -100,6 +100,7 @@ insert into public.reminder_settings (workshop_id) values ('bbbbbbbb-0000-0000-0
 insert into public.workshop_billing_settings (workshop_id) values ('bbbbbbbb-0000-0000-0000-000000000000') on conflict do nothing;
 insert into public.workshop_notification_settings (workshop_id) values ('bbbbbbbb-0000-0000-0000-000000000000') on conflict do nothing;
 insert into public.workshop_counters (workshop_id) values ('bbbbbbbb-0000-0000-0000-000000000000') on conflict do nothing;
+insert into public.workshop_plans (workshop_id, plan) values ('bbbbbbbb-0000-0000-0000-000000000000', 'premium');
 
 -- Ninguna tabla con workshop_id puede quedar sin datos de B.
 create temp table tablas_taller on commit drop as

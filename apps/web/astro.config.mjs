@@ -80,6 +80,10 @@ export default defineConfig({
       WHATSAPP_APP_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
       WHATSAPP_VERIFY_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
       NOTIFICATIONS_CRON_SECRET: envField.string({ context: 'server', access: 'secret', optional: true }),
+      // Notificaciones en el móvil (Web Push, gratis). Ver docs/NOTIFICACIONES.md y scripts/push/claves.mjs.
+      VAPID_PUBLIC_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      VAPID_PRIVATE_KEY: envField.string({ context: 'server', access: 'secret', optional: true }),
+      VAPID_SUBJECT: envField.string({ context: 'server', access: 'secret', optional: true }),
     },
     validateSecrets: false,
   },

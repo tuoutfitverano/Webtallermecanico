@@ -113,6 +113,12 @@ for name in REQUEST_HASH_SECRET NOTIFICATIONS_CRON_SECRET; do
     jq --arg k "$name" --arg v "$value" '. + {($k): $v}' "$secrets" > "$secrets.tmp" && mv "$secrets.tmp" "$secrets"
   fi
 done
+# Notificaciones en el móvil (Web Push, gratis): claves VAPID propias, también solo la primera vez
+# (si cambian, cada cliente tendría que volver a activarlas en su móvil).
+if ! has VAPID_PRIVATE_KEY; then
+  vapid=$(node scripts/push/claves.mjs --json)
+  jq --argjson v "$vapid" --arg sub "$APP_URL" '. + $v + {VAPID_SUBJECT: $sub}' "$secrets" > "$secrets.tmp" && mv "$secrets.tmp" "$secrets"
+fi
 (cd apps/web && npx wrangler secret bulk "$secrets" --name "$WORKER")
 rm -f "$secrets"
 

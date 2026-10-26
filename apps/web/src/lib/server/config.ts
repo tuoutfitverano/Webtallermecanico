@@ -19,6 +19,7 @@ import { dispatchEmails, type DispatchDeps, type DispatchSummary } from '../noti
 import { renderInvitationEmail, type ClaimedNotification } from '../notifications/templates.ts';
 import type { ChannelSender } from '../notifications/types.ts';
 import { createMetaWhatsappSender, dispatchWhatsapp, type ClaimedWhatsapp, type WhatsappSender } from '../notifications/whatsapp.ts';
+import { sendPush, validVapidKeys, type VapidKeys } from '../notifications/webpush.ts';
 
 export const isDev = import.meta.env.DEV;
 
@@ -379,4 +380,48 @@ export async function respondQuoteByToken(token: string, accept: boolean, name: 
     return { ok: false, message: error.code === '22023' && error.message ? error.message : 'No se ha podido guardar tu respuesta. Inténtalo de nuevo.' };
   }
   return { ok: true, status: String(data) };
+}
+
+/**
+ * Claves de las notificaciones en el móvil (Web Push), o null si no están (o
+ * están mal): entonces el portal dice que no están disponibles y no se envía nada.
+ * También hace falta la clave secreta de Supabase para enviarlas.
+ */
+export function pushKeys(): VapidKeys | null {
+  const keys: VapidKeys = {
+    publicKey: env('VAPID_PUBLIC_KEY').trim(),
+    privateKey: env('VAPID_PRIVATE_KEY').trim(),
+    subject: env('VAPID_SUBJECT').trim() || appOrigin() || '',
+  };
+  if (!keys.publicKey || !keys.privateKey || !getServiceClient()) return null;
+  return validVapidKeys(keys) ? keys : null;
+}
+
+export interface PushSummary { configured: boolean; claimed: number; sent: number; gone: number; failed: number }
+
+/** Envía los «toques» pendientes al móvil de los clientes (lote limitado). */
+export async function dispatchPendingPush(opts: { limit?: number } = {}): Promise<PushSummary> {
+  const summary: PushSummary = { configured: false, claimed: 0, sent: 0, gone: 0, failed: 0 };
+  const keys = pushKeys();
+  const service = getServiceClient();
+  if (!keys || !service) return summary;
+  summary.configured = true;
+  const { data, error } = await service.rpc('claim_push_deliveries', { p_limit: Math.min(Math.max(opts.limit ?? 50, 1), 200) });
+  if (error) {
+    log('push_claim_error', { code: error.code ?? 'desconocido' });
+    return summary;
+  }
+  const batch = (data ?? []) as Array<{ outbox_id: number; subscription_id: string; endpoint: string }>;
+  summary.claimed = batch.length;
+  await Promise.all(batch.map(async row => {
+    const status = await sendPush(row.endpoint, keys);
+    if (status >= 200 && status < 300) summary.sent++;
+    else if (status === 404 || status === 410) summary.gone++;
+    else summary.failed++;
+    const { error: recordError } = await service.rpc('record_push_result', { p_outbox_id: row.outbox_id, p_subscription_id: row.subscription_id, p_status: status });
+    if (recordError) log('push_record_error', { code: recordError.code ?? 'desconocido' });
+  }));
+  // Solo recuentos: ni direcciones de dispositivos ni contenidos.
+  log('push_dispatch', { ...summary });
+  return summary;
 }
