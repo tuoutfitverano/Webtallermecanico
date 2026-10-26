@@ -372,7 +372,9 @@ test.describe('Portal · el cliente añade y quita vehículos', () => {
     await page.getByLabel(/^Año/).fill('2020');
     await page.getByLabel(/Ese año es de/).selectOption('fabricacion');
     await page.getByRole('button', { name: 'Añadir vehículo' }).click();
-    await expect(page.getByRole('alert')).toContainText('Pídele al taller');
+    // Ya está en el taller a nombre de otra persona: no se añade; se ofrece pedir el cambio de titular.
+    await expect(page.getByRole('alert')).toContainText('a nombre de otra persona');
+    await expect(page.getByRole('button', { name: 'Este coche ahora es mío: pedir el cambio' })).toBeVisible();
 
     // Quitar (dos pasos) → papelera → recuperar.
     await page.goto(url);

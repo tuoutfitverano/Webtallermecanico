@@ -258,6 +258,15 @@ Los avisos por WhatsApp y las consultas por matrícula **cuestan dinero a la pla
 - **Rentable:** a los costes publicados por terceros (WhatsApp de utilidad en España ≈ 0,0166 €; Openapi 0,40 € + IVA ≈ 0,48 € por consulta), cada unidad deja margen incluso al precio rebajado. Comprueba las tarifas vigentes antes de activar: si suben, sube los precios con la orden de arriba.
 - **La plataforma no cobra sola:** el programa calcula el importe; la factura al taller la haces tú (no hay pagos en línea).
 
+## 10. Un cliente vende su coche a otra persona
+
+El comprador lo pide desde su portal y se confirma de una de dos formas:
+
+- **El anterior dueño dice que sí** desde su portal. El cambio se hace al momento.
+- **En el taller:** el comprador enseña el **permiso de circulación a su nombre** o la **app miDGT** (gratis, de Tráfico), y la recepción marca cuál ha visto.
+
+El comprador solo ve sus reparaciones desde ese día; el anterior dueño conserva sus facturas. El contrato de compraventa solo no basta, porque el traspaso en Tráfico puede estar pendiente. Detalles en `docs/GESTION_TALLER.md`.
+
 ## Fuentes (consultadas en octubre de 2026)
 
 - Supabase: correo propio (SMTP) por la API de gestión, `supabase/supabase` → `apps/docs/content/guides/auth/auth-smtp.mdx`.

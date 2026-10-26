@@ -1,5 +1,8 @@
 ---
-/** Mis vehículos: los de las fichas del cliente (sin los quitados), con alta y papelera. */
+/**
+ * Mis vehículos: los de las fichas del cliente (sin los quitados), con alta y papelera.
+ * Cambios de titular: el comprador ve cómo va su petición; el titular contesta si lo ha vendido.
+ */
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import Icon from '../../../components/Icon.astro';
 import StatusBadge from '../../../components/panel/StatusBadge.astro';
@@ -7,6 +10,8 @@ import Flash from '../../../components/panel/Flash.astro';
 import NotLinked from '../../../components/portal/NotLinked.astro';
 import { portalPage } from '../../../lib/server/portal.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { field, isUuid } from '../../../lib/server/panel.ts';
+import { formatDateTime } from '../../../lib/panel/format.ts';
 import { formatPlate, FUEL_LABELS, type FuelType, type RepairStatus } from '@talleres/core';
 
 export const prerender = false;
@@ -15,15 +20,41 @@ const portal = await portalPage(Astro);
 if (portal instanceof Response) return portal;
 
 interface Vehicle { id: string; workshop_name: string; plate: string; make: string; model: string; year: number | null; fuel: FuelType | null; active_status: RepairStatus | null }
+interface Transfer { id: string; role: 'comprador' | 'vendedor'; vehicle_id: string; plate: string; make: string; model: string; status: string; seller_answer: string | null; requested_at: string; decided_at: string | null }
 let vehicles: Vehicle[] = [];
+let transfers: Transfer[] = [];
 let error = false;
 let trash = 0;
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.searchParams.get('titular') === '1' ? 'Petición enviada. Te avisaremos cuando esté a tu nombre.' : '' };
+if (portal.form && portal.records.length > 0) {
+  const transfer = field(portal.form, 'transfer_id');
+  const answer = field(portal.form, 'vendido');
+  if (field(portal.form, 'action') === 'titular-contestar' && isUuid(transfer) && (answer === 'si' || answer === 'no')) {
+    const { data, error: e } = await portal.supabase.rpc('portal_answer_vehicle_transfer', { p_transfer_id: transfer, p_sold: answer === 'si' });
+    if (e) {
+      logAuth('portal_vehicle_transfer_answer_error', e.code);
+      flash = { kind: 'bad', text: e.code === '22023' && e.message ? e.message : 'No se ha podido guardar tu respuesta. Inténtalo de nuevo.' };
+      Astro.response.status = 400;
+    } else {
+      flash = { kind: 'ok', text: data === 'confirmado' ? 'Hecho: el vehículo ya está a nombre de su nuevo titular. Tus reparaciones y facturas se conservan.' : 'Gracias. El taller lo revisará con los papeles antes de cambiar nada.' };
+    }
+  }
+}
 if (portal.records.length > 0) {
-  const [{ data, error: e }, t] = await Promise.all([portal.supabase.rpc('portal_vehicles'), portal.supabase.rpc('portal_vehicle_trash')]);
+  const [{ data, error: e }, t, tr] = await Promise.all([portal.supabase.rpc('portal_vehicles'), portal.supabase.rpc('portal_vehicle_trash'), portal.supabase.rpc('portal_vehicle_transfers')]);
   if (e) { logAuth('portal_vehicles_error', e.code); error = true; }
   vehicles = (data ?? []) as Vehicle[];
   trash = (t.data ?? []).length;
+  transfers = (tr.data ?? []) as Transfer[];
 }
+const asSeller = transfers.filter(t => t.role === 'vendedor');
+const asBuyer = transfers.filter(t => t.role === 'comprador');
+const BUYER_STATUS: Record<string, string> = {
+  pendiente: 'Pendiente: lo confirmará el titular anterior o el taller cuando le enseñes el permiso de circulación a tu nombre (o la app miDGT).',
+  confirmado: 'Hecho: ya está a tu nombre.',
+  rechazado: 'No se ha podido comprobar. Lleva al taller el permiso de circulación a tu nombre o enséñale la app miDGT.',
+  anulado: 'Anulada.',
+};
 ---
 <PortalLayout portal={portal} title="Mis vehículos" section="vehiculos">
   <header class="pnl-head">
@@ -37,7 +68,44 @@ if (portal.records.length > 0) {
   </header>
   {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
     <>
+      <Flash kind={flash.kind} text={flash.text} />
       {error && <Flash kind="bad" text="No hemos podido cargar tus vehículos. Recarga la página." />}
+      {asSeller.map(t => (
+        <section class="card" aria-labelledby={`venta-${t.id}`}>
+          <h2 id={`venta-${t.id}`} class="card-title"><Icon name="alert" />¿Has vendido tu {t.make} {t.model}?</h2>
+          <p>Han pedido poner tu vehículo <span class="plate">{formatPlate(t.plate)}</span> a otro nombre ({formatDateTime(t.requested_at)}).</p>
+          {t.seller_answer === 'no_vendido' ? (
+            <p class="hint">Has dicho que no lo has vendido. El taller lo revisará con los papeles antes de cambiar nada.</p>
+          ) : (
+            <>
+              <p class="hint">Si dices que sí, dejará de aparecer en tu portal. Tus reparaciones y facturas se conservan y el nuevo titular no las verá.</p>
+              <div class="pnl-actions">
+                <form method="post" data-busy="Guardando…">
+                  <input type="hidden" name="action" value="titular-contestar" /><input type="hidden" name="transfer_id" value={t.id} /><input type="hidden" name="vendido" value="si" />
+                  <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, lo he vendido</span></button>
+                </form>
+                <form method="post" data-busy="Guardando…">
+                  <input type="hidden" name="action" value="titular-contestar" /><input type="hidden" name="transfer_id" value={t.id} /><input type="hidden" name="vendido" value="no" />
+                  <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>No lo he vendido</span></button>
+                </form>
+              </div>
+            </>
+          )}
+        </section>
+      ))}
+      {asBuyer.length > 0 && (
+        <section class="card" aria-labelledby="peticiones-t">
+          <h2 id="peticiones-t" class="card-title"><Icon name="user" />Cambios de titular que has pedido</h2>
+          <ul class="list">
+            {asBuyer.map(t => (
+              <li class="row"><span class="row-main">
+                <span class="row-title"><span class="plate">{formatPlate(t.plate)}</span>{t.make} {t.model}</span>
+                <span class="row-meta">{BUYER_STATUS[t.status] ?? t.status}</span>
+              </span></li>
+            ))}
+          </ul>
+        </section>
+      )}
       {vehicles.length === 0 ? (
         <div class="empty"><strong>Todavía no tienes vehículos registrados.</strong><span>Puedes añadir el tuyo con «Añadir vehículo».</span></div>
       ) : (

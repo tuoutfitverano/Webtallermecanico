@@ -4,6 +4,9 @@
  * obligatorios). Las reglas se comprueban aquí (@talleres/core) y otra vez en
  * la base de datos (portal_add_vehicle). Queda como dato «del cliente»,
  * pendiente de verificar por el taller.
+ * Si la matrícula ya está en el taller a nombre de otra persona (lo ha
+ * comprado), puede pedir el cambio de titular (portal_request_vehicle_transfer):
+ * lo confirma el titular anterior o el taller con el permiso de circulación.
  */
 import PortalLayout from '../../../layouts/PortalLayout.astro';
 import Icon from '../../../components/Icon.astro';
@@ -23,8 +26,18 @@ const values: Record<string, string> = { customer_id: portal.records[0]?.custome
 let errors: Partial<Record<string, string>> = {};
 let error = '';
 let askPlate = false;
+let offerTransfer = false;
 
-if (portal.form && portal.records.length > 0) {
+if (portal.form && portal.records.length > 0 && field(portal.form, 'action') === 'titular') {
+  const record = portal.records.find(r => r.customer_id === field(portal.form!, 'customer_id'));
+  const { error: e } = record
+    ? await portal.supabase.rpc('portal_request_vehicle_transfer', { p_customer_id: record.customer_id, p_plate: field(portal.form, 'plate') })
+    : { error: { code: '22023', message: 'Elige el taller.' } };
+  if (!e) return Astro.redirect('/portal/vehiculos?titular=1', 303);
+  logAuth('portal_vehicle_transfer_error', e.code);
+  error = e.code === '22023' && e.message ? e.message : 'No se ha podido enviar la petición. Inténtalo de nuevo.';
+  Astro.response.status = 400;
+} else if (portal.form && portal.records.length > 0) {
   for (const k of Object.keys(values)) values[k] = field(portal.form, k).trim();
   const record = portal.records.find(r => r.customer_id === values.customer_id);
   const yearText = values.year!;
@@ -50,6 +63,8 @@ if (portal.form && portal.records.length > 0) {
       logAuth('portal_vehicle_add_error', e?.code);
       // Los mensajes de la base de datos (22023) están pensados para el cliente.
       error = e?.code === '22023' && e.message ? e.message : 'No se ha podido añadir el vehículo. Inténtalo de nuevo.';
+      // Ya está en el taller a nombre de otra persona: puede pedir que se ponga a su nombre.
+      offerTransfer = e?.code === '22023' && Boolean(e.message?.includes('ya está registrada en el taller'));
       Astro.response.status = 400;
     } else {
       return Astro.redirect(`/portal/vehiculos/${data}?anadido=1`, 303);
@@ -65,7 +80,21 @@ const many = portal.records.length > 1;
   {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
     <section class="card" aria-labelledby="nuevo-t">
       <h2 id="nuevo-t" class="card-title"><Icon name="car" />Datos del vehículo</h2>
-      <Flash kind="bad" text={error} />
+      {offerTransfer ? (
+        <div class="alert alert-warn" role="alert">
+          <Icon name="alert" />
+          <div class="form-stack">
+            <span>Ese vehículo ya está registrado en el taller a nombre de otra persona. Si lo has comprado, pide que lo pongan a tu nombre.</span>
+            <span class="hint">Lo confirmará el titular anterior desde su portal o el taller cuando le enseñes el permiso de circulación a tu nombre (o la app miDGT). Solo verás tus propias reparaciones, no las anteriores.</span>
+            <form method="post" data-busy="Enviando…">
+              <input type="hidden" name="action" value="titular" />
+              <input type="hidden" name="customer_id" value={values.customer_id} />
+              <input type="hidden" name="plate" value={values.plate} />
+              <button class="btn btn-primary btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Este coche ahora es mío: pedir el cambio</span></button>
+            </form>
+          </div>
+        </div>
+      ) : <Flash kind="bad" text={error} />}
       <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
         <p class="hint">Matrícula, marca, modelo y año son obligatorios. El taller revisará los datos.</p>
         {many ? (

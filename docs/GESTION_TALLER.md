@@ -33,6 +33,21 @@ Los permisos los decide la base de datos (RLS y disparadores), no la interfaz: o
 - El cliente puede **añadir** vehículos desde su portal (quedan como «aportados por el cliente», pendientes de verificar) y **quitarlos**: van a su papelera 30 días y puede recuperarlos. Nunca se borran: el taller conserva siempre el vehículo, sus órdenes, revisiones, presupuestos y facturas, y la ficha avisa de que el cliente lo quitó.
 - Historial en la ficha: órdenes con kilómetros y trabajos; la oficina ve también presupuestos y facturas.
 
+### Cambio de titular (el coche se vende)
+
+Migración `20261109090100_cambio_titular.sql`, pruebas `31_cambio_titular.test.sql` y `e2e/titular.spec.ts`.
+
+- **Saber la matrícula no basta.** El comprador lo pide desde su portal (Añadir vehículo → «Este coche ahora es mío: pedir el cambio») o el taller lo hace en el mostrador. Hasta que se confirma, el coche sigue siendo del titular anterior.
+- **Se confirma de dos formas:**
+  1. El titular anterior contesta en su portal «Sí, lo he vendido» (no se le dice quién lo pide). El cambio se hace al momento.
+  2. La **oficina** (propietario, administración y recepción; los mecánicos no) ve el **permiso de circulación a nombre del comprador** o la **app miDGT** y marca cuál vio. No se guarda copia del documento.
+- Si el titular anterior dice «No lo he vendido», no se hace sola: la oficina lo revisa con los papeles. Puede rechazar la petición (se avisa al comprador).
+- Al confirmarse, el vehículo pasa a la ficha del comprador. El anterior deja de verlo, pero conserva sus reparaciones, presupuestos y facturas, que van a su nombre; el nuevo solo ve las suyas. Se cancelan los recordatorios pendientes del anterior sobre ese coche y se avisa a los dos.
+- No se puede cambiar con una reparación en curso.
+- Queda registrado en `vehicle_transfers` quién lo pidió, cómo se comprobó, quién lo confirmó y cuándo. La ficha del vehículo enseña el historial de titulares.
+- El cliente de un vehículo que ya tiene titular no se cambia al editar sus datos. Lo impide el disparador `vehicles_owner_guard`; hay que usar «Cambiar de titular». «Corrección» sirve para un vehículo registrado en la ficha equivocada, sin venta.
+- La petición está limitada a 3 al día por ficha.
+
 ## Órdenes de reparación
 
 - **Líneas** (mano de obra, piezas, otros) con cantidad, precio, descuento e IVA. Son lo que se ha hecho de verdad y pasan a la factura.

@@ -2,7 +2,7 @@
 /**
  * Ficha de vehículo: datos, kilómetros y próxima revisión, origen y verificación,
  * edición, historial (reparaciones con km y trabajos; la oficina ve además
- * presupuestos y facturas) y borrado.
+ * presupuestos y facturas), cambio de titular (oficina) y borrado.
  */
 import PanelLayout from '../../../layouts/PanelLayout.astro';
 import Icon from '../../../components/Icon.astro';
@@ -27,6 +27,10 @@ export const prerender = false;
 
 const PROVIDER_NAMES: Record<string, string> = { openapi: 'Openapi (Spanish Car Check)' };
 const FIELD_STATE_LABELS = { confirmado: 'tal como lo dio el proveedor', modificado: 'cambiado a mano', no_usado: 'no se usó' } as const;
+const TRANSFER_METHODS: Record<string, string> = {
+  vendedor: 'lo confirmó el titular anterior', permiso: 'permiso de circulación a su nombre', midgt: 'app miDGT', correccion: 'corrección: estaba en la ficha equivocada',
+};
+const TRANSFER_STATUS: Record<string, string> = { confirmado: 'Hecho', rechazado: 'Rechazado', anulado: 'Anulado' };
 
 const panel = await panelPage(Astro);
 if (panel instanceof Response) return panel;
@@ -82,6 +86,28 @@ if (panel.form && panel.workshop && isUuid(id)) {
       if (error) { logAuth('panel_vehicle_service_error', error.code); flash = { kind: 'bad', text: error.code === '22023' && error.message ? error.message : dbErrorMessage(error) }; Astro.response.status = 400; }
       else flash = { kind: 'ok', text: action === 'mantenimiento' ? 'Mantenimiento anotado. El próximo ya está calculado.' : 'Anotación quitada.' };
     }
+  } else if (action.startsWith('titular-') && panel.isOffice) {
+    // Cambio de titular: la base de datos comprueba permisos, reparación en curso y documento.
+    const method = field(panel.form, 'method');
+    const transfer = field(panel.form, 'transfer_id');
+    const target = field(panel.form, 'new_customer_id');
+    let res: { error: { code?: string; message?: string } | null };
+    if (action === 'titular-confirmar' && isUuid(transfer)) {
+      res = await panel.supabase.rpc('confirm_vehicle_transfer', { p_transfer_id: transfer, p_method: method });
+    } else if (action === 'titular-rechazar' && isUuid(transfer)) {
+      res = await panel.supabase.rpc('reject_vehicle_transfer', { p_transfer_id: transfer });
+    } else if (action === 'titular-cambiar' && isUuid(target)) {
+      res = await panel.supabase.rpc('transfer_vehicle', { p_vehicle_id: id, p_customer_id: target, p_method: method });
+    } else {
+      res = { error: { code: '22023', message: action === 'titular-cambiar' ? 'Elige a quién pasa el vehículo.' : 'Solicitud no válida.' } };
+    }
+    if (res.error) {
+      logAuth('panel_vehicle_transfer_error', res.error.code);
+      flash = { kind: 'bad', text: res.error.code === '22023' && res.error.message ? res.error.message : dbErrorMessage(res.error) };
+      Astro.response.status = 400;
+    } else {
+      flash = { kind: 'ok', text: action === 'titular-rechazar' ? 'Solicitud rechazada. Se ha avisado a quien la pidió.' : 'Titular cambiado. Se ha avisado a los dos.' };
+    }
   } else if (action === 'pedir-borrar') {
     askDelete = true;
   } else if (action === 'borrar') {
@@ -106,6 +132,13 @@ let invoices: Array<{ id: string; full_number: string | null; kind: 'ordinaria' 
 interface Interval { id: string; name: string; every_months: number | null; every_km: number | null }
 interface Service { interval_id: string; last_done_on: string; last_done_km: number | null; next_due_on: string | null; next_due_km: number | null; source: 'orden' | 'manual'; order_id: string | null }
 let intervals: Interval[] = [];
+interface Transfer {
+  id: string; status: 'pendiente' | 'confirmado' | 'rechazado' | 'anulado'; origin: 'portal' | 'taller'; method: string | null;
+  seller_answer: 'vendido' | 'no_vendido' | null; requested_at: string; decided_at: string | null;
+  from_customer_id: string | null; to_customer_id: string;
+}
+let transfers: Transfer[] = [];
+const names = new Map<string, string>();
 let services = new Map<string, Service>();
 if (panel.workshop && isUuid(id)) {
   const ws = panel.workshop.id;
@@ -129,7 +162,22 @@ if (panel.workshop && isUuid(id)) {
   customers = (c.data ?? []) as typeof customers;
   quotes = (q.data ?? []) as typeof quotes;
   invoices = (f.data ?? []) as typeof invoices;
+  if (office && vehicle) {
+    const { data: t } = await panel.supabase.from('vehicle_transfers')
+      .select('id, status, origin, method, seller_answer, requested_at, decided_at, from_customer_id, to_customer_id')
+      .eq('vehicle_id', id).eq('workshop_id', ws).order('requested_at', { ascending: false }).limit(30);
+    transfers = (t ?? []) as Transfer[];
+    for (const c of customers) names.set(c.id, c.full_name);
+    const missing = [...new Set(transfers.flatMap(x => [x.from_customer_id, x.to_customer_id]))].filter((x): x is string => !!x && !names.has(x));
+    if (missing.length) {
+      const { data: extra } = await panel.supabase.from('customers').select('id, full_name').eq('workshop_id', ws).in('id', missing);
+      for (const c of extra ?? []) names.set(c.id, c.full_name);
+    }
+  }
 }
+const pendingTransfers = transfers.filter(t => t.status === 'pendiente');
+const pastTransfers = transfers.filter(t => t.status !== 'pendiente');
+const who = (cid: string | null) => (cid ? names.get(cid) ?? 'Cliente' : 'Sin titular');
 const today = todayMadrid();
 const dueTone: Record<ServiceDueState, string> = { vencido: 'pill-bad', pronto: 'pill-warn', al_dia: 'pill-ok' };
 const km = (n: number | null | undefined) => (n === null || n === undefined ? '' : `${n.toLocaleString('es-ES')} km`);
@@ -176,6 +224,71 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
               {vehicle.internal_notes && <><dt>Notas internas</dt><dd class="note-internal">{vehicle.internal_notes}</dd></>}
             </dl>
           </section>
+          {panel.isOffice && (
+            <section class="card" aria-labelledby="titular">
+              <h2 id="titular" class="card-title"><Icon name="user" />Titular</h2>
+              {pendingTransfers.map(t => (
+                <div style="display:grid;gap:10px;padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--p-line)">
+                  <p><strong>{who(t.to_customer_id)}</strong> pide ponerlo a su nombre{t.origin === 'portal' ? ' desde su portal' : ''} · {formatDateTime(t.requested_at)}</p>
+                  {t.from_customer_id && (
+                    t.seller_answer === 'no_vendido'
+                      ? <div class="alert alert-warn" role="note"><Icon name="alert" /><span>{who(t.from_customer_id)} dice que <strong>NO</strong> lo ha vendido. Compruébalo con calma con los papeles delante.</span></div>
+                      : <p class="hint">{who(t.from_customer_id)}, el titular actual, no ha contestado. Si tiene cuenta en el portal y confirma la venta, el cambio se hace solo; si no, compruébalo tú con el documento.</p>
+                  )}
+                  <form method="post" class="form-stack" data-busy="Confirmando…" novalidate>
+                    <input type="hidden" name="action" value="titular-confirmar" /><input type="hidden" name="transfer_id" value={t.id} />
+                    <fieldset class="field checks">
+                      <legend>¿Qué has comprobado?</legend>
+                      <label class="check"><input type="radio" name="method" value="permiso" required /><span>El permiso de circulación a su nombre</span></label>
+                      <label class="check"><input type="radio" name="method" value="midgt" /><span>La app miDGT con el vehículo a su nombre</span></label>
+                    </fieldset>
+                    <p class="hint">No guardes copia del documento: basta con anotar cuál has visto.</p>
+                    <div class="pnl-actions">
+                      <button class="btn btn-primary btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Confirmar el cambio</span></button>
+                    </div>
+                  </form>
+                  <form method="post" data-busy="Rechazando…" style="margin-top:8px">
+                    <input type="hidden" name="action" value="titular-rechazar" /><input type="hidden" name="transfer_id" value={t.id} />
+                    <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Rechazar la solicitud</span></button>
+                  </form>
+                </div>
+              ))}
+              <p>{vehicle.customers ? <>A nombre de <a href={`/panel/clientes/${vehicle.customers.id}`}>{vehicle.customers.full_name}</a>.</> : 'Sin titular.'}</p>
+              {vehicle.customer_id && pendingTransfers.length === 0 && (
+                <details style="margin-top:12px">
+                  <summary style="cursor:pointer">Cambiar de titular</summary>
+                  <form method="post" class="form-stack" style="margin-top:12px" data-busy="Cambiando…" novalidate>
+                    <input type="hidden" name="action" value="titular-cambiar" />
+                    <div class="field"><label for="t-customer">Nuevo titular</label>
+                      <select class="select" id="t-customer" name="new_customer_id" required>
+                        <option value="">Elige un cliente…</option>
+                        {customers.filter(c => c.id !== vehicle!.customer_id).map(c => <option value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+                      </select>
+                      <p class="hint">Si no está, <a href="/panel/clientes/nuevo">crea su ficha</a> primero.</p>
+                    </div>
+                    <fieldset class="field checks">
+                      <legend>¿Cómo lo has comprobado?</legend>
+                      <label class="check"><input type="radio" name="method" value="permiso" required /><span>El permiso de circulación a su nombre</span></label>
+                      <label class="check"><input type="radio" name="method" value="midgt" /><span>La app miDGT con el vehículo a su nombre</span></label>
+                      <label class="check"><input type="radio" name="method" value="correccion" /><span>No hubo venta: estaba en la ficha equivocada</span></label>
+                    </fieldset>
+                    <p class="hint">El titular anterior conserva sus reparaciones y facturas; el nuevo solo verá las suyas. No se puede cambiar con una reparación en curso.</p>
+                    <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cambiar de titular</span></button>
+                  </form>
+                </details>
+              )}
+              {pastTransfers.length > 0 && (
+                <ul class="list" style="margin-top:12px" aria-label="Historial de titulares">
+                  {pastTransfers.map(t => (
+                    <li class="row"><span class="row-main">
+                      <span class="row-title">{TRANSFER_STATUS[t.status] ?? t.status}: {who(t.from_customer_id)} → {who(t.to_customer_id)}</span>
+                      <span class="row-meta">{formatDateTime(t.decided_at ?? t.requested_at)}{t.method && ` · ${TRANSFER_METHODS[t.method] ?? t.method}`}</span>
+                    </span></li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
           <section class="card" aria-labelledby="mant">
             <h2 id="mant" class="card-title"><Icon name="wrench" />Mantenimientos</h2>
             {intervals.length === 0 ? <p class="hint">El taller no tiene mantenimientos periódicos activos.{panel.isManager && <> <a href="/panel/mantenimientos">Configurarlos</a></>}</p> : (
@@ -276,7 +389,8 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
             <summary id="editar" class="card-title" style="cursor:pointer">Editar datos</summary>
             <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
               <input type="hidden" name="action" value="editar" />
-              <VehicleFields values={values} errors={errors} customers={customers} askPlateConfirmation={askPlate} />
+              <VehicleFields values={values} errors={errors} customers={customers} askPlateConfirmation={askPlate}
+                lockedCustomer={vehicle.customer_id ? (vehicle.customers?.full_name ?? 'Cliente') : undefined} />
               <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar cambios</span></button>
             </form>
           </details>

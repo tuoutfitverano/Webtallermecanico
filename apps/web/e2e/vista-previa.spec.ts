@@ -259,6 +259,8 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   }
   // La clienta pide recordatorios de mantenimiento; el taller activa las reglas y se generan.
   await rest('POST', '/rpc/set_service_reminders', client.tok, { p_customer_id: customers[5]!.id, p_enabled: true });
+  // «Prueba Cliente» ha comprado el Clio de otro cliente y pide ponerlo a su nombre (pendiente de comprobar).
+  await rest('POST', '/rpc/portal_request_vehicle_transfer', client.tok, { p_customer_id: customers[5]!.id, p_plate: '7395XJH' });
   await rest('PATCH', `/reminder_settings?workshop_id=eq.${DEMO}`, owner.tok, { revision_enabled: true, quote_enabled: true, pickup_enabled: true });
   await fetch(`${PROXY}/rest/v1/rpc/run_maintenance`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: '{}' });
 

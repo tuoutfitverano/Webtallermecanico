@@ -15,8 +15,10 @@ interface Props {
   askPlateConfirmation?: boolean;
   /** Solo en el alta: consulta por matrícula. */
   lookup?: { available: boolean; key: string; result: LookupView | null; appliedFrom: string | null };
+  /** Vehículo que ya tiene titular: el cliente no se cambia aquí, sino con «Cambiar de titular». */
+  lockedCustomer?: string;
 }
-const { values, errors = {}, customers, askPlateConfirmation = false, lookup } = Astro.props;
+const { values, errors = {}, customers, askPlateConfirmation = false, lookup, lockedCustomer } = Astro.props;
 const err = (k: string) => errors[k];
 ---
 <p class="hint">Matrícula, marca, modelo y año son obligatorios; lo demás es opcional.</p>
@@ -40,6 +42,14 @@ const err = (k: string) => errors[k];
       <p class="hint" id="lookup-off">La consulta automática por matrícula no está disponible (no hay un proveedor de datos configurado). Introduce los datos a mano.</p>
     ))}
   </div>
+  {lockedCustomer !== undefined ? (
+    <div class="field">
+      <label for="customer_locked">Cliente</label>
+      <input type="hidden" name="customer_id" value={values.customer_id} />
+      <input class="input" id="customer_locked" value={lockedCustomer} readonly aria-describedby="customer_locked-hint" />
+      <p class="hint" id="customer_locked-hint">Para pasarlo a otra persona usa «Cambiar de titular»: queda registrado cómo se comprobó.</p>
+    </div>
+  ) : (
   <div class={`field ${err('customerId') ? 'has-error' : ''}`}>
     <label for="customer_id">Cliente</label>
     <select class="select" id="customer_id" name="customer_id">
@@ -48,6 +58,7 @@ const err = (k: string) => errors[k];
     </select>
     {err('customerId') && <p class="field-error">{err('customerId')}</p>}
   </div>
+  )}
 </div>
 {lookup?.result && <LookupReview lookup={lookup.result} values={values} />}
 {lookup?.appliedFrom && <input type="hidden" name="lookup_id" value={lookup.appliedFrom} />}

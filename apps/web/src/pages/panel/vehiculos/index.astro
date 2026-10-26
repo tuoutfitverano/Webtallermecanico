@@ -6,6 +6,7 @@ import NoWorkshop from '../../../components/panel/NoWorkshop.astro';
 import Flash from '../../../components/panel/Flash.astro';
 import { panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
+import { formatDateTime } from '../../../lib/panel/format.ts';
 import { formatPlate, FUEL_LABELS, type FuelType } from '@talleres/core';
 
 export const prerender = false;
@@ -17,10 +18,19 @@ interface Row { id: string; plate: string; make: string; model: string; year: nu
 const q = (Astro.url.searchParams.get('q') ?? '').trim().slice(0, 100);
 let rows: Row[] = [];
 let error = false;
+// Cambios de titular pendientes de comprobar (solo los ve la oficina).
+let pending: Array<{ vehicle_id: string; requested_at: string; vehicles: { plate: string; make: string; model: string } | null }> = [];
 if (panel.workshop) {
-  const { data, error: e } = await panel.supabase.rpc('search_vehicles', { p_workshop_id: panel.workshop.id, p_query: q, p_limit: 100 });
-  if (e) { logAuth('panel_vehicles_error', e.code); error = true; }
-  rows = (data ?? []) as Row[];
+  const [v, t] = await Promise.all([
+    panel.supabase.rpc('search_vehicles', { p_workshop_id: panel.workshop.id, p_query: q, p_limit: 100 }),
+    panel.isOffice
+      ? panel.supabase.from('vehicle_transfers').select('vehicle_id, requested_at, vehicles(plate, make, model)')
+          .eq('workshop_id', panel.workshop.id).eq('status', 'pendiente').order('requested_at').limit(20)
+      : Promise.resolve({ data: [] }),
+  ]);
+  if (v.error) { logAuth('panel_vehicles_error', v.error.code); error = true; }
+  rows = (v.data ?? []) as Row[];
+  pending = (t.data ?? []) as unknown as typeof pending;
 }
 const deleted = Astro.url.searchParams.get('borrado') === '1';
 ---
@@ -35,6 +45,19 @@ const deleted = Astro.url.searchParams.get('borrado') === '1';
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
     <>
       <Flash kind="ok" text={deleted ? 'Vehículo borrado.' : ''} />
+      {pending.length > 0 && (
+        <section class="card" aria-labelledby="titulares-t">
+          <h2 id="titulares-t" class="card-title"><Icon name="user" />Cambios de titular por comprobar</h2>
+          <p class="hint">Alguien pide poner estos vehículos a su nombre. Comprueba el permiso de circulación o la app miDGT, o espera a que el titular actual confirme la venta.</p>
+          <ul class="list">
+            {pending.map(p => (
+              <li><a class="row" href={`/panel/vehiculos/${p.vehicle_id}#titular`}>
+                <span class="row-main"><span class="row-title"><span class="plate">{formatPlate(p.vehicles?.plate ?? '')}</span>{p.vehicles?.make} {p.vehicles?.model}</span><span class="row-meta">Pedido el {formatDateTime(p.requested_at)}</span></span>
+              </a></li>
+            ))}
+          </ul>
+        </section>
+      )}
       <form method="get" class="filters" role="search">
         <div class="field search">
           <label for="q" class="sr-only">Buscar vehículos</label>

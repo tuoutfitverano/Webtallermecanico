@@ -101,6 +101,8 @@ insert into public.workshop_billing_settings (workshop_id) values ('bbbbbbbb-000
 insert into public.workshop_notification_settings (workshop_id) values ('bbbbbbbb-0000-0000-0000-000000000000') on conflict do nothing;
 insert into public.workshop_counters (workshop_id) values ('bbbbbbbb-0000-0000-0000-000000000000') on conflict do nothing;
 insert into public.workshop_plans (workshop_id, plan) values ('bbbbbbbb-0000-0000-0000-000000000000', 'premium');
+insert into public.vehicle_transfers (workshop_id, vehicle_id, from_customer_id, to_customer_id, origin) values
+  ('bbbbbbbb-0000-0000-0000-000000000000', '7e000001-0000-0000-0000-00000000000b', 'c1000000-0000-0000-0000-00000000000b', 'c3000000-0000-0000-0000-00000000000b', 'portal');
 
 -- Ninguna tabla con workshop_id puede quedar sin datos de B.
 create temp table tablas_taller on commit drop as
@@ -117,6 +119,7 @@ select set_config('tests.nb', (select id::text from public.notifications where w
 select set_config('tests.rb', (select id::text from public.reminders where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000' limit 1), true);
 select set_config('tests.wib', (select id::text from public.workshop_invitations where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000' limit 1), true);
 select set_config('tests.cib', (select id::text from public.customer_invitations where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000' limit 1), true);
+select set_config('tests.tb', (select id::text from public.vehicle_transfers where workshop_id = 'bbbbbbbb-0000-0000-0000-000000000000' limit 1), true);
 select set_config('tests.b_before', tests.b_hash(), true);
 
 -- Una fila de B (como superusuario) para intentar copiarla dentro de B.
@@ -235,6 +238,7 @@ begin
               when 'p_vehicle_id' then '7e000001-0000-0000-0000-00000000000b'
               when 'p_interval_id' then current_setting('tests.ib')
               when 'p_payment_id' then current_setting('tests.pb')
+              when 'p_transfer_id' then current_setting('tests.tb')
               when 'p_user_id' then '00000000-0000-0000-0000-0000000000b2'
               when 'p_assigned_to' then '00000000-0000-0000-0000-0000000000b2'
               when 'p_request_key' then gen_random_uuid()::text

@@ -7,6 +7,7 @@
  * Lanza con scripts/test-e2e.sh (cuentas: propietaria@e2e.test, gestora@e2e.test).
  */
 import { expect, test, type Page } from '@playwright/test';
+import { acceptCookies } from './consent.ts';
 
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 const PASSWORD = process.env.E2E_PASSWORD ?? '';
@@ -17,7 +18,7 @@ test.skip(!PROXY || !PASSWORD, 'Lanza estas pruebas con scripts/test-e2e.sh');
 test.describe.configure({ mode: 'serial' });
 
 async function login(page: Page, email: string, next = '/panel') {
-  await page.context().clearCookies();
+  await page.context().clearCookies(); await acceptCookies(page.context());
   await page.goto(`/acceso?next=${encodeURIComponent(next)}`);
   await page.getByLabel('Correo electrónico').fill(email);
   await page.locator('#password').fill(PASSWORD);
