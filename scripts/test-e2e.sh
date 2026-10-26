@@ -113,6 +113,8 @@ SITE="http://demo.localhost:$WEB_PORT"
   GOTRUE_MAILER_URLPATHS_INVITE=/auth/v1/verify GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/auth/v1/verify \
   GOTRUE_MAILER_TEMPLATES_CONFIRMATION="http://127.0.0.1:$MAIL_PORT/templates/confirmation.html" \
   GOTRUE_MAILER_SUBJECTS_CONFIRMATION="Confirma tu correo · Área de talleres" \
+  GOTRUE_MAILER_TEMPLATES_MAGIC_LINK="http://127.0.0.1:$MAIL_PORT/templates/magic_link.html" \
+  GOTRUE_MAILER_SUBJECTS_MAGIC_LINK="Tu código de acceso · Área de talleres" \
   GOTRUE_RATE_LIMIT_EMAIL_SENT=1000 GOTRUE_RATE_LIMIT_VERIFY=1000 GOTRUE_RATE_LIMIT_TOKEN_REFRESH=1000 \
   GOTRUE_LOG_LEVEL=warn \
   exec ./auth serve >"$ROOT/.cache/auth/serve.log" 2>&1) & pids+=($!)

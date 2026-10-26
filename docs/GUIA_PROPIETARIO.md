@@ -210,7 +210,22 @@ Compruébalo antes de activarlo.
 
 Si más adelante quitas una clave de GitHub, el Worker conserva la última que se publicó. Para apagar un canal, desactívalo en **Avisos** de cada taller o borra el secreto en Cloudflare (Workers → `autovalue-web` → Settings → Variables).
 
-## 7. Si un taller deja el programa: se queda su web
+## 7. Si alguien pierde el móvil de la verificación en dos pasos
+
+En la pantalla del código, «¿No tienes el móvil?» ofrece dos caminos:
+
+1. **Un código de recuperación.** Al activar la verificación se enseñan 10 códigos; cada uno sirve una vez. Se pueden cambiar por otros en Mi cuenta → Seguridad.
+2. **Por correo.** Justo después de escribir la contraseña, se envía un código de 6 cifras al correo de la cuenta. Así hacen falta las dos cosas: la contraseña y el correo. Necesita que los correos de la cuenta funcionen (los mismos de «olvidé la contraseña»). No vale para las cuentas de la administración de la plataforma.
+
+En los dos casos se quita la verificación y la persona la vuelve a activar con su móvil nuevo. Si no tiene ni códigos ni correo, tú la quitas desde el SQL Editor de Supabase, después de comprobar quién es:
+
+```sql
+select private.admin_reset_mfa('correo@de-la-persona.es', 'Cómo has comprobado que es ella');
+```
+
+Por SMS no se ofrece: cada mensaje cuesta dinero (hace falta un proveedor como Twilio).
+
+## 8. Si un taller deja el programa: se queda su web
 
 Un taller que ha pagado su web se la queda aunque deje de pagar el programa. Se la das así:
 

@@ -50,11 +50,13 @@ auth=$(jq -n \
   --arg allow "$APP_URL/**" \
   --rawfile conf supabase/templates/confirmation.html \
   --rawfile rec supabase/templates/recovery.html \
+  --rawfile magic supabase/templates/magic_link.html \
   '{site_url: $site, uri_allow_list: $allow, mailer_autoconfirm: false,
     password_min_length: 10,
     password_required_characters: "abcdefghijklmnopqrstuvwxyz:ABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789",
     mailer_subjects_confirmation: "Confirma tu correo · Área de talleres", mailer_templates_confirmation_content: $conf,
-    mailer_subjects_recovery: "Cambiar la contraseña · Área de talleres", mailer_templates_recovery_content: $rec}')
+    mailer_subjects_recovery: "Cambiar la contraseña · Área de talleres", mailer_templates_recovery_content: $rec,
+    mailer_subjects_magic_link: "Tu código de acceso · Área de talleres", mailer_templates_magic_link_content: $magic}')
 # Con Resend, los correos de la cuenta (confirmar, cambiar contraseña) salen por su SMTP:
 # así llegan a cualquier persona, no solo al equipo de Supabase.
 if $EMAIL_ON; then

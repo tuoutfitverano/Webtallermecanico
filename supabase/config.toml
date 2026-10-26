@@ -258,6 +258,12 @@ content_path = "./supabase/templates/confirmation.html"
 subject = "Cambiar la contraseña · Área de talleres"
 content_path = "./supabase/templates/recovery.html"
 
+# Código de 6 cifras para recuperar la cuenta sin el móvil de la verificación en
+# dos pasos (/acceso/verificar → «Por correo»).
+[auth.email.template.magic_link]
+subject = "Tu código de acceso · Área de talleres"
+content_path = "./supabase/templates/magic_link.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

@@ -6,7 +6,9 @@
  *     clave para la app (solo en esta respuesta; no se guardan en la web).
  *  2. La persona escribe el código de 6 cifras: challenge + verify. Solo
  *     entonces queda activada, y la sesión pasa a «aal2».
- *  3. «Desactivar» (dos pasos): solo con la sesión ya verificada (aal2).
+ *  3. Se enseñan 10 códigos de recuperación, una sola vez (por si se pierde el móvil:
+ *     ver /acceso/verificar). Se pueden cambiar por otros nuevos con la sesión verificada.
+ *  4. «Desactivar» (dos pasos): solo con la sesión ya verificada (aal2).
  *
  * Obligatoria para la administración de la plataforma (lo exige la base de datos).
  */
@@ -27,6 +29,29 @@ const FRIENDLY_NAME = 'AutoValue (app de verificación)';
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
 let setup: { factorId: string; qr: string; secret: string } | null = null;
 let askDisable = false;
+let askNewCodes = false;
+/** Códigos de recuperación recién creados: solo se enseñan en esta respuesta. */
+let codes: string[] = [];
+
+async function newRecoveryCodes(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('create_mfa_recovery_codes');
+  if (error || !Array.isArray(data)) {
+    logAuth('mfa_codes_error', error?.code);
+    return false;
+  }
+  codes = data as string[];
+  return true;
+}
+
+const recoveredBy = Astro.url.searchParams.get('recuperada');
+if (!page.form && (recoveredBy === 'codigo' || recoveredBy === 'correo')) {
+  flash = {
+    kind: 'ok',
+    text: recoveredBy === 'codigo'
+      ? 'Has recuperado tu cuenta con un código de recuperación y se ha quitado la verificación en dos pasos. Vuelve a activarla ahora con tu móvil nuevo.'
+      : 'Has recuperado tu cuenta con el código del correo y se ha quitado la verificación en dos pasos. Vuelve a activarla ahora con tu móvil nuevo.',
+  };
+}
 
 async function factorsNow() {
   const { data, error } = await supabase.auth.mfa.listFactors();
@@ -68,8 +93,17 @@ if (page.form) {
         Astro.response.status = 400;
       } else {
         logAuth('mfa_enroll_ok');
-        flash = { kind: 'ok', text: 'Verificación en dos pasos activada. A partir de ahora, al entrar te pediremos también el código de tu app.' };
+        flash = (await newRecoveryCodes())
+          ? { kind: 'ok', text: 'Verificación en dos pasos activada. Guarda ahora tus códigos de recuperación: son la forma de entrar si pierdes el móvil.' }
+          : { kind: 'ok', text: 'Verificación en dos pasos activada. No hemos podido crear los códigos de recuperación: créalos abajo.' };
       }
+    }
+  } else if (action === 'pedir-codigos') {
+    askNewCodes = true;
+  } else if (action === 'codigos') {
+    if (!(await newRecoveryCodes())) {
+      flash = { kind: 'bad', text: 'No se han podido crear los códigos. Vuelve a entrar con el código de tu app e inténtalo otra vez.' };
+      Astro.response.status = 400;
     }
   } else if (action === 'pedir-desactivar') {
     askDisable = true;
@@ -89,6 +123,8 @@ if (page.form) {
 }
 
 const active = (await factorsNow()).find(f => f.status === 'verified') ?? null;
+const { data: recoveryRows } = active ? await supabase.rpc('mfa_recovery_status') : { data: null };
+const codesLeft: number = active && Array.isArray(recoveryRows) ? Number(recoveryRows[0]?.codes_left ?? 0) : 0;
 ---
 <AuthLayout title="Verificación en dos pasos" user={user} wide back={{ href: '/cuenta', label: 'Volver a mi cuenta' }}>
   <header class="account-head">
@@ -107,6 +143,32 @@ const active = (await factorsNow()).find(f => f.status === 'verified') ?? null;
     {active ? (
       <>
         <p>Tu cuenta pide el código de la app al entrar{active.created_at ? ` (activada el ${formatDate(active.created_at)})` : ''}.</p>
+        {codes.length > 0 ? (
+          <div class="mfa-codes" role="region" aria-labelledby="codigos-t">
+            <h3 id="codigos-t" class="heading">Tus códigos de recuperación</h3>
+            <p class="small">Guárdalos fuera del móvil (impresos o en un gestor de contraseñas). Cada uno sirve <strong>una sola vez</strong> para entrar si pierdes el móvil. <strong>No volverás a verlos</strong>.</p>
+            <ol class="mfa-code-list mono" id="codigos-recuperacion">{codes.map(c => <li>{c}</li>)}</ol>
+          </div>
+        ) : (
+          <div class="mfa-codes-status">
+            <p>{codesLeft > 0
+              ? `Códigos de recuperación: te quedan ${codesLeft} de 10.`
+              : 'No tienes códigos de recuperación: si pierdes el móvil, solo podrás recuperar la cuenta por correo.'}</p>
+            {askNewCodes ? (
+              <form method="post" class="confirm" data-busy="Creando…">
+                <input type="hidden" name="action" value="codigos" />
+                <strong>¿Crear códigos nuevos?</strong>
+                <span class="hint">Los que tienes ahora dejarán de servir.</span>
+                <div class="pnl-actions">
+                  <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, crear códigos nuevos</span></button>
+                  <a class="btn" href="/cuenta/seguridad">Cancelar</a>
+                </div>
+              </form>
+            ) : (
+              <form method="post"><input type="hidden" name="action" value="pedir-codigos" /><button class="btn btn-sm" type="submit">{codesLeft > 0 ? 'Crear códigos nuevos…' : 'Crear códigos de recuperación…'}</button></form>
+            )}
+          </div>
+        )}
         {askDisable ? (
           <form method="post" class="confirm" data-busy="Desactivando…">
             <input type="hidden" name="action" value="desactivar" />
@@ -154,4 +216,8 @@ const active = (await factorsNow()).find(f => f.status === 'verified') ?? null;
   .mfa-steps { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
   .mfa-qr { background: #fff; padding: 12px; border-radius: 12px; width: 200px; height: 200px; max-width: 100%; }
   #clave-totp { word-break: break-all; }
+  .mfa-codes, .mfa-codes-status { margin-top: 16px; display: grid; gap: 10px; }
+  .mfa-codes h3 { margin: 0; font-size: 1rem; }
+  .mfa-code-list { margin: 0; padding: 14px 14px 14px 2.4em; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 24px;
+    border: 1px dashed var(--line, currentColor); border-radius: 12px; font-size: 1rem; letter-spacing: .04em; }
 </style>
