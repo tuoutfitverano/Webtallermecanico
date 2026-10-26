@@ -1,0 +1,361 @@
+---
+/**
+ * Agenda de cada persona del taller: día, semana o mes.
+ *
+ *  · Apuntes (tareas, citas, reuniones, ausencias) con hora, unidos o no a una orden.
+ *  · «Lo que ha hecho»: apuntes marcados como hechos y el tiempo fichado en las órdenes.
+ *  · Cada persona ve y organiza la suya; propietario y administración, la de
+ *    cualquiera o la de todo el equipo a la vez. Lo impone la base de datos (RLS).
+ */
+import PanelLayout from '../../layouts/PanelLayout.astro';
+import Icon from '../../components/Icon.astro';
+import NoWorkshop from '../../components/panel/NoWorkshop.astro';
+import Flash from '../../components/panel/Flash.astro';
+import { field, isUuid, loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
+import { logAuth } from '../../lib/server/auth.ts';
+import { dbErrorMessage } from '../../lib/auth/messages.ts';
+import { formatDay, localInputToDb, toLocalInput, todayMadrid } from '../../lib/panel/format.ts';
+import { AGENDA_KIND_LABELS, AGENDA_KINDS, agendaItemSchema, fieldErrors, formatPlate, isAgendaKind, orderLabel, type AgendaKind } from '@talleres/core';
+
+export const prerender = false;
+
+const panel = await panelPage(Astro);
+if (panel instanceof Response) return panel;
+
+const me = panel.user.id;
+const params = Astro.url.searchParams;
+const VIEWS = ['dia', 'semana', 'mes'] as const;
+type View = (typeof VIEWS)[number];
+const view: View = (VIEWS as readonly string[]).includes(params.get('vista') ?? '') ? (params.get('vista') as View) : 'semana';
+const today = todayMadrid();
+const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get('fecha') ?? '') ? params.get('fecha')! : today;
+// Persona: la gerencia elige a cualquiera o «todos»; los demás, siempre la suya.
+const askedPerson = params.get('persona') ?? '';
+const person = panel.isManager ? (askedPerson === 'todos' ? 'todos' : isUuid(askedPerson) ? askedPerson : me) : me;
+
+// ---- Fechas (días «AAAA-MM-DD» en hora de Madrid) ----
+const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const weekday = (d: string) => (new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7; // lunes = 0
+const mondayOf = (d: string) => addDays(d, -weekday(d));
+/** Medianoche de Madrid de ese día, en ISO (tiene en cuenta el horario de verano). */
+function madridMidnight(day: string): string {
+  const offset = (at: number) => {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Madrid', timeZoneName: 'shortOffset' }).formatToParts(new Date(at))
+      .find(p => p.type === 'timeZoneName')?.value ?? 'GMT+1';
+    const m = /GMT([+-]\d+)(?::(\d+))?/.exec(name);
+    return m ? (Number(m[1]) * 60 + Math.sign(Number(m[1])) * Number(m[2] ?? 0)) * 60_000 : 3_600_000;
+  };
+  const utc = Date.parse(`${day}T00:00:00Z`);
+  let at = utc - offset(utc);
+  at = utc - offset(at);
+  return new Date(at).toISOString();
+}
+const localDay = (iso: string) => toLocalInput(iso).slice(0, 10);
+const localTime = (iso: string) => toLocalInput(iso).slice(11, 16);
+
+let days: string[];
+if (view === 'dia') days = [date];
+else if (view === 'semana') days = Array.from({ length: 7 }, (_, i) => addDays(mondayOf(date), i));
+else {
+  const first = `${date.slice(0, 8)}01`;
+  const start = mondayOf(first);
+  const last = addDays(addDays(first, 32).slice(0, 8) + '01', -1);
+  const end = addDays(last, 6 - weekday(last));
+  const count = Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86_400_000) + 1;
+  days = Array.from({ length: count }, (_, i) => addDays(start, i));
+}
+const rangeStart = madridMidnight(days[0]!);
+const rangeEnd = madridMidnight(addDays(days[days.length - 1]!, 1));
+const step = view === 'dia' ? 1 : view === 'semana' ? 7 : 0;
+const prevDate = step ? addDays(date, -step) : addDays(`${date.slice(0, 8)}01`, -1).slice(0, 8) + '01';
+const nextDate = step ? addDays(date, step) : addDays(`${date.slice(0, 8)}01`, 32).slice(0, 8) + '01';
+const href = (o: { vista?: View; fecha?: string; persona?: string; editar?: string }) => {
+  // Sin los valores por defecto (semana, hoy, la propia agenda): enlaces cortos y estables.
+  const q = new URLSearchParams();
+  const v = o.vista ?? view, f = o.fecha ?? date;
+  if (v !== 'semana') q.set('vista', v);
+  if (f !== today) q.set('fecha', f);
+  const p = o.persona ?? (person === me ? '' : person);
+  if (p) q.set('persona', p);
+  if (o.editar) q.set('editar', o.editar);
+  return q.size ? `/panel/agenda?${q}` : '/panel/agenda';
+};
+// Los formularios vuelven a la misma vista, día y persona.
+const self = href({});
+
+// ---- Acciones (la base de datos decide quién puede qué) ----
+interface Item {
+  id: string; user_id: string; kind: AgendaKind; title: string; notes: string | null; starts_at: string; ends_at: string;
+  order_id: string | null; done_at: string | null; created_by: string | null; repair_orders: { number: number } | null;
+}
+let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
+let errors: Partial<Record<string, string>> = {};
+let formValues: Record<string, string> | null = null;
+let askDelete = '';
+if (panel.form && panel.workshop) {
+  const action = field(panel.form, 'action');
+  const id = field(panel.form, 'id');
+  if (action === 'crear' || action === 'guardar') {
+    const raw = { title: field(panel.form, 'title'), kind: field(panel.form, 'kind'), day: field(panel.form, 'day'), start: field(panel.form, 'start'), end: field(panel.form, 'end'), notes: field(panel.form, 'notes') };
+    const who = panel.isManager && isUuid(field(panel.form, 'user_id')) ? field(panel.form, 'user_id') : me;
+    const order = isUuid(field(panel.form, 'order_id')) ? field(panel.form, 'order_id') : null;
+    const r = agendaItemSchema.safeParse(raw);
+    if (!r.success) {
+      errors = fieldErrors(r.error); formValues = { ...raw, user_id: who, order_id: order ?? '', id };
+      flash = { kind: 'bad', text: 'Revisa los campos marcados.' }; Astro.response.status = 422;
+    } else {
+      const row = {
+        user_id: who, kind: r.data.kind, title: r.data.title, notes: r.data.notes, order_id: order,
+        starts_at: localInputToDb(`${r.data.day}T${r.data.start}`), ends_at: localInputToDb(`${r.data.day}T${r.data.end}`),
+      };
+      const { data, error } = action === 'crear'
+        ? await panel.supabase.from('staff_agenda').insert({ workshop_id: panel.workshop.id, ...row }).select('id')
+        : isUuid(id) ? await panel.supabase.from('staff_agenda').update(row).eq('id', id).eq('workshop_id', panel.workshop.id).select('id') : { data: null, error: null };
+      if (error || !data?.length) {
+        logAuth('panel_agenda_save_error', error?.code);
+        formValues = { ...raw, user_id: who, order_id: order ?? '', id };
+        flash = { kind: 'bad', text: error ? dbErrorMessage(error) : 'No se ha guardado: no existe o no tienes permiso.' }; Astro.response.status = 400;
+      } else {
+        flash = { kind: 'ok', text: action === 'crear' ? 'Apuntado en la agenda.' : 'Cambios guardados.' };
+      }
+    }
+  } else if ((action === 'hecho' || action === 'deshacer') && isUuid(id)) {
+    const { data, error } = await panel.supabase.from('staff_agenda').update({ done_at: action === 'hecho' ? new Date().toISOString() : null })
+      .eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+    if (error || !data?.length) { logAuth('panel_agenda_done_error', error?.code); flash = { kind: 'bad', text: 'No se ha podido cambiar.' }; Astro.response.status = 400; }
+    else flash = { kind: 'ok', text: action === 'hecho' ? 'Marcado como hecho.' : 'Vuelve a estar pendiente.' };
+  } else if (action === 'pedir-borrar' && isUuid(id)) {
+    askDelete = id;
+  } else if (action === 'borrar' && isUuid(id)) {
+    const { data, error } = await panel.supabase.from('staff_agenda').delete().eq('id', id).eq('workshop_id', panel.workshop.id).select('id');
+    if (error || !data?.length) { logAuth('panel_agenda_delete_error', error?.code); flash = { kind: 'bad', text: 'No se ha borrado: no existe o no tienes permiso.' }; Astro.response.status = 400; }
+    else flash = { kind: 'ok', text: 'Apunte borrado.' };
+  }
+}
+
+// ---- Datos del periodo ----
+let items: Item[] = [];
+let logs: Array<{ id: number; order_id: string; user_id: string | null; started_at: string; ended_at: string | null; repair_orders: { number: number } | null }> = [];
+let planned: Array<{ id: string; number: number; assigned_to: string | null; scheduled_on: string; vehicles: { plate: string } | null }> = [];
+let orders: Array<{ id: string; number: number; vehicles: { plate: string } | null }> = [];
+let team: Awaited<ReturnType<typeof loadTeam>> = [];
+let loadError = false;
+if (panel.workshop) {
+  const ws = panel.workshop.id;
+  let qi = panel.supabase.from('staff_agenda').select('id, user_id, kind, title, notes, starts_at, ends_at, order_id, done_at, created_by, repair_orders(number)')
+    .eq('workshop_id', ws).lt('starts_at', rangeEnd).gt('ends_at', rangeStart).order('starts_at').limit(500);
+  let ql = panel.supabase.from('repair_order_work_logs').select('id, order_id, user_id, started_at, ended_at, repair_orders(number)')
+    .eq('workshop_id', ws).lt('started_at', rangeEnd).or(`ended_at.gt.${rangeStart},ended_at.is.null`).order('started_at').limit(500);
+  let qp = panel.supabase.from('repair_orders').select('id, number, assigned_to, scheduled_on, vehicles(plate)')
+    .eq('workshop_id', ws).neq('status', 'entregado').gte('scheduled_on', days[0]!).lte('scheduled_on', days[days.length - 1]!).limit(300);
+  if (person !== 'todos') { qi = qi.eq('user_id', person); ql = ql.eq('user_id', person); qp = qp.eq('assigned_to', person); }
+  else qp = qp.not('assigned_to', 'is', null);
+  const [i, l, p, o, t] = await Promise.all([
+    qi, ql, qp,
+    panel.supabase.from('repair_orders').select('id, number, vehicles(plate)').eq('workshop_id', ws).neq('status', 'entregado').order('number', { ascending: false }).limit(100),
+    loadTeam(panel),
+  ]);
+  if (i.error) { logAuth('panel_agenda_error', i.error.code); loadError = true; }
+  items = (i.data ?? []) as unknown as Item[];
+  logs = (l.data ?? []) as unknown as typeof logs;
+  planned = (p.data ?? []) as unknown as typeof planned;
+  orders = (o.data ?? []) as unknown as typeof orders;
+  team = t;
+}
+const activeTeam = team.filter(m => m.active);
+const name = (uid: string | null) => memberName(team, uid, me);
+const editing = isUuid(params.get('editar')) ? items.find(x => x.id === params.get('editar')) ?? null : null;
+const values: Record<string, string> = formValues ?? (editing ? {
+  id: editing.id, title: editing.title, kind: editing.kind, day: localDay(editing.starts_at), start: localTime(editing.starts_at),
+  end: localTime(editing.ends_at), notes: editing.notes ?? '', user_id: editing.user_id, order_id: editing.order_id ?? '',
+} : { id: '', title: '', kind: 'tarea', day: date, start: '09:00', end: '10:00', notes: '', user_id: person === 'todos' ? me : person, order_id: '' });
+const err = (k: string) => errors[k];
+
+// Lo que cae en cada día (un apunte de varios días aparece en todos).
+const dayStart = new Map(days.map(d => [d, madridMidnight(d)]));
+const dayEnd = (d: string) => dayStart.get(addDays(d, 1)) ?? madridMidnight(addDays(d, 1));
+const itemsOn = (d: string) => items.filter(x => Date.parse(x.starts_at) < Date.parse(dayEnd(d)) && Date.parse(x.ends_at) > Date.parse(dayStart.get(d)!));
+const logsOn = (d: string) => logs.filter(x => localDay(x.started_at) === d);
+const plannedOn = (d: string) => planned.filter(x => x.scheduled_on === d);
+const sameDay = (x: Item) => localDay(x.starts_at) === localDay(x.ends_at) || toLocalInput(x.ends_at).endsWith('00:00');
+const span = (x: Item) => sameDay(x) ? `${localTime(x.starts_at)}–${localTime(x.ends_at)}` : `${formatDay(localDay(x.starts_at))} ${localTime(x.starts_at)} – ${formatDay(localDay(x.ends_at))} ${localTime(x.ends_at)}`;
+const DOW = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DOW_SHORT = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const MONTH = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
+const heading = view === 'dia' ? `${DOW[weekday(date)]}, ${formatDay(date)}` : view === 'semana' ? `Semana del ${formatDay(days[0])} al ${formatDay(days[6])}` : MONTH.charAt(0).toUpperCase() + MONTH.slice(1);
+const personLabel = person === 'todos' ? 'Todo el equipo' : person === me ? 'Mi agenda' : `Agenda de ${name(person)}`;
+// Día: horas con algo, y como mínimo de 8 a 20.
+const hours = (() => {
+  const hs = [...itemsOn(date).map(x => (localDay(x.starts_at) === date ? Number(localTime(x.starts_at).slice(0, 2)) : 0)), ...logsOn(date).map(x => Number(localTime(x.started_at).slice(0, 2)))];
+  const from = Math.min(8, ...hs), to = Math.max(20, ...hs);
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+})();
+const startsInHour = (h: number) => itemsOn(date).filter(x => (localDay(x.starts_at) === date ? Number(localTime(x.starts_at).slice(0, 2)) : 0) === h);
+const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.started_at).slice(0, 2)) === h);
+---
+<PanelLayout panel={panel} title="Agenda" section="agenda">
+  <header class="pnl-head">
+    <div>
+      <h1 class="pnl-title">Agenda</h1>
+      <p class="pnl-sub">{panel.isManager ? 'Lo que tiene que hacer cada persona y lo que ha hecho. Tú ves y organizas la de todo el equipo.' : 'Lo que tienes que hacer cada día y lo que has hecho.'}</p>
+    </div>
+  </header>
+  {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : (
+    <>
+      <Flash kind={flash.kind} text={flash.text} />
+      {loadError && <Flash kind="bad" text="No hemos podido cargar la agenda. Recarga la página." />}
+      <nav class="pnl-actions agenda-views" aria-label="Vista">
+        {VIEWS.map(v => <a class:list={['btn btn-sm', { 'btn-primary': v === view }]} href={href({ vista: v })} aria-current={v === view ? 'page' : undefined}>{v === 'dia' ? 'Día' : v === 'semana' ? 'Semana' : 'Mes'}</a>)}
+      </nav>
+      <div class="agenda-bar">
+        <nav class="pnl-actions" aria-label="Fechas">
+          <a class="btn btn-sm" href={href({ fecha: prevDate })}>← Anterior</a>
+          <a class="btn btn-sm" href={href({ fecha: today })}>Hoy</a>
+          <a class="btn btn-sm" href={href({ fecha: nextDate })}>Siguiente →</a>
+        </nav>
+        {panel.isManager && (
+          <form method="get" class="filters" action="/panel/agenda">
+            <input type="hidden" name="vista" value={view} /><input type="hidden" name="fecha" value={date} />
+            <div class="field"><label for="persona">Persona</label>
+              <select class="select" id="persona" name="persona">
+                <option value="">Mi agenda</option>
+                <option value="todos" selected={person === 'todos'}>Todo el equipo</option>
+                {activeTeam.filter(m => m.user_id !== me).map(m => <option value={m.user_id} selected={m.user_id === person}>{m.full_name ?? m.email ?? 'Sin nombre'}</option>)}
+              </select></div>
+            <button class="btn" type="submit">Ver</button>
+          </form>
+        )}
+      </div>
+      <h2 class="agenda-title">{heading} <span class="muted">· {personLabel}</span></h2>
+
+      {view === 'dia' && (
+        <section class="card" aria-label={`Horas del ${formatDay(date)}`}>
+          {plannedOn(date).length > 0 && (
+            <p class="agenda-allday">Planificadas para hoy: {plannedOn(date).map((o, n) => <>{n > 0 && ' · '}<a href={`/panel/ordenes/${o.id}`}>{orderLabel(o.number)}</a>{o.vehicles && ` ${formatPlate(o.vehicles.plate)}`}{person === 'todos' && ` (${name(o.assigned_to)})`}</>)}</p>
+          )}
+          <ol class="agenda-hours">
+            {hours.map(h => (
+              <li class="agenda-hour">
+                <span class="agenda-hour-label">{String(h).padStart(2, '0')}:00</span>
+                <div class="agenda-hour-items">
+                  {startsInHour(h).map(x => (
+                    <article class:list={['agenda-item', `is-${x.kind}`, { 'is-done': x.done_at }]} aria-label={x.title}>
+                      <p class="row-title"><span class="agenda-time">{span(x)}</span>{x.title}</p>
+                      <p class="row-meta">
+                        <span class="pill">{AGENDA_KIND_LABELS[x.kind]}</span>
+                        {x.done_at && <span class="pill pill-ok">Hecho</span>}
+                        {person === 'todos' && <span>{name(x.user_id)}</span>}
+                        {x.order_id && x.repair_orders && <a href={`/panel/ordenes/${x.order_id}`}>{orderLabel(x.repair_orders.number)}</a>}
+                        {x.created_by && x.created_by !== x.user_id && <span class="muted small">Lo apuntó {name(x.created_by)}</span>}
+                      </p>
+                      {x.notes && <p class="row-meta">{x.notes}</p>}
+                      <div class="agenda-actions">
+                        <form method="post" action={self} data-busy="Guardando…"><input type="hidden" name="action" value={x.done_at ? 'deshacer' : 'hecho'} /><input type="hidden" name="id" value={x.id} />
+                          <button class="btn btn-sm" type="submit" aria-label={`${x.done_at ? 'Volver a pendiente' : 'Hecho'}: ${x.title}`}><span class="spinner" aria-hidden="true"></span><span data-label>{x.done_at ? 'Volver a pendiente' : 'Hecho'}</span></button></form>
+                        <a class="btn btn-sm" href={`${href({ editar: x.id })}#apunte`} aria-label={`Editar: ${x.title}`}>Editar</a>
+                        {askDelete === x.id ? (
+                          <form method="post" action={self} class="confirm" data-busy="Borrando…"><input type="hidden" name="action" value="borrar" /><input type="hidden" name="id" value={x.id} />
+                            <button class="btn btn-sm btn-danger" type="submit" aria-label={`Sí, borrar: ${x.title}`}><span class="spinner" aria-hidden="true"></span><span data-label>Sí, borrar</span></button></form>
+                        ) : (
+                          <form method="post" action={self}><input type="hidden" name="action" value="pedir-borrar" /><input type="hidden" name="id" value={x.id} />
+                            <button class="btn btn-sm" type="submit" aria-label={`Borrar: ${x.title}`}>Borrar…</button></form>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                  {logsInHour(h).map(l => (
+                    <p class="agenda-log"><Icon name="clock" />Trabajado{person === 'todos' && ` (${name(l.user_id)})`} en <a href={`/panel/ordenes/${l.order_id}`}>{l.repair_orders ? orderLabel(l.repair_orders.number) : 'una orden'}</a> · {localTime(l.started_at)}–{l.ended_at ? localTime(l.ended_at) : 'en curso'}</p>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {view === 'semana' && (
+        <div class="week agenda-week">
+          {days.map(d => (
+            <section class:list={['board-col', { 'is-today': d === today }]} aria-labelledby={`d-${d}`}>
+              <h3 id={`d-${d}`} class="card-title"><a href={href({ vista: 'dia', fecha: d })}>{DOW[weekday(d)]} {formatDay(d)}</a></h3>
+              {plannedOn(d).map(o => <p class="row-meta"><Icon name="wrench" /><a href={`/panel/ordenes/${o.id}`}>{orderLabel(o.number)}</a>{o.vehicles && ` ${formatPlate(o.vehicles.plate)}`}{person === 'todos' && ` · ${name(o.assigned_to)}`}</p>)}
+              {itemsOn(d).length === 0 && logsOn(d).length === 0 && plannedOn(d).length === 0 ? <p class="hint">Nada apuntado.</p> : (
+                <ul class="plain-list">
+                  {itemsOn(d).map(x => (
+                    <li class:list={['agenda-item', `is-${x.kind}`, { 'is-done': x.done_at }]}>
+                      <a href={`${href({ editar: x.id })}#apunte`}><span class="agenda-time">{span(x)}</span> {x.title}</a>
+                      <span class="row-meta">{AGENDA_KIND_LABELS[x.kind]}{x.done_at ? ' · hecho' : ''}{person === 'todos' ? ` · ${name(x.user_id)}` : ''}</span>
+                    </li>
+                  ))}
+                  {logsOn(d).map(l => <li class="agenda-log"><Icon name="clock" />{localTime(l.started_at)}–{l.ended_at ? localTime(l.ended_at) : 'en curso'} trabajado en {l.repair_orders ? orderLabel(l.repair_orders.number) : 'una orden'}{person === 'todos' && ` · ${name(l.user_id)}`}</li>)}
+                </ul>
+              )}
+            </section>
+          ))}
+        </div>
+      )}
+
+      {view === 'mes' && (
+        <section class="card" aria-label={heading}>
+          <div class="agenda-month agenda-dows" aria-hidden="true">{DOW_SHORT.map(w => <span class="agenda-dow">{w}</span>)}</div>
+          <ol class="agenda-month">
+            {days.map(d => {
+              const its = itemsOn(d);
+              const count = its.length + logsOn(d).length + plannedOn(d).length;
+              return (
+                <li class:list={['agenda-cell', { 'is-out': d.slice(0, 7) !== date.slice(0, 7), 'is-today': d === today }]}>
+                  <a class="agenda-num" href={href({ vista: 'dia', fecha: d })}>{Number(d.slice(8))}<span class="sr-only"> de {formatDay(d).split(' ').slice(1).join(' ')}{count === 0 ? ', nada apuntado' : `, ${count} ${count === 1 ? 'cosa' : 'cosas'}`}</span></a>
+                  {its.slice(0, 3).map(x => <span class:list={['agenda-chip', `is-${x.kind}`, { 'is-done': x.done_at }]}>{localDay(x.starts_at) === d ? `${localTime(x.starts_at)} ` : ''}{x.title}</span>)}
+                  {count > Math.min(3, its.length) && <span class="agenda-more">+{count - Math.min(3, its.length)} más</span>}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      <section class="card" id="apunte" aria-labelledby="apunte-t">
+        <h2 id="apunte-t" class="card-title"><Icon name="plus" />{values.id ? 'Editar apunte' : 'Apuntar en la agenda'}</h2>
+        <form method="post" action={self} class="form-stack" data-busy="Guardando…" novalidate>
+          <input type="hidden" name="action" value={values.id ? 'guardar' : 'crear'} />
+          {values.id && <input type="hidden" name="id" value={values.id} />}
+          {panel.isManager && (
+            <div class="field"><label for="a-user">Para</label>
+              <select class="select" id="a-user" name="user_id">
+                {activeTeam.map(m => <option value={m.user_id} selected={m.user_id === values.user_id}>{m.user_id === me ? 'Yo' : m.full_name ?? m.email ?? 'Sin nombre'}</option>)}
+              </select></div>
+          )}
+          <div class={`field ${err('title') ? 'has-error' : ''}`}><label for="a-title">Qué hay que hacer</label>
+            <input class="input" id="a-title" name="title" required maxlength="120" value={values.title} placeholder="Ej.: Recibir el Golf de las 10" aria-invalid={err('title') ? 'true' : undefined} />
+            {err('title') && <p class="field-error">{err('title')}</p>}</div>
+          <div class="form-row">
+            <div class="field"><label for="a-kind">Tipo</label>
+              <select class="select" id="a-kind" name="kind">{AGENDA_KINDS.map(k => <option value={k} selected={k === (isAgendaKind(values.kind) ? values.kind : 'tarea')}>{AGENDA_KIND_LABELS[k]}</option>)}</select></div>
+            <div class={`field ${err('day') ? 'has-error' : ''}`}><label for="a-day">Día</label>
+              <input class="input" id="a-day" name="day" type="date" required value={values.day} />
+              {err('day') && <p class="field-error">{err('day')}</p>}</div>
+          </div>
+          <div class="form-row">
+            <div class={`field ${err('start') ? 'has-error' : ''}`}><label for="a-start">Desde</label>
+              <input class="input" id="a-start" name="start" type="time" required value={values.start} />
+              {err('start') && <p class="field-error">{err('start')}</p>}</div>
+            <div class={`field ${err('end') ? 'has-error' : ''}`}><label for="a-end">Hasta</label>
+              <input class="input" id="a-end" name="end" type="time" required value={values.end} aria-invalid={err('end') ? 'true' : undefined} />
+              {err('end') && <p class="field-error">{err('end')}</p>}</div>
+          </div>
+          <div class="field"><label for="a-order">Orden de reparación <span class="muted">(opcional)</span></label>
+            <select class="select" id="a-order" name="order_id">
+              <option value="">Ninguna</option>
+              {orders.map(o => <option value={o.id} selected={o.id === values.order_id}>{orderLabel(o.number)}{o.vehicles ? ` · ${formatPlate(o.vehicles.plate)}` : ''}</option>)}
+            </select></div>
+          <div class="field"><label for="a-notes">Notas <span class="muted">(opcional)</span></label>
+            <textarea class="textarea" id="a-notes" name="notes" rows="2" maxlength="1000">{values.notes}</textarea></div>
+          <div class="pnl-actions">
+            <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>{values.id ? 'Guardar cambios' : 'Apuntar'}</span></button>
+            {values.id && <a class="btn" href={href({})}>Cancelar</a>}
+          </div>
+        </form>
+      </section>
+    </>
+  )}
+</PanelLayout>

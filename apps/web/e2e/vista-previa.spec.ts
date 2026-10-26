@@ -55,7 +55,7 @@ async function login(page: Page, email: string, next: string, password = PASSWOR
 }
 
 /** Combinaciones de filtros de la planificación (semanas, mecánicos, prioridades): solo se guardan las dos vistas. */
-const SKIP = /^\/panel\/planificacion\?(?!vista=(semana|tablero)$)/;
+const SKIP = /^\/panel\/planificacion\?(?!vista=(semana|tablero)$)|^\/panel\/agenda\?(.*(fecha|editar)=|.*persona=(?!todos))/;
 
 /** Recorre las páginas enlazadas desde `start` (solo bajo `prefixes`) y guarda su HTML. */
 async function crawl(page: Page, role: string, start: string[], prefixes: string[], limit: number) {
@@ -261,6 +261,25 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   await rest('POST', '/rpc/set_service_reminders', client.tok, { p_customer_id: customers[5]!.id, p_enabled: true });
   // «Prueba Cliente» ha comprado el Clio de otro cliente y pide ponerlo a su nombre (pendiente de comprobar).
   await rest('POST', '/rpc/portal_request_vehicle_transfer', client.tok, { p_customer_id: customers[5]!.id, p_plate: '7395XJH' });
+
+  // ---- Agenda de demostración: la propietaria organiza la semana del trabajador y la suya.
+  const at = (offset: number, hm: string) => `${day(offset)} ${hm} Europe/Madrid`;
+  const agenda = [
+    { who: worker.id, kind: 'tarea', title: 'Revisar frenos del Seat León', d: 0, from: '09:00', to: '10:30', order: orders[0]!.id, done: true },
+    { who: worker.id, kind: 'cita', title: 'Recibir al cliente del Ford Transit', d: 0, from: '11:00', to: '11:30', order: null, done: false },
+    { who: worker.id, kind: 'tarea', title: 'Cambio de aceite y filtros', d: 0, from: '12:00', to: '13:30', order: null, done: false },
+    { who: worker.id, kind: 'reunion', title: 'Reunión de equipo', d: 1, from: '08:30', to: '09:00', order: null, done: false },
+    { who: worker.id, kind: 'ausencia', title: 'Médico (tarde libre)', d: 2, from: '15:00', to: '19:00', order: null, done: false },
+    { who: owner.id, kind: 'reunion', title: 'Proveedor de recambios', d: 0, from: '10:00', to: '10:45', order: null, done: false },
+    { who: owner.id, kind: 'tarea', title: 'Cierre de caja', d: 0, from: '19:00', to: '19:30', order: null, done: false },
+    { who: owner.id, kind: 'cita', title: 'Entrega del Peugeot 308', d: 1, from: '17:00', to: '17:30', order: null, done: false },
+  ];
+  for (const a of agenda) {
+    const [row] = await rest('POST', '/staff_agenda', owner.tok, {
+      workshop_id: DEMO, user_id: a.who, kind: a.kind, title: a.title, starts_at: at(a.d, a.from), ends_at: at(a.d, a.to), order_id: a.order,
+    });
+    if (a.done) await rest('PATCH', `/staff_agenda?id=eq.${row!.id}`, owner.tok, { done_at: new Date().toISOString() });
+  }
   await rest('PATCH', `/reminder_settings?workshop_id=eq.${DEMO}`, owner.tok, { revision_enabled: true, quote_enabled: true, pickup_enabled: true });
   await fetch(`${PROXY}/rest/v1/rpc/run_maintenance`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: '{}' });
 
@@ -293,9 +312,9 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
 
   // ---- Recorrido de pantallas
   await login(page, 'propietaria@e2e.test', '/panel');
-  const t = await crawl(page, 'taller', ['/panel', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/panel/planificacion', '/panel/mantenimientos', '/panel/presupuestos', '/panel/facturas', '/panel/recordatorios', '/panel/estadisticas', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 260);
+  const t = await crawl(page, 'taller', ['/panel', '/panel/agenda', '/panel/agenda?vista=dia', '/panel/agenda?vista=mes', '/panel/agenda?persona=todos', '/panel/agenda?vista=dia&persona=todos', '/panel/agenda?vista=mes&persona=todos', '/panel/taller', '/panel/solicitudes', '/panel/avisos', '/panel/planificacion', '/panel/mantenimientos', '/panel/presupuestos', '/panel/facturas', '/panel/recordatorios', '/panel/estadisticas', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 300);
   await login(page, WORKER, '/panel', DEMO_PASSWORD);
-  const w = await crawl(page, 'trabajador', ['/panel', '/panel/ordenes', '/panel/mantenimientos', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
+  const w = await crawl(page, 'trabajador', ['/panel', '/panel/agenda', '/panel/agenda?vista=dia', '/panel/agenda?vista=mes', '/panel/ordenes', '/panel/mantenimientos', '/cuenta', '/cuenta/contrasena'], ['/panel', '/cuenta'], 80);
   await login(page, CLIENT, '/portal', DEMO_PASSWORD);
   const c = await crawl(page, 'cliente', ['/portal', '/portal/talleres', '/portal/avisos', '/portal/datos', '/portal/presupuestos', '/portal/facturas', '/cuenta', '/cuenta/contrasena'], ['/portal', '/cuenta'], 80);
   expect(t).toBeGreaterThan(20);

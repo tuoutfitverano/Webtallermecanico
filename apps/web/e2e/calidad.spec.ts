@@ -118,7 +118,7 @@ test('panel del taller: accesibilidad, consola y móvil', async ({ page, isMobil
   await audit(page, [
     '/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/ordenes/nueva', '/panel/vehiculos', '/panel/vehiculos/nuevo',
     '/panel/clientes', `/panel/clientes/${f.customer}`, '/panel/equipo', '/panel/avisos', '/panel/solicitudes', '/panel/taller',
-    '/panel/planificacion', '/panel/planificacion?vista=semana', '/panel/presupuestos', '/panel/presupuestos/nuevo',
+    '/panel/planificacion', '/panel/planificacion?vista=semana', '/panel/agenda', '/panel/agenda?vista=dia', '/panel/agenda?vista=mes', '/panel/agenda?vista=semana&persona=todos', '/panel/presupuestos', '/panel/presupuestos/nuevo',
     '/panel/facturas', '/panel/facturas/nueva', '/panel/recordatorios', '/panel/estadisticas',
     '/panel/mantenimientos', `/panel/vehiculos/${f.vehicle}`, '/panel/copia', '/cuenta/seguridad', `/panel/ordenes/${f.order}/resguardo`,
   ], isMobile);
@@ -159,7 +159,7 @@ test('modo claro y oscuro: accesibilidad de la web, el acceso, el panel y el por
   await login(page, 'propietaria@e2e.test', '/panel');
   for (const tema of ['claro', 'oscuro']) {
     await context.addCookies([{ name: 'modo', value: tema, url: page.url() }]);
-    await audit(page, ['/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/vehiculos/nuevo', '/panel/avisos', '/cuenta', '/panel/planificacion', '/panel/facturas', '/panel/estadisticas'], false);
+    await audit(page, ['/panel', '/panel/ordenes', `/panel/ordenes/${f.order}`, '/panel/vehiculos/nuevo', '/panel/avisos', '/cuenta', '/panel/planificacion', '/panel/agenda', '/panel/agenda?vista=mes', '/panel/facturas', '/panel/estadisticas'], false);
   }
   await context.clearCookies(); await acceptCookies(context);
   await login(page, f.email, '/portal');

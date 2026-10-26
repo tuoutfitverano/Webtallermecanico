@@ -267,6 +267,10 @@ El comprador lo pide desde su portal y se confirma de una de dos formas:
 
 El comprador solo ve sus reparaciones desde ese día; el anterior dueño conserva sus facturas. El contrato de compraventa solo no basta, porque el traspaso en Tráfico puede estar pendiente. Detalles en `docs/GESTION_TALLER.md`.
 
+## 11. Agenda de cada trabajador
+
+En el panel, **Agenda**: cada persona ve su día, su semana o su mes, con lo que tiene que hacer a cada hora y lo que ha hecho (lo marcado como hecho y el tiempo fichado en las órdenes). El propietario y la administración ven la de todos («Persona → Todo el equipo») y pueden apuntarle tareas a cualquiera. Recepción y mecánicos solo ven la suya.
+
 ## Fuentes (consultadas en octubre de 2026)
 
 - Supabase: correo propio (SMTP) por la API de gestión, `supabase/supabase` → `apps/docs/content/guides/auth/auth-smtp.mdx`.

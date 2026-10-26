@@ -55,6 +55,19 @@ Migración `20261109090100_cambio_titular.sql`, pruebas `31_cambio_titular.test.
 - **Fichaje real**: «Empezar» y «Parar» guardan la hora del servidor; nadie escribe horas a mano. Una persona solo tiene un trabajo en marcha; al entregar la orden se cierran los fichajes abiertos.
 - Avisos internos: entrega retrasada y presupuesto aprobado. «Preparar WhatsApp» abre el mensaje en el teléfono; **no** se registra como enviado.
 
+## Agenda de cada persona (`/panel/agenda`)
+
+Migración `20261110090000_agenda.sql`, pruebas `32_agenda.test.sql` y `e2e/agenda.spec.ts`; reglas en `packages/core/src/agenda.ts`.
+
+- Cada persona del taller (mecánico, recepción, administración, propietario) tiene su agenda, con vistas de **día** (por horas), **semana** y **mes**.
+- **Apuntes:** tarea, cita, reunión, ausencia u otro, con día, hora de inicio y de fin, notas y, si se quiere, la orden de reparación relacionada. Se marcan como **hechos** (la hora la pone el servidor), se editan y se borran en dos pasos.
+- **Lo que ha hecho:** los apuntes hechos y el **tiempo fichado** en las órdenes (`repair_order_work_logs`) salen en su día y hora. Las órdenes planificadas para ese día (`scheduled_on`) también aparecen.
+- **Quién ve qué** (en la base de datos, RLS):
+  - Cada persona ve y organiza **la suya**.
+  - **Propietario y administración** ven y organizan la de **cualquiera** o la de **todo el equipo** a la vez, y le pueden apuntar cosas a otra persona; queda quién lo apuntó.
+  - Recepción y mecánicos no ven la de los demás, ni cambiando el enlace.
+- Un apunte solo se une a una orden en la que esa persona pueda trabajar. Quien deja el equipo deja de ver su agenda, pero el taller la conserva (y va en la copia del taller).
+
 ## Planificación (`/panel/planificacion`)
 
 - **Tablero** por estados (mover de estado y asignar desde la tarjeta) y **semana** (lo planificado por día).

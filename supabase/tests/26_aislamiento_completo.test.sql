@@ -103,6 +103,8 @@ insert into public.workshop_counters (workshop_id) values ('bbbbbbbb-0000-0000-0
 insert into public.workshop_plans (workshop_id, plan) values ('bbbbbbbb-0000-0000-0000-000000000000', 'premium');
 insert into public.vehicle_transfers (workshop_id, vehicle_id, from_customer_id, to_customer_id, origin) values
   ('bbbbbbbb-0000-0000-0000-000000000000', '7e000001-0000-0000-0000-00000000000b', 'c1000000-0000-0000-0000-00000000000b', 'c3000000-0000-0000-0000-00000000000b', 'portal');
+insert into public.staff_agenda (workshop_id, user_id, title, notes, starts_at, ends_at) values
+  ('bbbbbbbb-0000-0000-0000-000000000000', '00000000-0000-0000-0000-0000000000b2', 'SECRETO agenda B', 'NOTA-SECRETA-B', now(), now() + interval '1 hour');
 
 -- Ninguna tabla con workshop_id puede quedar sin datos de B.
 create temp table tablas_taller on commit drop as
