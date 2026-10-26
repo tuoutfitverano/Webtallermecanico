@@ -16,6 +16,7 @@ import { authPage, formText, redirectToLogin } from '../lib/server/auth-page.ts'
 import { logAuth } from '../lib/server/auth.ts';
 import { dbErrorMessage } from '../lib/auth/messages.ts';
 import { formatDateTime } from '../lib/panel/format.ts';
+import { formatCents } from '@talleres/core';
 
 export const prerender = false;
 
@@ -69,16 +70,24 @@ interface Workshop { workshop_id: string; slug: string; name: string; status: st
 interface AccessEvent { created_at: string; workshop_name: string | null; kind: string; detail: Record<string, unknown> }
 let workshops: Workshop[] = [];
 let events: AccessEvent[] = [];
+interface UsageRow { workshop_id: string; name: string; plan: string; whatsapp: number; matriculas: number; whatsapp_cents: number; matriculas_cents: number }
+let usage: UsageRow[] = [];
 const supportOpen = Boolean(status.support_until);
 if (status.mfa) {
-  const [w, e] = await Promise.all([
+  const [w, e, u] = await Promise.all([
     supabase.rpc('admin_workshops_overview'),
     supportOpen ? supabase.rpc('admin_access_events', { p_limit: 50 }) : Promise.resolve({ data: [], error: null }),
+    supabase.rpc('admin_usage'),
   ]);
   if (w.error) logAuth('admin_overview_error', w.error.code);
   workshops = (w.data ?? []) as Workshop[];
   events = (e.data ?? []) as AccessEvent[];
+  if (u.error) logAuth('admin_usage_error', u.error.code);
+  usage = (u.data ?? []) as UsageRow[];
 }
+const PLAN: Record<string, string> = { profesional: 'Profesional', premium: 'Premium' };
+const usageTotal = usage.reduce((t, r) => t + r.whatsapp_cents + r.matriculas_cents, 0);
+const MONTH = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'Europe/Madrid' }).format(new Date());
 const STATUS: Record<string, string> = { demo: 'Demostración', activo: 'Activo', suspendido: 'Suspendido' };
 const LINK: Record<string, string> = { activa: 'Vinculada', invitacion_pendiente: 'Invitación pendiente', invitacion_caducada: 'Invitación caducada', sin_vinculos: 'Sin talleres vinculados' };
 const KIND: Record<string, string> = {
@@ -178,6 +187,26 @@ const KIND: Record<string, string> = {
                   <tr><th scope="row">{w.name}<br /><span class="muted small mono">{w.slug}</span></th><td>{STATUS[w.status] ?? w.status}</td><td>{w.site_published ? 'Publicada' : 'No'}</td>
                     <td>{w.staff_active}</td><td>{w.customers}</td><td>{w.customers_linked}</td><td>{w.pending_invitations}</td><td>{formatDateTime(w.created_at)}</td></tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section class="panel liquid-glass" aria-labelledby="consumo-t">
+        <h2 id="consumo-t" class="panel-title heading">Consumo del mes</h2>
+        <p class="muted small">WhatsApp aceptados por Meta y consultas por matrícula contestadas en {MONTH}, con el precio del plan de cada taller (IVA incluido). Para cobrarlo con su cuota: el programa no cobra solo.</p>
+        {usage.length === 0 ? <p>Sin datos.</p> : (
+          <div class="table-scroll">
+            <table class="data-table">
+              <caption class="sr-only">Consumo de extras de cada taller en {MONTH}</caption>
+              <thead><tr><th scope="col">Taller</th><th scope="col">Plan</th><th scope="col">WhatsApp</th><th scope="col">Matrículas</th><th scope="col">Importe</th></tr></thead>
+              <tbody>
+                {usage.map(r => (
+                  <tr><th scope="row">{r.name}</th><td>{PLAN[r.plan] ?? r.plan}</td><td>{r.whatsapp} · {formatCents(r.whatsapp_cents)}</td>
+                    <td>{r.matriculas} · {formatCents(r.matriculas_cents)}</td><td>{formatCents(r.whatsapp_cents + r.matriculas_cents)}</td></tr>
+                ))}
+                <tr><th scope="row">Total</th><td></td><td></td><td></td><td><strong>{formatCents(usageTotal)}</strong></td></tr>
               </tbody>
             </table>
           </div>

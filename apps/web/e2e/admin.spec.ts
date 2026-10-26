@@ -99,7 +99,12 @@ test('verificación en dos pasos y administración de la plataforma', async ({ p
 
   // Administración: resumen sin datos personales; con sesión de soporte, diagnóstico y registro.
   await page.goto('/admin');
-  await expect(page.getByRole('table')).toContainText('Taller Otro');
+  await expect(page.getByRole('table', { name: 'Talleres de la plataforma' })).toContainText('Taller Otro');
+  // Consumo de extras de cada taller (para cobrarlo): sin plan, Profesional.
+  const usage = page.getByRole('table', { name: /Consumo de extras de cada taller/ });
+  await expect(usage).toContainText('Taller Otro');
+  await expect(usage).toContainText('Profesional');
+  await expect(usage.getByRole('row', { name: /Total/ })).toContainText('€');
   await expect(page.getByRole('heading', { name: 'Diagnóstico de vinculación' })).toHaveCount(0);
   await page.getByLabel('Motivo (queda registrado)').fill('corto');
   await page.getByRole('button', { name: 'Abrir sesión de soporte' }).click();

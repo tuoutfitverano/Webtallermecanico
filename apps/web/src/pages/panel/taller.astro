@@ -137,6 +137,12 @@ let billing: Billing | null = null;
 let site: { published: boolean; is_demo_content: boolean } | null = null;
 let domains: Array<{ hostname: string; is_primary: boolean }> = [];
 let loadError = false;
+interface Usage {
+  plan: string; whatsapp: number; matriculas: number; whatsapp_cents: number; matriculas_cents: number;
+  whatsapp_unit_cents: number; whatsapp_discounted_cents: number; whatsapp_limit: number;
+  matricula_unit_cents: number; matricula_discounted_cents: number; matricula_limit: number;
+}
+let usage: Usage | null = null;
 if (panel.workshop && panel.isManager) {
   const id = panel.workshop.id;
   const [w, s, d, b] = await Promise.all([
@@ -145,6 +151,9 @@ if (panel.workshop && panel.isManager) {
     panel.supabase.from('workshop_domains').select('hostname, is_primary').eq('workshop_id', id).order('is_primary', { ascending: false }),
     panel.supabase.from('workshop_billing_settings').select('default_tax_rate, quote_validity_days, labour_rate_cents, invoice_series, rectifying_series, payment_terms_days, quote_conditions, invoice_footer').eq('workshop_id', id).maybeSingle(),
   ]);
+  const u = await panel.supabase.rpc('workshop_usage', { p_workshop_id: id });
+  if (u.error) logAuth('panel_usage_error', u.error.code);
+  usage = ((u.data ?? []) as Usage[])[0] ?? null;
   const { data: acc } = await panel.supabase.from('workshop_legal_acceptances').select('accepted_at')
     .eq('workshop_id', id).eq('document', 'encargo').eq('version', LEGAL_VERSION).maybeSingle();
   accepted = acc ?? null;
@@ -172,6 +181,13 @@ if (panel.workshop && panel.isManager) {
 }
 
 const STATUS_LABELS: Record<string, string> = { demo: 'Demostración', activo: 'Activo', suspendido: 'Suspendido' };
+const PLAN_LABELS: Record<string, string> = { profesional: 'Profesional', premium: 'Premium' };
+const MONTH = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'Europe/Madrid' }).format(new Date());
+/** «0,06 € cada uno» o «0,04 € los 300 primeros del mes; después, 0,06 €». */
+const tariff = (unit: number, discounted: number, limit: number, word: string) =>
+  limit > 0 && discounted !== unit
+    ? `${formatCents(discounted)} ${word === 'aviso' ? 'los' : 'las'} ${limit} primer${word === 'aviso' ? 'os' : 'as'} del mes; después, ${formatCents(unit)}`
+    : `${formatCents(unit)} cada ${word === 'aviso' ? 'uno' : 'una'}`;
 const err = (k: string) => errors[k];
 const berr = (k: string) => billErrors[k];
 const integrations = [
@@ -271,10 +287,11 @@ const integrations = [
             <h2 id="cuenta-t" class="card-title"><Icon name="shield" />Cuenta en la plataforma</h2>
             <dl class="facts">
               <dt>Estado</dt><dd>{workshop ? (STATUS_LABELS[workshop.status] ?? workshop.status) : '—'}</dd>
+              <dt>Plan</dt><dd>{usage ? (PLAN_LABELS[usage.plan] ?? usage.plan) : '—'}</dd>
               <dt>Identificador</dt><dd class="mono">{panel.workshop.slug}</dd>
               {workshop && <><dt>Alta</dt><dd>{formatDate(workshop.created_at)}</dd></>}
             </dl>
-            <p class="hint" style="margin-top:10px">El estado y el identificador solo los cambia la plataforma.</p>
+            <p class="hint" style="margin-top:10px">El estado, el plan y el identificador solo los cambia la plataforma.</p>
           </section>
 
           <section class="card" aria-labelledby="legal-t">
@@ -316,6 +333,25 @@ const integrations = [
               ))}
             </ul>
             <p class="hint" style="margin-top:10px">Qué avisos reciben tus clientes se decide en <a href="/panel/avisos#ajustes">Avisos</a>; los recordatorios, en <a href="/panel/recordatorios">Recordatorios</a>; cada cuánto toca cada servicio, en <a href="/panel/mantenimientos">Mantenimientos</a>.</p>
+          </section>
+
+          <section class="card" aria-labelledby="consumo-t" id="consumo">
+            <h2 id="consumo-t" class="card-title"><Icon name="euro" />Consumo de este mes</h2>
+            {!usage ? <p class="hint">No se ha podido cargar el consumo. Recarga la página.</p> : (
+              <>
+                <p class="hint">Avisos por WhatsApp y consultas por matrícula de {MONTH}. Cuestan dinero a la plataforma, así que van a cargo del taller (IVA incluido). Los avisos en el portal, el correo y las notificaciones en el móvil no cuentan.</p>
+                  <table class="data-table" style="margin-top:10px">
+                    <caption class="sr-only">Consumo de extras de {MONTH}</caption>
+                    <thead><tr><th scope="col">Extra</th><th scope="col" class="num-col">Usados</th><th scope="col" class="num-col">Importe</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row">Avisos por WhatsApp</th><td class="num-col">{usage.whatsapp}</td><td class="num-col">{formatCents(usage.whatsapp_cents)}</td></tr>
+                      <tr><th scope="row">Consultas por matrícula</th><td class="num-col">{usage.matriculas}</td><td class="num-col">{formatCents(usage.matriculas_cents)}</td></tr>
+                      <tr><th scope="row">Total</th><td></td><td class="num-col"><strong>{formatCents(usage.whatsapp_cents + usage.matriculas_cents)}</strong></td></tr>
+                    </tbody>
+                  </table>
+                <p class="hint" style="margin-top:8px">Precio en tu plan ({PLAN_LABELS[usage.plan] ?? usage.plan}): WhatsApp, {tariff(usage.whatsapp_unit_cents, usage.whatsapp_discounted_cents, usage.whatsapp_limit, 'aviso')}; matrícula, {tariff(usage.matricula_unit_cents, usage.matricula_discounted_cents, usage.matricula_limit, 'consulta')}. Repetir una matrícula en 24 h o una consulta fallida no cuenta.</p>
+              </>
+            )}
           </section>
 
           <section class="card" aria-labelledby="copia-t">
