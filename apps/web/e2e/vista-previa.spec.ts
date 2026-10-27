@@ -55,7 +55,7 @@ async function login(page: Page, email: string, next: string, password = PASSWOR
 }
 
 /** Combinaciones de filtros de la planificación (semanas, mecánicos, prioridades): solo se guardan las dos vistas. */
-const SKIP = /^\/panel\/planificacion\?(?!vista=(semana|tablero)$)|^\/panel\/agenda\?(.*(fecha|editar)=|.*persona=(?!todos))/;
+const SKIP = /^\/panel\/planificacion\?(?!vista=(semana|tablero)$)|^\/panel\/agenda\?.*(fecha|editar)=/;
 
 /** Recorre las páginas enlazadas desde `start` (solo bajo `prefixes`) y guarda su HTML. */
 async function crawl(page: Page, role: string, start: string[], prefixes: string[], limit: number) {
@@ -280,6 +280,11 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
     });
     if (a.done) await rest('PATCH', `/staff_agenda?id=eq.${row!.id}`, owner.tok, { done_at: new Date().toISOString() });
   }
+  // El trabajador se apunta algo y la propietaria se lo cambia de hora: él verá «Modificado por».
+  const [own] = await rest('POST', '/staff_agenda', worker.tok, {
+    workshop_id: DEMO, user_id: worker.id, kind: 'tarea', title: 'Ordenar el almacén de recambios', starts_at: at(1, '12:00'), ends_at: at(1, '13:00'),
+  });
+  await rest('PATCH', `/staff_agenda?id=eq.${own!.id}`, owner.tok, { starts_at: at(1, '16:00'), ends_at: at(1, '17:00'), notes: 'Mejor por la tarde, que por la mañana hay entregas.' });
   await rest('PATCH', `/reminder_settings?workshop_id=eq.${DEMO}`, owner.tok, { revision_enabled: true, quote_enabled: true, pickup_enabled: true });
   await fetch(`${PROXY}/rest/v1/rpc/run_maintenance`, { method: 'POST', headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json' }, body: '{}' });
 

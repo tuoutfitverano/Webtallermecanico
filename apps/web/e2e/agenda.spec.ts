@@ -80,11 +80,24 @@ test('cada persona organiza su agenda y la propietaria ve la de todo el equipo',
   await oform.getByLabel('Hasta').fill('11:30');
   await oform.getByRole('button', { name: 'Apuntar' }).click();
   await expect(o.page.getByRole('status')).toContainText('Apuntado en la agenda');
+  // Pincha en su empleado: ve su agenda y le cambia un apunte suyo.
+  await o.page.getByRole('navigation', { name: 'Persona' }).locator(`a[href*="${mechanicId}"]`).click();
+  await expect(o.page.getByRole('heading', { level: 2, name: /Agenda de/ })).toBeVisible();
+  await o.page.goto(`/panel/agenda?vista=dia&fecha=${today}&persona=${mechanicId}`);
+  await o.page.getByRole('article', { name: mechTask }).getByRole('link', { name: `Editar: ${mechTask}` }).click();
+  const edit = o.page.getByRole('region', { name: 'Editar apunte' });
+  await edit.getByLabel('Notas').fill('Mejor con el elevador 2');
+  await edit.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(o.page.getByRole('status')).toContainText('Cambios guardados');
+  await expect(o.page.getByRole('article', { name: mechTask })).toContainText('Mejor con el elevador 2');
   await o.close();
 
   // 3. El mecánico lo ve en su agenda, con quién se lo apuntó.
   await m.page.goto(`/panel/agenda?vista=dia&fecha=${today}`);
   await expect(m.page.getByRole('article', { name: ownerTask })).toContainText('Lo apuntó');
+  // Y ve que su jefa le cambió el suyo, con su nombre.
+  await expect(m.page.getByRole('article', { name: mechTask })).toContainText('Modificado por');
+  await expect(m.page.getByRole('article', { name: ownerTask })).not.toContainText('Modificado por');
   // Y puede borrar lo suyo (en dos pasos).
   await m.page.getByRole('article', { name: mechTask }).getByRole('button', { name: `Borrar: ${mechTask}` }).click();
   await m.page.getByRole('article', { name: mechTask }).getByRole('button', { name: `Sí, borrar: ${mechTask}` }).click();

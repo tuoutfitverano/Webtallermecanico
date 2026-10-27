@@ -118,6 +118,7 @@ const canManage = (role: string) => panel.isOwner ? role !== 'propietario' : pan
                   <span class="row-meta">
                     {m.email && <>{m.email} · </>}
                     <a href={`/panel/ordenes?empleado=${m.user_id}`}>{counts.get(m.user_id) ?? 0} {(counts.get(m.user_id) ?? 0) === 1 ? 'orden activa' : 'órdenes activas'}</a>
+                    {panel.isManager && m.active && <> · <a href={m.user_id === panel.user.id ? '/panel/agenda' : `/panel/agenda?persona=${m.user_id}`}>{m.user_id === panel.user.id ? 'Mi agenda' : `Agenda de ${m.full_name ?? 'esta persona'}`}</a></>}
                   </span>
                   {m.user_id !== panel.user.id && canManage(m.role) && (
                     <div class="pnl-actions" style="margin-top:8px">

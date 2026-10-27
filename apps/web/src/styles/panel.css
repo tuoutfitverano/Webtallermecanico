@@ -490,10 +490,14 @@ details.danger-zone[open] > summary { margin-bottom: 10px; }
 .agenda-seg a[aria-current='page'] { background: var(--p-text); color: var(--p-surface); }
 .agenda-seg a:active { transform: scale(.97); }
 @media (hover: hover) { .agenda-seg a:not([aria-current='page']):hover { background: color-mix(in srgb, var(--p-text) 8%, transparent); } }
-.agenda-person { display: flex; align-items: center; gap: 8px; }
-.agenda-person label { font-size: .8125rem; color: var(--p-muted); }
-.agenda-person .select { min-height: 40px; padding-block: 6px; width: auto; max-width: 14rem; font-size: .875rem; }
-@media (pointer: coarse) { .agenda-seg a, .agenda-person .select { min-height: 44px; } }
+/* Gerencia: la agenda de cada persona del equipo, a un toque. */
+.agenda-people { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -4px 0 16px; }
+.agenda-people-label { font-size: .8125rem; color: var(--p-muted); margin-right: 4px; }
+.agenda-people a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--p-line-2); font-size: .8125rem; font-weight: 600; color: var(--p-text); text-decoration: none; white-space: nowrap; transition: background-color 150ms ease, transform 120ms var(--ease-out, cubic-bezier(.23, 1, .32, 1)); }
+.agenda-people a[aria-current='page'] { background: var(--p-text); color: var(--p-bg, var(--bg)); border-color: var(--p-text); }
+.agenda-people a:active { transform: scale(.97); }
+@media (hover: hover) { .agenda-people a:not([aria-current='page']):hover { background: color-mix(in srgb, var(--p-text) 8%, transparent); } }
+@media (pointer: coarse) { .agenda-seg a, .agenda-people a { min-height: 44px; } }
 
 /* Tipo de apunte: un tono por tipo, como fondo suave (no como raya). */
 :is(.agenda-item, .agenda-chip, .cal-ev, .cal-legend li).is-tarea { --kind: var(--tone-ok); }
@@ -564,6 +568,7 @@ details.danger-zone[open] > summary { margin-bottom: 10px; }
 .cal-ev.is-short { padding-block: 2px; }
 .cal-ev.is-short a { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cal-ev.is-short .cal-ev-meta { display: none; }
+.cal-ev-by { font-style: italic; }
 .cal-ev.is-log { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--p-text) 7%, transparent) 0 6px, transparent 6px 12px), var(--p-surface); border: 1px dashed var(--p-line-2); }
 .cal-ev.is-log .cal-ev-title { font-weight: 500; }
 @media (hover: hover) { .cal-ev:hover { border-color: var(--kind, var(--p-muted)); } }

@@ -57,7 +57,7 @@ Migración `20261109090100_cambio_titular.sql`, pruebas `31_cambio_titular.test.
 
 ## Agenda de cada persona (`/panel/agenda`)
 
-Migración `20261110090000_agenda.sql`, pruebas `32_agenda.test.sql` y `e2e/agenda.spec.ts`; reglas en `packages/core/src/agenda.ts`.
+Migraciones `20261110090000_agenda.sql` y `20261111090000_agenda_modificado_por.sql`, pruebas `32_agenda.test.sql` y `e2e/agenda.spec.ts`; reglas en `packages/core/src/agenda.ts`.
 
 - Cada persona del taller (mecánico, recepción, administración, propietario) tiene su agenda, con vistas de **día** (por horas), **semana** (rejilla de lunes a domingo con las horas: cada apunte ocupa su hora y lo que dura; en el móvil, lista de días) y **mes**.
 - **Apuntes:** tarea, cita, reunión, ausencia u otro, con día, hora de inicio y de fin, notas y, si se quiere, la orden de reparación relacionada. Se marcan como **hechos** (la hora la pone el servidor), se editan y se borran en dos pasos.
@@ -66,6 +66,7 @@ Migración `20261110090000_agenda.sql`, pruebas `32_agenda.test.sql` y `e2e/agen
   - Cada persona ve y organiza **la suya**.
   - **Propietario y administración** ven y organizan la de **cualquiera** o la de **todo el equipo** a la vez, y le pueden apuntar cosas a otra persona; queda quién lo apuntó.
   - Recepción y mecánicos no ven la de los demás, ni cambiando el enlace.
+- Propiedad y administración entran en la agenda de cualquier persona (fila «Agenda» o Equipo) y la cambian. `updated_by` lo pone la base de datos en cada cambio real; la persona ve «Modificado por …» (y «Lo apuntó …») cuando no fue ella.
 - Un apunte solo se une a una orden en la que esa persona pueda trabajar. Quien deja el equipo deja de ver su agenda, pero el taller la conserva (y va en la copia del taller).
 
 ## Planificación (`/panel/planificacion`)

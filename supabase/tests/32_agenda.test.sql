@@ -48,6 +48,26 @@ insert into public.staff_agenda (workshop_id, user_id, kind, title, starts_at, e
    'Cierre de caja', '2026-11-02 19:00 Europe/Madrid', '2026-11-02 19:30 Europe/Madrid');
 select tests.eq((select created_by::text from public.staff_agenda where title = 'Recibir al cliente del Golf'),
   '00000000-0000-0000-0000-0000000000a3', 'y le apunta cosas (queda quién lo hizo)');
+select tests.eq((select updated_by from public.staff_agenda where title = 'Recibir al cliente del Golf'), null::uuid,
+  'recién apuntado, nadie lo ha modificado');
+-- La administradora cambia un apunte del mecánico: queda que lo modificó ella.
+update public.staff_agenda set notes = 'Mejor por la tarde', starts_at = '2026-11-02 16:00 Europe/Madrid', ends_at = '2026-11-02 17:30 Europe/Madrid'
+  where title = 'Cambiar pastillas';
+select tests.eq((select updated_by::text from public.staff_agenda where title = 'Cambiar pastillas'),
+  '00000000-0000-0000-0000-0000000000a3', 'al modificar el apunte de su empleado, queda quién lo modificó');
+select tests.throws($$update public.staff_agenda set updated_by = '00000000-0000-0000-0000-0000000000a2' where title = 'Cambiar pastillas'$$,
+  'quién lo modificó no se escribe a mano', '%permission denied%');
+-- Guardar sin cambiar nada no cuenta como modificación.
+update public.staff_agenda set title = 'Recibir al cliente del Golf' where title = 'Recibir al cliente del Golf';
+select tests.eq((select updated_by from public.staff_agenda where title = 'Recibir al cliente del Golf'), null::uuid,
+  'guardar sin cambios no marca a nadie');
+reset role;
+-- El mecánico lo vuelve a tocar: ahora consta él.
+select tests.login('00000000-0000-0000-0000-0000000000a2');
+set local role authenticated;
+update public.staff_agenda set notes = 'De acuerdo' where title = 'Cambiar pastillas';
+select tests.eq((select updated_by::text from public.staff_agenda where title = 'Cambiar pastillas'),
+  '00000000-0000-0000-0000-0000000000a2', 'el último que cambia es el que consta');
 reset role;
 
 -- ===================== Recepción solo la suya =====================

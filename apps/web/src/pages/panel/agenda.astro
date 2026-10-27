@@ -86,7 +86,7 @@ const self = href({});
 // ---- Acciones (la base de datos decide quién puede qué) ----
 interface Item {
   id: string; user_id: string; kind: AgendaKind; title: string; notes: string | null; starts_at: string; ends_at: string;
-  order_id: string | null; done_at: string | null; created_by: string | null; repair_orders: { number: number } | null;
+  order_id: string | null; done_at: string | null; created_by: string | null; updated_by: string | null; repair_orders: { number: number } | null;
 }
 let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: '' };
 let errors: Partial<Record<string, string>> = {};
@@ -142,7 +142,7 @@ let team: Awaited<ReturnType<typeof loadTeam>> = [];
 let loadError = false;
 if (panel.workshop) {
   const ws = panel.workshop.id;
-  let qi = panel.supabase.from('staff_agenda').select('id, user_id, kind, title, notes, starts_at, ends_at, order_id, done_at, created_by, repair_orders(number)')
+  let qi = panel.supabase.from('staff_agenda').select('id, user_id, kind, title, notes, starts_at, ends_at, order_id, done_at, created_by, updated_by, repair_orders(number)')
     .eq('workshop_id', ws).lt('starts_at', rangeEnd).gt('ends_at', rangeStart).order('starts_at').limit(500);
   let ql = panel.supabase.from('repair_order_work_logs').select('id, order_id, user_id, started_at, ended_at, repair_orders(number)')
     .eq('workshop_id', ws).lt('started_at', rangeEnd).or(`ended_at.gt.${rangeStart},ended_at.is.null`).order('started_at').limit(500);
@@ -170,6 +170,13 @@ const values: Record<string, string> = formValues ?? (editing ? {
   end: localTime(editing.ends_at), notes: editing.notes ?? '', user_id: editing.user_id, order_id: editing.order_id ?? '',
 } : { id: '', title: '', kind: 'tarea', day: date, start: '09:00', end: '10:00', notes: '', user_id: person === 'todos' ? me : person, order_id: '' });
 const err = (k: string) => errors[k];
+/** «Lo apuntó …» y «Modificado por …» cuando no fue la propia persona (p. ej. su jefe). */
+const byOthers = (x: Item) => [
+  x.created_by && x.created_by !== x.user_id ? `Lo apuntó ${name(x.created_by)}` : '',
+  x.updated_by && x.updated_by !== x.user_id ? `Modificado por ${name(x.updated_by)}` : '',
+].filter(Boolean);
+/** Enlace a la agenda de una persona (solo la gerencia ve la de otros). */
+const personHref = (uid: string) => href({ persona: uid === me ? '' : uid, editar: undefined });
 
 // Lo que cae en cada día (un apunte de varios días aparece en todos).
 const dayStart = new Map(days.map(d => [d, madridMidnight(d)]));
@@ -250,20 +257,16 @@ const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.st
             <a href={href({ fecha: today })} aria-current={days.includes(today) ? 'date' : undefined}>Hoy</a>
             <a href={href({ fecha: nextDate })}>Siguiente →</a>
           </nav>
-          {panel.isManager && (
-            <form method="get" class="agenda-person" action="/panel/agenda">
-              <input type="hidden" name="vista" value={view} /><input type="hidden" name="fecha" value={date} />
-              <label for="persona">Persona</label>
-              <select class="select" id="persona" name="persona">
-                <option value="">Mi agenda</option>
-                <option value="todos" selected={person === 'todos'}>Todo el equipo</option>
-                {activeTeam.filter(m => m.user_id !== me).map(m => <option value={m.user_id} selected={m.user_id === person}>{m.full_name ?? m.email ?? 'Sin nombre'}</option>)}
-              </select>
-              <button class="btn btn-sm" type="submit">Ver</button>
-            </form>
-          )}
         </div>
       </div>
+      {panel.isManager && (
+        <nav class="agenda-people" aria-label="Persona">
+          <span class="agenda-people-label">Agenda</span>
+          <a href={href({ persona: '' })} aria-current={person === me ? 'page' : undefined}>La mía</a>
+          <a href={href({ persona: 'todos' })} aria-current={person === 'todos' ? 'page' : undefined}>Todo el equipo</a>
+          {activeTeam.filter(m => m.user_id !== me).map(m => <a href={personHref(m.user_id)} aria-current={m.user_id === person ? 'page' : undefined}>{m.full_name ?? m.email ?? 'Sin nombre'}</a>)}
+        </nav>
+      )}
 
       {view === 'dia' && (
         <section class="card" aria-label={`Horas del ${formatDay(date)}`}>
@@ -281,9 +284,9 @@ const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.st
                       <p class="row-meta">
                         <span class="pill">{AGENDA_KIND_LABELS[x.kind]}</span>
                         {x.done_at && <span class="pill pill-ok">Hecho</span>}
-                        {person === 'todos' && <span>{name(x.user_id)}</span>}
+                        {person === 'todos' && <a href={personHref(x.user_id)}>{name(x.user_id)}</a>}
                         {x.order_id && x.repair_orders && <a href={`/panel/ordenes/${x.order_id}`}>{orderLabel(x.repair_orders.number)}</a>}
-                        {x.created_by && x.created_by !== x.user_id && <span class="muted small">Lo apuntó {name(x.created_by)}</span>}
+                        {byOthers(x).map(t => <span class="muted small">{t}</span>)}
                       </p>
                       {x.notes && <p class="row-meta">{x.notes}</p>}
                       <div class="agenda-actions">
@@ -336,6 +339,7 @@ const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.st
                           <li class:list={['cal-ev', `is-${b.item.kind}`, { 'is-done': b.item.done_at, 'is-short': b.e - b.s < 0.75 }]} style={blockStyle(b)}>
                             <a href={`${href({ editar: b.item.id })}#apunte`} title={`${span(b.item)} ${b.item.title}`}><span class="agenda-time">{span(b.item)}</span> <span class="cal-ev-title">{b.item.title}</span></a>
                             <span class="cal-ev-meta">{AGENDA_KIND_LABELS[b.item.kind]}{b.item.done_at ? ' · hecho' : ''}{person === 'todos' ? ` · ${name(b.item.user_id)}` : ''}</span>
+                            {byOthers(b.item).map(t => <span class="cal-ev-meta cal-ev-by">{t}</span>)}
                           </li>
                         ) : b.log && (
                           <li class:list={['cal-ev', 'is-log', { 'is-short': b.e - b.s < 0.75 }]} style={blockStyle(b)}>
@@ -382,6 +386,8 @@ const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.st
         <form method="post" action={self} class="form-stack" data-busy="Guardando…" novalidate>
           <input type="hidden" name="action" value={values.id ? 'guardar' : 'crear'} />
           {values.id && <input type="hidden" name="id" value={values.id} />}
+          {editing && byOthers(editing).length > 0 && <p class="hint">{byOthers(editing).join(' · ')}</p>}
+          {panel.isManager && values.user_id !== me && <p class="hint">Lo verá {name(values.user_id)} en su agenda, con tu nombre.</p>}
           {panel.isManager && (
             <div class="field"><label for="a-user">Para</label>
               <select class="select" id="a-user" name="user_id">

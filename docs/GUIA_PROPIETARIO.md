@@ -269,7 +269,7 @@ El comprador solo ve sus reparaciones desde ese día; el anterior dueño conserv
 
 ## 11. Agenda de cada trabajador
 
-En el panel, **Agenda**: cada persona ve su día, su semana o su mes, con lo que tiene que hacer a cada hora y lo que ha hecho (lo marcado como hecho y el tiempo fichado en las órdenes). El propietario y la administración ven la de todos («Persona → Todo el equipo») y pueden apuntarle tareas a cualquiera. Recepción y mecánicos solo ven la suya.
+En el panel, **Agenda**: cada persona ve su día, su semana o su mes, con lo que tiene que hacer a cada hora y lo que ha hecho (lo marcado como hecho y el tiempo fichado en las órdenes). El propietario y la administración ven la de todos: arriba aparece la fila **Agenda** con «La mía», «Todo el equipo» y el nombre de cada persona (también desde **Equipo → Agenda de …**). Al pinchar en un empleado se ve su agenda y se le puede apuntar, cambiar o dar por hecho cualquier cosa. Cuando el trabajador abre la suya, en lo que le apuntó o le cambió su jefe ve «Lo apuntó …» o «Modificado por …» con el nombre. Ese nombre lo guarda la base de datos, nadie lo puede escribir a mano. Recepción y mecánicos solo ven la suya.
 
 ## Fuentes (consultadas en octubre de 2026)
 
