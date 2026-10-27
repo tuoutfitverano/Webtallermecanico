@@ -78,12 +78,12 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await expect(page.getByRole('status')).toContainText('Datos del taller guardados.');
 
     await page.getByLabel(/Precio de la hora/).fill('40');
-    await page.getByLabel(/Serie de rectificativas/).fill('F');
+    await page.getByLabel(/Serie de las correcciones/).fill('F');
     await page.getByRole('button', { name: 'Guardar ajustes' }).click();
     await expect(page.locator('.field-error')).toContainText('distinta');
-    await page.getByLabel(/Serie de rectificativas/).fill('R');
+    await page.getByLabel(/Serie de las correcciones/).fill('R');
     await page.getByRole('button', { name: 'Guardar ajustes' }).click();
-    await expect(page.getByRole('status')).toContainText('Ajustes de presupuestos y facturas guardados.');
+    await expect(page.getByRole('status')).toContainText('Ajustes de presupuestos y resúmenes guardados.');
   });
 
   test('presupuesto aceptado por enlace → líneas en la orden → factura emitida, cobrada e imprimible', async ({ page, browser }) => {
@@ -135,13 +135,13 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await expect(page.locator('.totals')).toContainText('217,80');
 
     // Factura desde la orden (copia sus líneas).
-    await page.getByRole('link', { name: 'Crear factura' }).click();
+    await page.getByRole('link', { name: 'Crear resumen de servicios' }).click();
     await page.getByRole('button', { name: 'Crear borrador' }).click();
     await expect(page.getByRole('status')).toContainText('Borrador creado');
     await expect(page.locator('.totals')).toContainText('217,80');
-    await page.getByRole('button', { name: 'Emitir factura…' }).click();
+    await page.getByRole('button', { name: 'Emitir resumen…' }).click();
     await page.getByRole('button', { name: 'Sí, emitir' }).click();
-    await expect(page.getByRole('status')).toContainText(/Factura F\d{4}-\d{4} emitida/);
+    await expect(page.getByRole('status')).toContainText(/Resumen F\d{4}-\d{4} emitido/);
     const invoiceUrl = page.url().replace(/\?.*$/, '');
     await expect(page.getByRole('button', { name: 'Añadir línea' })).toHaveCount(0);
 
@@ -156,13 +156,13 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await page.getByRole('button', { name: 'Registrar' }).click();
     await expect(page.getByRole('status')).toContainText('Cobro registrado.');
 
-    // Vista para imprimir: datos congelados y aviso de que no es VERI*FACTU.
+    // Vista para imprimir: datos congelados y aviso bien visible de que NO es una factura.
     await page.getByRole('link', { name: 'Imprimir o guardar PDF' }).click();
-    await expect(page.getByRole('heading', { name: 'Factura' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Resumen de servicios' })).toBeVisible();
     await expect(page.locator('main')).toContainText('Talleres Demo E2E SL');
     await expect(page.locator('main')).toContainText('B12345674');
     await expect(page.locator('main')).toContainText('217,80');
-    await expect(page.locator('main')).toContainText('VERI*FACTU');
+    await expect(page.locator('main')).toContainText('No es una factura');
 
     // Lista: cobrada.
     await page.goto('/panel/facturas?estado=cobradas');
@@ -172,7 +172,7 @@ test.describe('Gestión · presupuesto, factura y cobro', () => {
     await page.goto(job.vehicleUrl);
     await expect(page.locator('#hist')).toBeVisible();
     await expect(page.getByText(/Trabajos: Diagnosis de frenos/)).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Presupuestos y facturas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Presupuestos y servicios' })).toBeVisible();
   });
 });
 
@@ -183,7 +183,7 @@ test.describe('Gestión · planificación, estadísticas, recordatorios y roles'
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await page.goto('/panel/estadisticas');
     await expect(page.getByRole('heading', { name: 'Estadísticas' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Facturación' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Servicios cobrados' })).toBeVisible();
     await page.goto('/panel/estadisticas?desde=2026-02-30&hasta=2026-03-01');
     await expect(page.getByRole('alert')).toContainText('Fechas no válidas');
     await page.goto('/panel/recordatorios');
@@ -197,7 +197,7 @@ test.describe('Gestión · planificación, estadísticas, recordatorios y roles'
   test('recepción gestiona presupuestos y facturas, pero no el taller ni el equipo', async ({ page }) => {
     await login(page, 'recepcion@e2e.test');
     await page.goto('/panel/facturas');
-    await expect(page.getByRole('link', { name: 'Nueva factura' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Nuevo resumen' })).toBeVisible();
     await page.goto('/panel/presupuestos');
     await expect(page.getByRole('heading', { name: 'Presupuestos', level: 1 })).toBeVisible();
     await page.goto('/panel/taller');

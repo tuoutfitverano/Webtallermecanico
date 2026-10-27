@@ -21,7 +21,7 @@ import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { formatDateTime, formatDay, todayMadrid } from '../../../lib/panel/format.ts';
 import { LINE_SELECT, lineColumns, readLine, type LineRow } from '../../../lib/panel/lines.ts';
 import {
-  formatCents, formatPlate, INVOICE_KIND_LABELS, orderLabel, parseEuros, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS,
+  formatCents, formatPlate, INVOICE_KIND_LABELS, orderLabel, parseEuros, PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, summaryMessage,
   type PaymentMethod,
 } from '@talleres/core';
 
@@ -84,7 +84,7 @@ if (panel.form && panel.workshop && invoice) {
   const action = field(form, 'action');
   const fail = (error: { code?: string; message?: string } | null, fallback: string, event: string) => {
     logAuth(event, error?.code);
-    flash = { kind: 'bad', text: error && ['22023', '23514', '42501'].includes(error.code ?? '') && error.message ? error.message : error ? dbErrorMessage(error) : fallback };
+    flash = { kind: 'bad', text: error && ['22023', '23514', '42501'].includes(error.code ?? '') && error.message ? summaryMessage(error.message) : error ? summaryMessage(dbErrorMessage(error)) : fallback };
     Astro.response.status = 400;
   };
   if (action === 'linea-anadir' && invoice.status === 'borrador') {
@@ -110,7 +110,7 @@ if (panel.form && panel.workshop && invoice) {
   } else if (action === 'emitir') {
     const { data, error } = await panel.supabase.rpc('issue_invoice', { p_invoice_id: invoice.id });
     if (error || !data) fail(error, 'No se ha emitido la factura.', 'panel_invoice_issue_error');
-    else flash = { kind: 'ok', text: `Factura ${data} emitida. Ya no se puede modificar.` };
+    else flash = { kind: 'ok', text: `Resumen ${data} emitido. Ya no se puede modificar.` };
   } else if (action === 'pedir-borrar') {
     askDelete = true;
   } else if (action === 'borrar' && invoice.status === 'borrador') {
@@ -143,7 +143,7 @@ if (panel.form && panel.workshop && invoice) {
     askRectify = true;
   } else if (action === 'rectificar') {
     const { data, error } = await panel.supabase.rpc('create_rectifying_invoice', { p_invoice_id: invoice.id, p_reason: field(form, 'reason').trim() });
-    if (error || !data) fail(error, 'No se ha creado la rectificativa.', 'panel_invoice_rectify_error');
+    if (error || !data) fail(error, 'No se ha creado la corrección.', 'panel_invoice_rectify_error');
     else return Astro.redirect(`/panel/facturas/${data}?creada=1`, 303);
   }
   invoice = await load();
@@ -162,16 +162,16 @@ if (invoice?.status === 'borrador') {
   if (!invoice.customers?.tax_id) missing.push('el NIF del cliente (necesario para una factura completa; sin él sería una factura simplificada)');
   if (!invoice.customers?.address_line) missing.push('la dirección del cliente');
 }
-const label = invoice ? (invoice.full_number ? `${INVOICE_KIND_LABELS[invoice.kind]} ${invoice.full_number}` : `${INVOICE_KIND_LABELS[invoice.kind]} (borrador)`) : 'Factura';
+const label = invoice ? (invoice.full_number ? `${INVOICE_KIND_LABELS[invoice.kind]} ${invoice.full_number}` : `${INVOICE_KIND_LABELS[invoice.kind]} (borrador)`) : 'Resumen de servicios';
 const stored = invoice?.status === 'emitida' ? { subtotal_cents: Number(invoice.subtotal_cents), tax_cents: Number(invoice.tax_cents), total_cents: Number(invoice.total_cents), taxes: invoice.taxes ?? [] } : null;
 const address = (p: Party | null) => p ? [p.address, [p.postal_code, p.city].filter(Boolean).join(' '), p.province].filter(Boolean).join(', ') : '';
 ---
 <PanelLayout panel={panel} title={label} section="facturas">
-  <a class="pnl-back" href="/panel/facturas"><Icon name="arrow" />Facturas</a>
+  <a class="pnl-back" href="/panel/facturas"><Icon name="arrow" />Servicios realizados</a>
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
-    <div class="empty"><strong>Las facturas las gestiona la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+    <div class="empty"><strong>Los servicios realizados los gestiona la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
   ) : !invoice || !rest ? (
-    <div class="empty"><strong>Factura no encontrada.</strong><a class="btn" href="/panel/facturas">Volver a facturas</a></div>
+    <div class="empty"><strong>Resumen no encontrado.</strong><a class="btn" href="/panel/facturas">Volver a servicios realizados</a></div>
   ) : (
     <>
       <header class="pnl-head">
@@ -186,8 +186,8 @@ const address = (p: Party | null) => p ? [p.address, [p.postal_code, p.city].fil
         {invoice.status === 'emitida' && <div class="pnl-actions"><a class="btn" href={`/panel/facturas/${invoice.id}/imprimir`} data-astro-reload><Icon name="printer" />Imprimir o guardar PDF</a></div>}
       </header>
       <Flash kind={flash.kind} text={flash.text} />
-      {invoice.kind === 'rectificativa' && <div class="explain" style="margin-bottom:16px"><strong>Rectifica otra factura</strong><p>Motivo: {invoice.rectification_reason} · <a href={`/panel/facturas/${invoice.rectifies_id}`}>Ver la factura original</a></p></div>}
-      {rest.rectifications.length > 0 && <div class="explain" style="margin-bottom:16px"><strong>Esta factura tiene rectificativas</strong><p>{rest.rectifications.map(r => <a href={`/panel/facturas/${r.id}`} style="margin-right:12px">{r.full_number ?? 'Borrador'}</a>)}</p></div>}
+      {invoice.kind === 'rectificativa' && <div class="explain" style="margin-bottom:16px"><strong>Corrige otro resumen</strong><p>Motivo: {invoice.rectification_reason} · <a href={`/panel/facturas/${invoice.rectifies_id}`}>Ver el resumen original</a></p></div>}
+      {rest.rectifications.length > 0 && <div class="explain" style="margin-bottom:16px"><strong>Este resumen tiene correcciones</strong><p>{rest.rectifications.map(r => <a href={`/panel/facturas/${r.id}`} style="margin-right:12px">{r.full_number ?? 'Borrador'}</a>)}</p></div>}
 
       <div class="grid-2">
         <div class="stack">
@@ -254,7 +254,7 @@ const address = (p: Party | null) => p ? [p.address, [p.postal_code, p.city].fil
                 {missing.length > 0 && <div class="alert alert-warn" role="note"><Icon name="alert" /><span>Antes de emitir revisa: {missing.join('; ')}.</span></div>}
                 <form method="post" class="form-stack" data-busy="Guardando…">
                   <input type="hidden" name="action" value="nota" />
-                  <div class="field"><label for="notes">Nota en la factura <span class="muted">(opcional)</span></label><textarea class="textarea" id="notes" name="notes" maxlength="2000" rows="3">{invoice.notes ?? ''}</textarea></div>
+                  <div class="field"><label for="notes">Nota en el resumen <span class="muted">(opcional)</span></label><textarea class="textarea" id="notes" name="notes" maxlength="2000" rows="3">{invoice.notes ?? ''}</textarea></div>
                   <button class="btn btn-sm" type="submit">Guardar nota</button>
                 </form>
               </>
@@ -267,11 +267,11 @@ const address = (p: Party | null) => p ? [p.address, [p.postal_code, p.city].fil
                 {askIssue ? (
                   <form method="post" class="confirm" data-busy="Emitiendo…">
                     <input type="hidden" name="action" value="emitir" />
-                    <strong>¿Emitir la factura?</strong>
-                    <span class="hint">Recibirá el siguiente número de la serie y ya no se podrá modificar ni borrar (solo corregir con una rectificativa).</span>
+                    <strong>¿Emitir el resumen?</strong>
+                    <span class="hint">Recibirá el siguiente número de la serie y ya no se podrá modificar ni borrar (solo corregir con una corrección).</span>
                     <div class="pnl-actions"><button class="btn btn-primary" type="submit">Sí, emitir</button><a class="btn" href={`/panel/facturas/${invoice.id}`}>Cancelar</a></div>
                   </form>
-                ) : <form method="post"><input type="hidden" name="action" value="pedir-emitir" /><button class="btn btn-primary" type="submit" disabled={rest.lines.length === 0}>Emitir factura…</button></form>}
+                ) : <form method="post"><input type="hidden" name="action" value="pedir-emitir" /><button class="btn btn-primary" type="submit" disabled={rest.lines.length === 0}>Emitir resumen…</button></form>}
                 <div style="margin-top:16px">
                   {askDelete ? (
                     <form method="post" class="confirm" data-busy="Borrando…">
@@ -288,13 +288,13 @@ const address = (p: Party | null) => p ? [p.address, [p.postal_code, p.city].fil
                   <input type="hidden" name="action" value="rectificar" />
                   <label for="reason">Motivo de la rectificación</label>
                   <input class="input" id="reason" name="reason" required minlength="5" maxlength="500" placeholder="Ej.: precio de una pieza equivocado" />
-                  <span class="hint">Se crea un borrador de rectificativa que anula en negativo esta factura; puedes ajustarlo antes de emitirlo.</span>
-                  <div class="pnl-actions"><button class="btn btn-danger" type="submit">Crear rectificativa</button><a class="btn" href={`/panel/facturas/${invoice.id}`}>Cancelar</a></div>
+                  <span class="hint">Se crea un borrador de corrección que anula en negativo este resumen; puedes ajustarlo antes de emitirlo.</span>
+                  <div class="pnl-actions"><button class="btn btn-danger" type="submit">Crear corrección</button><a class="btn" href={`/panel/facturas/${invoice.id}`}>Cancelar</a></div>
                 </form>
-              ) : <form method="post"><input type="hidden" name="action" value="pedir-rectificar" /><button class="btn btn-sm" type="submit">Corregir con una rectificativa…</button></form>
-            ) : <p class="hint">Una factura emitida no se modifica. {invoice.kind === 'ordinaria' && 'Las rectificativas las hace el propietario o un administrador.'}</p>}
+              ) : <form method="post"><input type="hidden" name="action" value="pedir-rectificar" /><button class="btn btn-sm" type="submit">Corregir…</button></form>
+            ) : <p class="hint">Un resumen emitido no se modifica. {invoice.kind === 'ordinaria' && 'Las correcciones las hace el propietario o un administrador.'}</p>}
           </section>
-          <p class="hint">Facturación operativa, no certificada VERI*FACTU. Ver la guía de facturación antes de usarla para facturar de verdad.</p>
+          <p class="hint">Documento de seguimiento de los servicios del taller. No es una factura: la factura, si hace falta, la emite el taller con su programa de facturación.</p>
         </div>
       </div>
     </>

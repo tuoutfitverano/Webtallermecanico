@@ -1,5 +1,5 @@
 /**
- * Textos y valores de presupuestos, facturas, cobros, planificación y
+ * Textos y valores de presupuestos, resúmenes de servicios, cobros, planificación y
  * recordatorios. Los valores coinciden con los tipos de la base de datos.
  */
 
@@ -25,7 +25,7 @@ export function quoteLabel(number: number, version = 1): string {
 }
 
 export const INVOICE_STATUS_LABELS: Readonly<Record<'borrador' | 'emitida', string>> = { borrador: 'Borrador', emitida: 'Emitida' };
-export const INVOICE_KIND_LABELS: Readonly<Record<'ordinaria' | 'rectificativa', string>> = { ordinaria: 'Factura', rectificativa: 'Factura rectificativa' };
+export const INVOICE_KIND_LABELS: Readonly<Record<'ordinaria' | 'rectificativa', string>> = { ordinaria: 'Resumen de servicios', rectificativa: 'Corrección de resumen' };
 export const PAYMENT_STATUS_LABELS: Readonly<Record<'pendiente' | 'parcial' | 'cobrada', string>> = {
   pendiente: 'Pendiente de cobro',
   parcial: 'Cobrada en parte',
@@ -172,4 +172,30 @@ export function whatsappNumber(phone: string | null | undefined): string | null 
 export function whatsappLink(phone: string | null | undefined, text: string): string | null {
   const n = whatsappNumber(phone);
   return n ? `https://wa.me/${n}?text=${encodeURIComponent(text)}` : null;
+}
+
+/**
+ * Los mensajes de la base de datos hablan de «facturas» (nombre interno de la
+ * tabla); en pantalla el documento es un resumen de servicios, no una factura.
+ */
+const SUMMARY_MESSAGES: Readonly<Record<string, string>> = {
+  'Añade al menos una línea antes de emitir la factura.': 'Añade al menos una línea antes de emitir el resumen.',
+  'El cobro supera lo que queda pendiente de la factura.': 'El cobro supera lo que queda pendiente del resumen.',
+  'El importe del cobro debe tener el mismo signo que la factura.': 'El importe del cobro debe tener el mismo signo que el resumen.',
+  'El registro de facturas no se modifica ni se borra.': 'El registro de resúmenes no se modifica ni se borra.',
+  'Explica el motivo de la rectificación.': 'Explica el motivo de la corrección.',
+  'Factura no encontrada.': 'Resumen no encontrado.',
+  'La factura ya está emitida.': 'El resumen ya está emitido.',
+  'La fecha de emisión no puede ser anterior a la de la última factura de la serie.': 'La fecha de emisión no puede ser anterior a la del último resumen de la serie.',
+  'Solo el propietario o un administrador hace facturas rectificativas.': 'Solo el propietario o un administrador hace correcciones.',
+  'Solo se rectifica una factura ordinaria emitida.': 'Solo se corrige un resumen emitido.',
+  'Solo se registran cobros de facturas emitidas.': 'Solo se registran cobros de resúmenes emitidos.',
+  'Solo una factura rectificativa lleva cantidades negativas.': 'Solo una corrección lleva cantidades negativas.',
+  'Una factura emitida no se borra.': 'Un resumen emitido no se borra.',
+  'Una factura emitida no se modifica: corrígela con una factura rectificativa.': 'Un resumen emitido no se modifica: corrígelo con una corrección.',
+  'Una factura ordinaria no puede tener total negativo.': 'Un resumen no puede tener total negativo.',
+  'Una línea no cambia de factura.': 'Una línea no cambia de resumen.',
+};
+export function summaryMessage(message: string): string {
+  return SUMMARY_MESSAGES[message] ?? message;
 }

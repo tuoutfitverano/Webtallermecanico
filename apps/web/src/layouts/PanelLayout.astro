@@ -45,7 +45,7 @@ const nav: Array<{ id: PanelSection; href: string; label: string; icon: NavIcon 
   // Oficina (propietario, administrador, recepción): la base de datos tampoco enseña estos datos a los demás.
   ...(panel.isOffice ? [
     { id: 'presupuestos' as const, href: '/panel/presupuestos', label: 'Presupuestos', icon: 'file' as const },
-    { id: 'facturas' as const, href: '/panel/facturas', label: 'Facturas', icon: 'euro' as const },
+    { id: 'facturas' as const, href: '/panel/facturas', label: 'Servicios realizados', icon: 'euro' as const },
     { id: 'estadisticas' as const, href: '/panel/estadisticas', label: 'Estadísticas', icon: 'chart' as const },
     { id: 'recordatorios' as const, href: '/panel/recordatorios', label: 'Recordatorios', icon: 'clock' as const },
     { id: 'solicitudes' as const, href: '/panel/solicitudes', label: 'Solicitudes web', icon: 'mail' as const },

@@ -172,7 +172,7 @@ export const billingSettingsSchema = z
   })
   .superRefine((v, ctx) => {
     if (v.invoiceSeries === v.rectifyingSeries) {
-      ctx.addIssue({ code: 'custom', path: ['rectifyingSeries'], message: 'La serie de rectificativas debe ser distinta de la de facturas.' });
+      ctx.addIssue({ code: 'custom', path: ['rectifyingSeries'], message: 'La serie de las correcciones debe ser distinta de la de los resúmenes.' });
     }
   });
 

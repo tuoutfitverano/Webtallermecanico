@@ -1,4 +1,9 @@
-# Presupuestos, facturas y cobros
+# Resúmenes de servicios (antes «facturas»), presupuestos y cobros
+
+> **Decisión del propietario (27-10-2026): el programa NO emite facturas.** Lo que antes se llamaba «factura» es un **resumen de servicios**: un seguimiento de lo que el taller hizo y cobró a cada cliente, para no perderlo. En pantalla, en el portal y al imprimir se lee «Servicios realizados» / «Resumen de servicios» y **«No es una factura»**. La factura, si hace falta, la emite el taller con su programa de facturación certificado. Un asesor fiscal debe confirmar que así el programa no se considera un sistema de facturación (RD 1007/2023).
+>
+> Por dentro (tablas `invoices`, rutas `/panel/facturas`, funciones `issue_invoice`…) siguen los nombres antiguos; los mensajes de la base de datos se traducen en pantalla con `summaryMessage()` (`packages/core/src/documents.ts`). El resto de este documento describe el funcionamiento, que no ha cambiado.
+
 
 Guía de cómo funcionan los presupuestos y la facturación de la plataforma, qué garantiza y, sobre todo, **qué NO garantiza todavía**.
 

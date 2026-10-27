@@ -53,19 +53,19 @@ if (panel.workshop && panel.isOffice) {
 }
 const tone = { pendiente: 'pill-warn', parcial: 'pill-warn', cobrada: 'pill-ok' } as const;
 ---
-<PanelLayout panel={panel} title="Facturas" section="facturas">
+<PanelLayout panel={panel} title="Servicios realizados" section="facturas">
   <header class="pnl-head">
     <div>
-      <h1 class="pnl-title">Facturas</h1>
-      <p class="pnl-sub">Facturas, cobros y lo que queda pendiente.</p>
+      <h1 class="pnl-title">Servicios realizados</h1>
+      <p class="pnl-sub">Resumen de los servicios de cada cliente, lo cobrado y lo que queda pendiente.</p>
     </div>
-    {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/facturas/nueva"><Icon name="plus" />Nueva factura</a></div>}
+    {panel.isOffice && <div class="pnl-actions"><a class="btn btn-primary" href="/panel/facturas/nueva"><Icon name="plus" />Nuevo resumen</a></div>}
   </header>
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
-    <div class="empty"><strong>Las facturas las gestiona la oficina del taller (propietario, administrador o recepción).</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+    <div class="empty"><strong>Los servicios realizados los gestiona la oficina del taller (propietario, administrador o recepción).</strong><a class="btn" href="/panel">Volver al inicio</a></div>
   ) : (
     <>
-      <div class="alert alert-warn" role="note"><Icon name="alert" /><span>Facturación operativa: <strong>no es un sistema VERI*FACTU certificado</strong>. Antes de usarla para facturar de verdad, revísalo con tu asesoría (ver la guía de facturación).</span></div>
+      <div class="alert alert-warn" role="note"><Icon name="alert" /><span><strong>Seguimiento, no facturas.</strong> Aquí queda lo que se hizo a cada cliente y lo cobrado, para no perderlo. La factura, si hace falta, la emite el taller con su programa de facturación.</span></div>
       {loadError && <Flash kind="bad" text="No se han podido cargar las facturas. Recarga la página." />}
       <section class="kpis" aria-label="Resumen de cobros">
         <a class="kpi" href="/panel/facturas?estado=pendientes"><span class="kpi-value is-money">{formatCents(totals.pending)}</span><span class="kpi-label">Pendiente de cobro</span></a>
@@ -74,8 +74,8 @@ const tone = { pendiente: 'pill-warn', parcial: 'pill-warn', cobrada: 'pill-ok' 
       <nav class="filter-tabs" aria-label="Estado">
         {FILTERS.map(f => <a href={`/panel/facturas?estado=${f.id}`} aria-current={f.id === filter ? 'page' : undefined}>{f.label}</a>)}
       </nav>
-      <section class="card" aria-label="Lista de facturas">
-        {rows.length === 0 ? <div class="empty"><strong>No hay facturas con este filtro.</strong><span>Crea una desde una orden terminada o un presupuesto aceptado.</span></div> : (
+      <section class="card" aria-label="Lista de resúmenes de servicios">
+        {rows.length === 0 ? <div class="empty"><strong>No hay resúmenes con este filtro.</strong><span>Crea una desde una orden terminada o un presupuesto aceptado.</span></div> : (
           <ul class="list">
             {rows.map(r => {
               const bal = balances.get(r.id);

@@ -6,7 +6,7 @@ Lo que queda abierto tras la auditoría (`AUDITORIA_FINAL.md`). En el **código*
 
 | # | Qué | Quién | Por qué bloquea |
 |---|---|---|---|
-| B1 | **Decidir qué hacer con la facturación** (ver §2) | Propietario + asesor fiscal | El módulo de facturas no está adaptado a VERI\*FACTU. Según el RD 1007/2023, los fabricantes debían ofrecer los sistemas adaptados desde el 29-07-2025. Venderlo sin adaptar puede suponer sanciones al fabricante o comercializador (art. 201 bis LGT: 150.000 € por año y tipo de sistema). |
+| B1 | **Facturación: decidido (27-10-2026) que el programa NO emite facturas**; las antiguas «facturas» son «resúmenes de servicios» (seguimiento). Falta que **un asesor fiscal lo confirme** (ver §2, opción 2) | Asesor fiscal | El módulo de facturas no está adaptado a VERI\*FACTU. Según el RD 1007/2023, los fabricantes debían ofrecer los sistemas adaptados desde el 29-07-2025. Venderlo sin adaptar puede suponer sanciones al fabricante o comercializador (art. 201 bis LGT: 150.000 € por año y tipo de sistema). |
 | B2 | **Datos reales del titular** de la plataforma en `apps/web/src/lib/legal/platform.ts`: razón social, NIF, domicilio, correo y registro | Propietario | LSSI art. 10. Las condiciones y el contrato de encargo salen con «[Falta: …]». |
 | B3 | **Revisión por un abogado** de los seis textos legales y del contrato de encargo (art. 28 RGPD) | Abogado | Los textos los redactó el equipo técnico, sin validación jurídica. |
 | B4 | **Entorno de producción** (Supabase y Cloudflare), con migraciones aplicadas y las variables de `CHECKLIST_LANZAMIENTO.md` | Propietario (con autorización expresa) | No existe todavía. Nada se ha probado contra servicios reales. |

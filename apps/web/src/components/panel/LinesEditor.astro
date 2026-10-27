@@ -130,7 +130,7 @@ const err = (k: string) => errors[k];
         </div>
       </div>
       {labourRateCents && <p class="hint">Precio por hora del taller: {formatCents(labourRateCents)} (sin IVA). Si dejas el precio vacío en mano de obra, se usa ese.</p>}
-      {allowNegative && <p class="hint">Rectificativa: usa una cantidad negativa para restar lo facturado de más.</p>}
+      {allowNegative && <p class="hint">Corrección: usa una cantidad negativa para restar lo que se puso de más.</p>}
       <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Añadir línea</span></button>
     </form>
   )}

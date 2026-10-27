@@ -11,7 +11,7 @@ export const CSV_TABLES = {
   ordenes: { table: 'repair_orders', label: 'Órdenes de reparación' },
   trabajos: { table: 'repair_order_items', label: 'Trabajos y piezas de las órdenes' },
   presupuestos: { table: 'quotes', label: 'Presupuestos' },
-  facturas: { table: 'invoices', label: 'Facturas' },
+  facturas: { table: 'invoices', label: 'Resumenes de servicios' },
   cobros: { table: 'payments', label: 'Cobros' },
   mantenimientos: { table: 'vehicle_services', label: 'Mantenimientos de los vehículos' },
 } as const;

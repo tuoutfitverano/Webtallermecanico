@@ -213,7 +213,7 @@ const tone: Record<QuoteStatus, string> = { borrador: '', enviado: 'pill-warn', 
           <p class="hint" style="margin-top:10px">Se guarda una copia de lo respondido (líneas, importes, condiciones y fecha) con su huella. No es una firma electrónica cualificada.</p>
           {quote.status === 'aceptado' && (
             <div class="doc-actions" style="margin-top:12px">
-              <a class="btn btn-primary" href={`/panel/facturas/nueva?presupuesto=${quote.id}`}><Icon name="euro" />Crear factura</a>
+              <a class="btn btn-primary" href={`/panel/facturas/nueva?presupuesto=${quote.id}`}><Icon name="euro" />Crear resumen de servicios</a>
               {quote.repair_orders && <a class="btn" href={`/panel/ordenes/${quote.repair_orders.id}`}>Ver la orden</a>}
             </div>
           )}

@@ -95,7 +95,7 @@ export function renderEmail(n: ClaimedNotification, portalOrigin: string | null)
 export function renderInvitationEmail(workshopName: string, url: string, expiresAt: Date): RenderedEmail {
   const subject = oneLine(`${workshopName} te invita a tu área de cliente`, 150);
   const until = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'Europe/Madrid' }).format(expiresAt);
-  const lead = `${workshopName} te invita a tu área de cliente de AutoValue: desde ahí podrás seguir tus vehículos, reparaciones, presupuestos y facturas de este taller.`;
+  const lead = `${workshopName} te invita a tu área de cliente de AutoValue: desde ahí podrás seguir tus vehículos, reparaciones, presupuestos y servicios realizados de este taller.`;
   const note = `El enlace es personal, solo funciona con este correo, una vez y hasta el ${until}. Si ya tienes cuenta en AutoValue (por otro taller), entra con ella: no hace falta crear otra. Si no esperabas este correo, ignóralo.`;
   const text = [lead, '', `Aceptar la invitación: ${url}`, '', note, '', `— ${workshopName}`].join('\n');
   const html = `<!doctype html>

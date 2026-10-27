@@ -87,17 +87,17 @@ const statusOrder: RepairStatus[] = ['recibido', 'diagnosis', 'esperando_recambi
 
           <div class="grid-2">
             <section class="card" aria-labelledby="fact-t">
-              <h2 id="fact-t" class="card-title"><Icon name="euro" />Facturación</h2>
+              <h2 id="fact-t" class="card-title"><Icon name="euro" />Servicios cobrados</h2>
               <dl class="facts">
-                <dt>Facturas emitidas</dt><dd>{n(stats.facturacion.emitidas)}</dd>
-                <dt>Importe facturado (IVA incl.)</dt><dd>{formatCents(Number(stats.facturacion.importe_emitido_cents))}</dd>
+                <dt>Resúmenes emitidos</dt><dd>{n(stats.facturacion.emitidas)}</dd>
+                <dt>Importe de los servicios (IVA incl.)</dt><dd>{formatCents(Number(stats.facturacion.importe_emitido_cents))}</dd>
                 <dt>Base imponible</dt><dd>{formatCents(Number(stats.facturacion.base_emitida_cents))}</dd>
                 <dt>Cobrado en el periodo</dt><dd>{formatCents(Number(stats.facturacion.cobrado_cents))}</dd>
                 <dt>Pendiente de cobro (hoy)</dt><dd>{formatCents(Number(stats.facturacion.pendiente_cents))}</dd>
                 <dt>Vencido (hoy)</dt><dd>{formatCents(Number(stats.facturacion.vencido_cents))}</dd>
                 <dt>Borradores sin emitir</dt><dd>{n(stats.facturacion.borradores)}</dd>
               </dl>
-              <p class="hint">Facturación operativa, no certificada VERI*FACTU.</p>
+              <p class="hint">Según los resúmenes de servicios: es un seguimiento, no la contabilidad oficial.</p>
             </section>
             <section class="card" aria-labelledby="pres-t">
               <h2 id="pres-t" class="card-title"><Icon name="file" />Presupuestos</h2>
@@ -160,8 +160,8 @@ const statusOrder: RepairStatus[] = ['recibido', 'diagnosis', 'esperando_recambi
                 <p class="bars-axis"><span>{formatDay(weeks[0]!.semana)}</span><span>máx. {n(maxOrders)}</span><span>{formatDay(weeks[weeks.length - 1]!.semana)}</span></p>
               </section>
               <section class="card" aria-labelledby="ev-f-t">
-                <h2 id="ev-f-t" class="card-title"><Icon name="chart" />Facturado por semana</h2>
-                <div class="bars" role="img" aria-label={`Facturado por semana: ${weeks.map(w => `${formatDay(w.semana)}, ${formatCents(Number(w.facturado_cents))}`).join('; ')}`}>
+                <h2 id="ev-f-t" class="card-title"><Icon name="chart" />Importe de servicios por semana</h2>
+                <div class="bars" role="img" aria-label={`Importe de servicios por semana: ${weeks.map(w => `${formatDay(w.semana)}, ${formatCents(Number(w.facturado_cents))}`).join('; ')}`}>
                   {weeks.map(w => (
                     <div class="bar-col" title={`Semana del ${formatDay(w.semana)}: ${formatCents(Number(w.facturado_cents))}`}>
                       <span class="bar" style={`--h:${(Number(w.facturado_cents) / maxBilled) * 100}%`}></span>
@@ -177,7 +177,7 @@ const statusOrder: RepairStatus[] = ['recibido', 'diagnosis', 'esperando_recambi
               <summary>Ver la tabla por semanas</summary>
               <div class="table-wrap">
                 <table class="data-table">
-                  <thead><tr><th>Semana del</th><th class="num-col">Vehículos recibidos</th><th class="num-col">Facturado</th></tr></thead>
+                  <thead><tr><th>Semana del</th><th class="num-col">Vehículos recibidos</th><th class="num-col">Importe</th></tr></thead>
                   <tbody>{weeks.map(w => <tr><td>{formatDay(w.semana)}</td><td class="num-col">{n(w.ordenes)}</td><td class="num-col">{formatCents(Number(w.facturado_cents))}</td></tr>)}</tbody>
                 </table>
               </div>

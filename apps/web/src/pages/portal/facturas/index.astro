@@ -24,13 +24,13 @@ if (portal.records.length > 0) {
 const state = (r: Row) => Number(r.pending_cents) === 0 ? { text: 'Pagada', tone: 'pill-ok' }
   : Number(r.paid_cents) === 0 ? { text: 'Pendiente de pago', tone: 'pill-warn' } : { text: 'Pagada en parte', tone: 'pill-warn' };
 ---
-<PortalLayout portal={portal} title="Facturas" section="facturas">
-  <header class="pnl-head"><div><h1 class="pnl-title">Facturas</h1><p class="pnl-sub">Las facturas de tus reparaciones y lo que queda por pagar.</p></div></header>
+<PortalLayout portal={portal} title="Servicios realizados" section="facturas">
+  <header class="pnl-head"><div><h1 class="pnl-title">Servicios realizados</h1><p class="pnl-sub">Lo que el taller ha hecho a tus vehículos, lo que costó y lo que queda por pagar. Es un seguimiento: no son facturas.</p></div></header>
   {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : (
     <>
       {error && <Flash kind="bad" text="No se han podido cargar tus facturas. Recarga la página." />}
-      <section class="card" aria-label="Lista de facturas">
-        {rows.length === 0 ? <div class="empty"><strong>No tienes facturas.</strong></div> : (
+      <section class="card" aria-label="Lista de servicios realizados">
+        {rows.length === 0 ? <div class="empty"><strong>Todavía no hay servicios.</strong></div> : (
           <ul class="list">
             {rows.map(r => (
               <li>

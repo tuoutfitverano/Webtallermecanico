@@ -347,7 +347,7 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
       <div style="margin-top:16px">
         <LinesEditor lines={lines} editable={order.status !== 'entregado'} title="Trabajo realizado y piezas" taxRate={settings.default_tax_rate}
           errors={lineErrors} values={lineValues} labourRateCents={settings.labour_rate_cents}
-          emptyText="Anota aquí la mano de obra y las piezas montadas: forman el historial del vehículo y la base de la factura." />
+          emptyText="Anota aquí la mano de obra y las piezas montadas: forman el historial del vehículo y la base del resumen de servicios." />
       </div>
 
       <div class="grid-2" style="margin-top:16px">
@@ -500,15 +500,15 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
           </section>
           {panel.isOffice && (
             <section class="card" aria-labelledby="docs-t">
-              <h2 id="docs-t" class="card-title"><Icon name="euro" />Presupuestos y facturas</h2>
-              {quotes.length === 0 && invoices.length === 0 && <p class="hint">Todavía no hay presupuestos ni facturas de esta orden.</p>}
+              <h2 id="docs-t" class="card-title"><Icon name="euro" />Presupuestos y servicios</h2>
+              {quotes.length === 0 && invoices.length === 0 && <p class="hint">Todavía no hay presupuestos ni resúmenes de servicios de esta orden.</p>}
               <ul class="plain-list">
                 {quotes.map(q => <li><a href={`/panel/presupuestos/${q.id}`}>{quoteLabel(q.number, q.version)}</a> · {QUOTE_STATUS_LABELS[q.status]}{q.total_cents !== null && ` · ${formatCents(Number(q.total_cents))}`}</li>)}
-                {invoices.map(i => <li><a href={`/panel/facturas/${i.id}`}>{i.full_number ?? 'Factura (borrador)'}</a> · {INVOICE_STATUS_LABELS[i.status]}{i.total_cents !== null && ` · ${formatCents(Number(i.total_cents))}`}</li>)}
+                {invoices.map(i => <li><a href={`/panel/facturas/${i.id}`}>{i.full_number ?? 'Resumen (borrador)'}</a> · {INVOICE_STATUS_LABELS[i.status]}{i.total_cents !== null && ` · ${formatCents(Number(i.total_cents))}`}</li>)}
               </ul>
               <div class="doc-actions" style="margin-top:12px">
                 <a class="btn btn-sm" href={`/panel/presupuestos/nuevo?orden=${order.id}`}><Icon name="file" />Crear presupuesto</a>
-                <a class="btn btn-sm" href={`/panel/facturas/nueva?orden=${order.id}`}><Icon name="euro" />Crear factura</a>
+                <a class="btn btn-sm" href={`/panel/facturas/nueva?orden=${order.id}`}><Icon name="euro" />Crear resumen de servicios</a>
               </div>
             </section>
           )}

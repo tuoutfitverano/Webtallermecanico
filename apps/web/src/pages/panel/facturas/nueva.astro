@@ -1,6 +1,6 @@
 ---
 /**
- * Nueva factura (borrador). Desde una orden (sus líneas), un presupuesto
+ * Nuevo resumen de servicios (borrador). Desde una orden (sus líneas), un presupuesto
  * aceptado (sus líneas) o un cliente (vacía). Se crea con un POST: abrir la
  * página no crea nada. La base de datos comprueba que todo es del taller.
  */
@@ -11,6 +11,7 @@ import Flash from '../../../components/panel/Flash.astro';
 import { field, isUuid, panelPage } from '../../../lib/server/panel.ts';
 import { logAuth } from '../../../lib/server/auth.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
+import { summaryMessage } from '@talleres/core';
 
 export const prerender = false;
 
@@ -28,7 +29,7 @@ if (panel.workshop && panel.isOffice) {
     const { data, error: e } = await panel.supabase.rpc('create_invoice_draft', {
       p_order_id: isUuid(src.o) ? src.o : null, p_quote_id: isUuid(src.q) ? src.q : null, p_customer_id: isUuid(src.c) ? src.c : null,
     });
-    if (e || !data) { logAuth('panel_invoice_create_error', e?.code); error = e ? dbErrorMessage(e) : 'No se ha creado la factura.'; Astro.response.status = 400; }
+    if (e || !data) { logAuth('panel_invoice_create_error', e?.code); error = e ? summaryMessage(dbErrorMessage(e)) : 'No se ha creado el resumen.'; Astro.response.status = 400; }
     else return Astro.redirect(`/panel/facturas/${data}?creada=1`, 303);
   }
   if (!orderId && !quoteId) {
@@ -37,11 +38,11 @@ if (panel.workshop && panel.isOffice) {
   }
 }
 ---
-<PanelLayout panel={panel} title="Nueva factura" section="facturas">
-  <a class="pnl-back" href="/panel/facturas"><Icon name="arrow" />Facturas</a>
-  <header class="pnl-head"><div><h1 class="pnl-title">Nueva factura</h1><p class="pnl-sub">Se crea como borrador: revisas las líneas y la emites cuando esté bien.</p></div></header>
+<PanelLayout panel={panel} title="Nuevo resumen de servicios" section="facturas">
+  <a class="pnl-back" href="/panel/facturas"><Icon name="arrow" />Servicios realizados</a>
+  <header class="pnl-head"><div><h1 class="pnl-title">Nuevo resumen de servicios</h1><p class="pnl-sub">Se crea como borrador: revisas las líneas y la emites cuando esté bien.</p></div></header>
   {!panel.workshop ? <NoWorkshop loadError={panel.loadError} /> : !panel.isOffice ? (
-    <div class="empty"><strong>Las facturas las crea la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
+    <div class="empty"><strong>Los resúmenes de servicios los crea la oficina del taller.</strong><a class="btn" href="/panel">Volver al inicio</a></div>
   ) : (
     <form method="post" class="card form-stack" data-busy="Creando…">
       <Flash kind="bad" text={error} />
@@ -56,7 +57,7 @@ if (panel.workshop && panel.isOffice) {
             <option value="">Elige un cliente</option>
             {customers.map(c => <option value={c.id}>{c.full_name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
           </select>
-          <p class="hint">La factura empezará vacía. Lo normal es crearla desde una orden o un presupuesto aceptado.</p>
+          <p class="hint">El resumen empezará vacío. Lo normal es crearla desde una orden o un presupuesto aceptado.</p>
         </div>
       )}
       <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear borrador</span></button>

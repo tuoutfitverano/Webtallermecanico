@@ -49,6 +49,7 @@ const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
         </div>
         <div class="doc-id">
           <h1>{INVOICE_KIND_LABELS[inv.kind]}</h1>
+          <p class="not-invoice">No es una factura</p>
           <dl>
             <dt>Número</dt><dd>{inv.full_number}</dd>
             <dt>Fecha</dt><dd>{formatDay(inv.issue_date)}</dd>
@@ -65,7 +66,7 @@ const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
         {inv.vehicle && <p>Vehículo: {inv.vehicle}</p>}
       </section>
 
-      {inv.rectifies && <p class="note"><strong>Rectifica la factura {inv.rectifies}.</strong> {inv.reason}</p>}
+      {inv.rectifies && <p class="note"><strong>Corrige el resumen {inv.rectifies}.</strong> {inv.reason}</p>}
 
       <div class="table-scroll"><table>
         <thead><tr><th>Concepto</th><th class="n">Cant.</th><th class="n">Precio</th><th class="n">Dto.</th><th class="n">IVA</th><th class="n">Importe</th></tr></thead>
@@ -92,7 +93,7 @@ const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
       {inv.notes && <p class="note">{inv.notes}</p>}
       {inv.issuer.footer && <p class="foot">{inv.issuer.footer}</p>}
       {inv.vehicle && inv.kind === 'ordinaria' && <p class="foot">Garantía: las reparaciones tienen la garantía del artículo 16 del Real Decreto 1457/1986, de al menos 3 meses o 2.000 km (15 días o 2.000 km en vehículos industriales), salvo que las piezas tengan una garantía mayor.</p>}
-      <p class="foot legal">Documento generado por el software de gestión del taller. Este software todavía no es un sistema de facturación certificado VERI*FACTU.</p>
+      <p class="foot legal"><strong>Documento de seguimiento de los servicios del taller. No es una factura: la factura, si hace falta, la emite el taller con su programa de facturación.</strong></p>
     </main>
     <script>
       document.getElementById('imprimir')?.addEventListener('click', () => window.print());
@@ -111,6 +112,7 @@ const title = `${INVOICE_KIND_LABELS[inv.kind]} ${inv.full_number}`;
       .doc-id { text-align: right; }
       .doc-id h1 { font-family: 'Archivo Variable', system-ui, sans-serif; font-stretch: 125%; text-transform: uppercase; font-size: 22px; margin: 0 0 6px; letter-spacing: 0.02em; }
       .doc-id dl { display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 0; justify-content: end; }
+      .not-invoice { margin: 0 0 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: 12px; }
       .doc-id dt { color: #555; } .doc-id dd { margin: 0; font-weight: 600; }
       .to { margin: 20px 0; }
       .lbl { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: #555; }

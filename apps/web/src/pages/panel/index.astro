@@ -118,7 +118,7 @@ const kpis = summary ? [
           { n: late, text: 'trabajos pasados de la fecha prevista', href: '/panel/planificacion' },
           { n: Number(attention.ordenes_sin_asignar), text: 'órdenes abiertas sin mecánico asignado', href: '/panel/planificacion' },
           { n: Number(attention.presupuestos_sin_respuesta_3d), text: 'presupuestos sin respuesta desde hace más de 3 días', href: '/panel/presupuestos?estado=pendientes' },
-          { n: Number(attention.facturas_vencidas), text: 'facturas vencidas sin cobrar', href: '/panel/facturas?estado=vencidas' },
+          { n: Number(attention.facturas_vencidas), text: 'servicios vencidos sin cobrar', href: '/panel/facturas?estado=vencidas' },
           { n: Number(attention.recordatorios_pendientes), text: 'recordatorios por revisar', href: '/panel/recordatorios' },
         ].filter(i => i.n > 0);
         return items.length > 0 && (

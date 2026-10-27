@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkTaxId, isTaxIdShape, isVin, normalizeTaxId, normalizeVin, quoteLabel, whatsappLink, whatsappNumber } from './documents.ts';
+import { checkTaxId, INVOICE_KIND_LABELS, summaryMessage, isTaxIdShape, isVin, normalizeTaxId, normalizeVin, quoteLabel, whatsappLink, whatsappNumber } from './documents.ts';
 
 describe('documentos', () => {
   it('etiqueta de presupuesto con versión', () => {
@@ -61,5 +61,13 @@ describe('NIF/NIE/CIF con control (auditoría H03)', () => {
     expect(checkTaxId('FR12345678901', { allowForeign: true })).toEqual({ ok: true, kind: 'extranjero', value: 'FR12345678901' });
     expect(checkTaxId('PT123456789', { allowForeign: true }).ok).toBe(true);
     expect(checkTaxId('FR12345678901')).toEqual({ ok: false, reason: 'extranjero' });
+  });
+});
+
+describe('resúmenes de servicios', () => {
+  it('los mensajes de la base de datos no hablan de facturas', () => {
+    expect(summaryMessage('Una factura emitida no se borra.')).toBe('Un resumen emitido no se borra.');
+    expect(summaryMessage('Otro mensaje.')).toBe('Otro mensaje.');
+    expect(INVOICE_KIND_LABELS.ordinaria).toBe('Resumen de servicios');
   });
 });

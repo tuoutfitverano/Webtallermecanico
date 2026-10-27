@@ -3,7 +3,7 @@
  * Los rellena el titular: lo que esté en null sale en las páginas legales como
  * «[Falta: …]» bien visible. Nunca se inventan. No son secretos (son públicos por ley).
  */
-export const LEGAL_VERSION = '1.0';
+export const LEGAL_VERSION = '1.1';
 export const LEGAL_DATE = 'octubre de 2026';
 
 export interface PlatformLegal {

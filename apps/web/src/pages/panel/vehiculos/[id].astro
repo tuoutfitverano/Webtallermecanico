@@ -272,7 +272,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
                       <label class="check"><input type="radio" name="method" value="midgt" /><span>La app miDGT con el vehículo a su nombre</span></label>
                       <label class="check"><input type="radio" name="method" value="correccion" /><span>No hubo venta: estaba en la ficha equivocada</span></label>
                     </fieldset>
-                    <p class="hint">El titular anterior conserva sus reparaciones y facturas; el nuevo solo verá las suyas. No se puede cambiar con una reparación en curso.</p>
+                    <p class="hint">El titular anterior conserva sus reparaciones y resúmenes de servicios; el nuevo solo verá las suyas. No se puede cambiar con una reparación en curso.</p>
                     <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cambiar de titular</span></button>
                   </form>
                 </details>
@@ -366,7 +366,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
           </section>
           {panel.isOffice && (quotes.length > 0 || invoices.length > 0) && (
             <section class="card" aria-labelledby="docs">
-              <h2 id="docs" class="card-title"><Icon name="file" />Presupuestos y facturas</h2>
+              <h2 id="docs" class="card-title"><Icon name="file" />Presupuestos y servicios</h2>
               <ul class="list">
                 {quotes.map(q => (
                   <li><a class="row" href={`/panel/presupuestos/${q.id}`}>

@@ -34,18 +34,19 @@ const lines: LineRow[] = (inv?.lines ?? []).map((l, i) => ({ ...l, id: String(i)
 const address = (p: Party) => [p.address, [p.postal_code, p.city].filter(Boolean).join(' '), p.province].filter(Boolean).join(', ');
 const pending = inv ? Number(inv.total_cents) - Number(inv.paid_cents) : 0;
 ---
-<PortalLayout portal={portal} title={inv ? `Factura ${inv.full_number}` : 'Factura'} section="facturas">
-  <a class="pnl-back" href="/portal/facturas"><Icon name="arrow" />Facturas</a>
+<PortalLayout portal={portal} title={inv ? `Resumen de servicios ${inv.full_number}` : 'Resumen de servicios'} section="facturas">
+  <a class="pnl-back" href="/portal/facturas"><Icon name="arrow" />Servicios realizados</a>
   {portal.records.length === 0 ? <NotLinked loadError={portal.loadError} /> : !inv ? (
-    <div class="empty"><strong>Factura no encontrada.</strong><a class="btn" href="/portal/facturas">Ver mis facturas</a></div>
+    <div class="empty"><strong>Resumen no encontrado.</strong><a class="btn" href="/portal/facturas">Ver mis servicios</a></div>
   ) : (
     <>
       <header class="pnl-head"><div><h1 class="pnl-title">{INVOICE_KIND_LABELS[inv.kind]} {inv.full_number}</h1><p class="pnl-sub">Fecha {formatDay(inv.issue_date)} · vence {formatDay(inv.due_date)}</p></div><div class="pnl-actions"><a class="btn" href={`/portal/facturas/${inv.id}/imprimir`} data-astro-reload><Icon name="printer" />Imprimir o guardar PDF</a></div></header>
+      <div class="alert alert-warn" role="note" style="margin-bottom:16px"><Icon name="alert" /><span>Documento de seguimiento de los servicios del taller. No es una factura: la factura, si hace falta, la emite el taller con su programa de facturación.</span></div>
       <div class="grid-2">
         <section class="card" aria-labelledby="emisor-t"><h2 id="emisor-t" class="card-title">Emisor</h2><p><strong>{inv.issuer.legal_name ?? inv.issuer.name}</strong><br />NIF {inv.issuer.tax_id}<br />{address(inv.issuer)}</p></section>
         <section class="card" aria-labelledby="dest-t"><h2 id="dest-t" class="card-title">Cliente</h2><p><strong>{inv.recipient.name}</strong>{inv.recipient.tax_id && <><br />NIF {inv.recipient.tax_id}</>}{address(inv.recipient) && <><br />{address(inv.recipient)}</>}</p></section>
       </div>
-      {inv.rectifies && <div class="explain" style="margin-top:16px"><strong>Rectifica la factura {inv.rectifies}</strong><p>{inv.reason}</p></div>}
+      {inv.rectifies && <div class="explain" style="margin-top:16px"><strong>Corrige el resumen {inv.rectifies}</strong><p>{inv.reason}</p></div>}
       <div style="margin-top:16px"><LinesEditor lines={lines} title="Conceptos" stored={{ subtotal_cents: inv.subtotal_cents, tax_cents: inv.tax_cents, total_cents: inv.total_cents, taxes: inv.taxes }} /></div>
       <section class="card" aria-labelledby="pago-t">
         <h2 id="pago-t" class="card-title"><Icon name="euro" />Pago</h2>

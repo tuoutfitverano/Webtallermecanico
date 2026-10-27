@@ -112,7 +112,7 @@ if (panel.form && panel.workshop && field(panel.form, 'action') === 'facturacion
       flash = { kind: 'bad', text: error ? dbErrorMessage(error) : 'No se han guardado los ajustes.' };
       Astro.response.status = 400;
     } else {
-      flash = { kind: 'ok', text: 'Ajustes de presupuestos y facturas guardados.' };
+      flash = { kind: 'ok', text: 'Ajustes de presupuestos y resúmenes guardados.' };
       billPosted = false;
     }
   }
@@ -222,12 +222,12 @@ const integrations = [
             </div>
             <div class="form-row">
               <div class={`field ${err('legalName') ? 'has-error' : ''}`}>
-                <label for="legal_name">Razón social o nombre del titular <span class="muted">(sale en el aviso legal y en las facturas)</span></label>
+                <label for="legal_name">Razón social o nombre del titular <span class="muted">(sale en el aviso legal, presupuestos y resúmenes)</span></label>
                 <input class="input" id="legal_name" name="legal_name" maxlength="160" value={values.legal_name} aria-invalid={err('legalName') ? 'true' : undefined} />
                 {err('legalName') && <p class="field-error">{err('legalName')}</p>}
               </div>
               <div class={`field ${err('taxId') ? 'has-error' : ''}`}>
-                <label for="tax_id">NIF / CIF <span class="muted">(aviso legal y facturas)</span></label>
+                <label for="tax_id">NIF / CIF <span class="muted">(aviso legal, presupuestos y resúmenes)</span></label>
                 <input class="input mono" id="tax_id" name="tax_id" maxlength="20" autocomplete="off" value={values.tax_id} aria-invalid={err('taxId') ? 'true' : undefined} />
                 {err('taxId') && <p class="field-error">{err('taxId')}</p>}
               </div>
@@ -245,7 +245,7 @@ const integrations = [
               </div>
             </div>
             <div class={`field ${err('addressLine') ? 'has-error' : ''}`}>
-              <label for="address_line">Dirección <span class="muted">(sale en el aviso legal, presupuestos y facturas)</span></label>
+              <label for="address_line">Dirección <span class="muted">(sale en el aviso legal, presupuestos y resúmenes)</span></label>
               <input class="input" id="address_line" name="address_line" maxlength="200" autocomplete="off" value={values.address_line} />
             </div>
             <div class="form-row">
@@ -363,8 +363,8 @@ const integrations = [
       </div>
 
       <section class="card" aria-labelledby="fact-t" id="facturacion">
-        <h2 id="fact-t" class="card-title"><Icon name="euro" />Presupuestos y facturas</h2>
-        <p class="hint">Facturación operativa, <strong>no certificada VERI*FACTU</strong>: revisa estos ajustes con tu asesoría. Para emitir facturas hacen falta la razón social y el NIF del taller (arriba).</p>
+        <h2 id="fact-t" class="card-title"><Icon name="euro" />Presupuestos y resúmenes de servicios</h2>
+        <p class="hint">Los resúmenes de servicios son un <strong>seguimiento, no facturas</strong>: la factura la emite el taller con su programa de facturación. Para emitir resúmenes hacen falta la razón social y el NIF del taller (arriba).</p>
         <form method="post" class="form-stack" data-busy="Guardando…" novalidate>
           <input type="hidden" name="action" value="facturacion" />
           <div class="form-row">
@@ -386,31 +386,31 @@ const integrations = [
               {berr('quoteValidityDays') && <p class="field-error">{berr('quoteValidityDays')}</p>}
             </div>
             <div class={`field ${berr('paymentTermsDays') ? 'has-error' : ''}`}>
-              <label for="payment_terms_days">Plazo de pago de las facturas (días; 0 = al contado)</label>
+              <label for="payment_terms_days">Plazo de pago (días; 0 = al contado)</label>
               <input class="input" id="payment_terms_days" name="payment_terms_days" inputmode="numeric" value={billValues.payment_terms_days} />
               {berr('paymentTermsDays') && <p class="field-error">{berr('paymentTermsDays')}</p>}
             </div>
           </div>
           <div class="form-row">
             <div class={`field ${berr('invoiceSeries') ? 'has-error' : ''}`}>
-              <label for="invoice_series">Serie de facturas</label>
+              <label for="invoice_series">Serie de los resúmenes</label>
               <input class="input mono" id="invoice_series" name="invoice_series" maxlength="6" autocapitalize="characters" value={billValues.invoice_series} />
               {berr('invoiceSeries') && <p class="field-error">{berr('invoiceSeries')}</p>}
             </div>
             <div class={`field ${berr('rectifyingSeries') ? 'has-error' : ''}`}>
-              <label for="rectifying_series">Serie de rectificativas</label>
+              <label for="rectifying_series">Serie de las correcciones</label>
               <input class="input mono" id="rectifying_series" name="rectifying_series" maxlength="6" autocapitalize="characters" value={billValues.rectifying_series} />
               {berr('rectifyingSeries') && <p class="field-error">{berr('rectifyingSeries')}</p>}
             </div>
           </div>
-          <p class="hint">La numeración es correlativa por serie y año (p. ej. {billValues.invoice_series || 'F'}{new Date().getFullYear()}-0001). Cambiar la serie no renumera las facturas ya emitidas.</p>
+          <p class="hint">La numeración es correlativa por serie y año (p. ej. {billValues.invoice_series || 'F'}{new Date().getFullYear()}-0001). Cambiar la serie no renumera los resúmenes ya emitidos.</p>
           <div class={`field ${berr('quoteConditions') ? 'has-error' : ''}`}>
             <label for="quote_conditions">Condiciones de los presupuestos <span class="muted">(opcional; las ve el cliente)</span></label>
             <textarea class="textarea" id="quote_conditions" name="quote_conditions" maxlength="2000" rows="3">{billValues.quote_conditions}</textarea>
             {berr('quoteConditions') && <p class="field-error">{berr('quoteConditions')}</p>}
           </div>
           <div class={`field ${berr('invoiceFooter') ? 'has-error' : ''}`}>
-            <label for="invoice_footer">Pie de las facturas <span class="muted">(opcional; p. ej. datos bancarios o registro mercantil)</span></label>
+            <label for="invoice_footer">Pie de los resúmenes <span class="muted">(opcional; p. ej. datos bancarios o registro mercantil)</span></label>
             <textarea class="textarea" id="invoice_footer" name="invoice_footer" maxlength="1000" rows="2">{billValues.invoice_footer}</textarea>
             {berr('invoiceFooter') && <p class="field-error">{berr('invoiceFooter')}</p>}
           </div>

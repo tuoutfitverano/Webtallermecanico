@@ -131,7 +131,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
               <form method="post" class="confirm" data-busy="Quitando…" data-astro-reload>
                 <input type="hidden" name="action" value="dejar" /><input type="hidden" name="workshop_id" value={w.workshop_id} />
                 <strong>¿Dejar de ver {w.name} en tu portal?</strong>
-                <span class="hint">Desaparecerá de «Mis talleres» y no verás tus vehículos, reparaciones ni facturas de este taller. No se borra nada: el taller conserva tu historial (está obligado a guardar sus facturas). Para volver a verlo tendrás que pedirle una invitación nueva.</span>
+                <span class="hint">Desaparecerá de «Mis talleres» y no verás tus vehículos, reparaciones ni servicios de este taller. No se borra nada: el taller conserva tu historial (está obligado a guardar sus facturas). Para volver a verlo tendrás que pedirle una invitación nueva.</span>
                 <div class="pnl-actions">
                   <button class="btn btn-danger" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Sí, dejar de verlo</span></button>
                   <a class="btn" href="/portal/talleres" data-astro-reload>Cancelar</a>

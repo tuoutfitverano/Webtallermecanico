@@ -36,7 +36,7 @@ if (portal.form && portal.records.length > 0) {
       flash = { kind: 'bad', text: e.code === '22023' && e.message ? e.message : 'No se ha podido guardar tu respuesta. Inténtalo de nuevo.' };
       Astro.response.status = 400;
     } else {
-      flash = { kind: 'ok', text: data === 'confirmado' ? 'Hecho: el vehículo ya está a nombre de su nuevo titular. Tus reparaciones y facturas se conservan.' : 'Gracias. El taller lo revisará con los papeles antes de cambiar nada.' };
+      flash = { kind: 'ok', text: data === 'confirmado' ? 'Hecho: el vehículo ya está a nombre de su nuevo titular. Tus reparaciones y servicios se conservan.' : 'Gracias. El taller lo revisará con los papeles antes de cambiar nada.' };
     }
   }
 }
@@ -78,7 +78,7 @@ const BUYER_STATUS: Record<string, string> = {
             <p class="hint">Has dicho que no lo has vendido. El taller lo revisará con los papeles antes de cambiar nada.</p>
           ) : (
             <>
-              <p class="hint">Si dices que sí, dejará de aparecer en tu portal. Tus reparaciones y facturas se conservan y el nuevo titular no las verá.</p>
+              <p class="hint">Si dices que sí, dejará de aparecer en tu portal. Tus reparaciones y servicios se conservan y el nuevo titular no los verá.</p>
               <div class="pnl-actions">
                 <form method="post" data-busy="Guardando…">
                   <input type="hidden" name="action" value="titular-contestar" /><input type="hidden" name="transfer_id" value={t.id} /><input type="hidden" name="vendido" value="si" />
