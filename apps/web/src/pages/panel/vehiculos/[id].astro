@@ -247,7 +247,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
                       <button class="btn btn-primary btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Confirmar el cambio</span></button>
                     </div>
                   </form>
-                  <form method="post" data-busy="Rechazando…" style="margin-top:8px">
+                  <form class="mt-s" method="post" data-busy="Rechazando…">
                     <input type="hidden" name="action" value="titular-rechazar" /><input type="hidden" name="transfer_id" value={t.id} />
                     <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Rechazar la solicitud</span></button>
                   </form>
@@ -255,9 +255,9 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
               ))}
               <p>{vehicle.customers ? <>A nombre de <a href={`/panel/clientes/${vehicle.customers.id}`}>{vehicle.customers.full_name}</a>.</> : 'Sin titular.'}</p>
               {vehicle.customer_id && pendingTransfers.length === 0 && (
-                <details style="margin-top:12px">
+                <details class="mt-m">
                   <summary style="cursor:pointer">Cambiar de titular</summary>
-                  <form method="post" class="form-stack" style="margin-top:12px" data-busy="Cambiando…" novalidate>
+                  <form method="post" class="form-stack mt-m" data-busy="Cambiando…" novalidate>
                     <input type="hidden" name="action" value="titular-cambiar" />
                     <div class="field"><label for="t-customer">Nuevo titular</label>
                       <select class="select" id="t-customer" name="new_customer_id" required>
@@ -278,7 +278,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
                 </details>
               )}
               {pastTransfers.length > 0 && (
-                <ul class="list" style="margin-top:12px" aria-label="Historial de titulares">
+                <ul class="list mt-m" aria-label="Historial de titulares">
                   {pastTransfers.map(t => (
                     <li class="row"><span class="row-main">
                       <span class="row-title">{TRANSFER_STATUS[t.status] ?? t.status}: {who(t.from_customer_id)} → {who(t.to_customer_id)}</span>
@@ -319,9 +319,9 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
               </ul>
             )}
             {panel.isOffice && intervals.length > 0 && (
-              <details style="margin-top:12px">
+              <details class="mt-m">
                 <summary style="cursor:pointer">Anotar uno hecho fuera del taller</summary>
-                <form method="post" class="form-stack" style="margin-top:12px" data-busy="Guardando…" novalidate>
+                <form method="post" class="form-stack mt-m" data-busy="Guardando…" novalidate>
                   <input type="hidden" name="action" value="mantenimiento" />
                   <div class="field"><label for="m-interval">Mantenimiento</label>
                     <select class="select" id="m-interval" name="interval_id" required>{intervals.map(i => <option value={i.id}>{i.name}</option>)}</select></div>
@@ -395,7 +395,7 @@ const values: Record<string, string> = editValues ?? (vehicle ? {
             </form>
           </details>
           {panel.isManager && (
-            <div style="margin-top:20px">
+            <div class="mt-l">
               {askDelete ? (
                 <form method="post" class="confirm" data-busy="Borrando…">
                   <input type="hidden" name="action" value="borrar" />

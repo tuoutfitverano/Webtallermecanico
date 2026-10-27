@@ -103,7 +103,7 @@ const remindersOn = (customerId: string) => reminderPrefs.some(p => p.customer_i
       <p class="hint">Todavía no están disponibles. Mientras, tienes todos los avisos aquí, en tu portal.</p>
     )}
   </section>
-  {portal.records.length === 0 ? <div style="margin-top:16px"><NotLinked loadError={portal.loadError} /></div> : portal.records.map(r => {
+  {portal.records.length === 0 ? <div class="mt-l"><NotLinked loadError={portal.loadError} /></div> : portal.records.map(r => {
     const p = prefsOf(r.customer_id);
     return (
       <section class="card" aria-label={`Ficha en ${r.workshop_name}`}>
@@ -116,7 +116,7 @@ const remindersOn = (customerId: string) => reminderPrefs.some(p => p.customer_i
           {r.workshop_phone && <><dt>Teléfono del taller</dt><dd>{r.workshop_phone}</dd></>}
         </dl>
         {p && (
-          <form method="post" class="form-stack" style="margin-top:16px" data-busy="Guardando…" aria-label={`Comunicaciones de ${r.workshop_name}`}>
+          <form method="post" class="form-stack mt-l" data-busy="Guardando…" aria-label={`Comunicaciones de ${r.workshop_name}`}>
             <input type="hidden" name="action" value="preferencias" />
             <input type="hidden" name="customer_id" value={r.customer_id} />
             <h3 class="card-title" style="margin:0"><Icon name="bell" />Comunicaciones</h3>

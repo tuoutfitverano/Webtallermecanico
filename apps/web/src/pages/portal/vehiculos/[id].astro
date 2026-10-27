@@ -93,7 +93,7 @@ const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next
             {vehicle.mileage !== null && <><dt>Últimos kilómetros anotados</dt><dd>{km(vehicle.mileage)}</dd></>}
             <dt>Taller</dt><dd>{vehicle.workshop_name}</dd>
           </dl>
-          <p class="hint" style="margin-top:12px">Si algún dato no es correcto, díselo a tu taller.</p>
+          <p class="hint mt-m">Si algún dato no es correcto, díselo a tu taller.</p>
         </section>
         <section class="card" aria-labelledby="revision">
           <h2 id="revision" class="card-title"><Icon name="calendar" />Próxima revisión y mantenimientos</h2>
@@ -115,8 +115,8 @@ const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next
             </ul>
           )}
           {!hasService && services.length === 0 && <p class="hint">Tu taller todavía no ha anotado la próxima revisión ni otros mantenimientos.</p>}
-          <p class="hint" style="margin-top:12px">Las fechas son orientativas (lo primero que llegue: la fecha o los kilómetros).</p>
-          <p class="hint" style="margin-top:12px">Si quieres que te lo recordemos, actívalo en <a href="/portal/datos">Mis datos</a>.</p>
+          <p class="hint mt-m">Las fechas son orientativas (lo primero que llegue: la fecha o los kilómetros).</p>
+          <p class="hint mt-m">Si quieres que te lo recordemos, actívalo en <a href="/portal/datos">Mis datos</a>.</p>
         </section>
         <section class="card" aria-labelledby="quitar-t">
           <h2 id="quitar-t" class="card-title">¿Ya no tienes este vehículo?</h2>
@@ -134,7 +134,7 @@ const hasService = Boolean(vehicle && (vehicle.next_service_date || vehicle.next
             <form method="post">
               <input type="hidden" name="action" value="pedir-quitar" />
               <button class="btn btn-sm btn-danger" type="submit">Quitar de mi portal…</button>
-              <p class="hint" style="margin-top:8px">No se borra: va a la papelera durante 30 días.</p>
+              <p class="hint mt-s">No se borra: va a la papelera durante 30 días.</p>
             </form>
           )}
         </section>

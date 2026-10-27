@@ -291,7 +291,7 @@ const integrations = [
               <dt>Identificador</dt><dd class="mono">{panel.workshop.slug}</dd>
               {workshop && <><dt>Alta</dt><dd>{formatDate(workshop.created_at)}</dd></>}
             </dl>
-            <p class="hint" style="margin-top:10px">El estado, el plan y el identificador solo los cambia la plataforma.</p>
+            <p class="hint mt-m">El estado, el plan y el identificador solo los cambia la plataforma.</p>
           </section>
 
           <section class="card" aria-labelledby="legal-t">
@@ -308,7 +308,7 @@ const integrations = [
             ) : (
               <p class="hint">Pendiente: la persona propietaria del taller tiene que aceptar las <a href="/condiciones" data-astro-reload>condiciones</a> y el <a href="/encargo" data-astro-reload>contrato de encargo</a>.</p>
             )}
-            <p class="hint" style="margin-top:8px">El aviso legal y la privacidad de tu web se rellenan solos con los datos de la izquierda: <a href="/aviso-legal" target="_blank" rel="noopener">ver aviso legal</a> · <a href="/privacidad" target="_blank" rel="noopener">ver privacidad</a>.</p>
+            <p class="hint mt-s">El aviso legal y la privacidad de tu web se rellenan solos con los datos de la izquierda: <a href="/aviso-legal" target="_blank" rel="noopener">ver aviso legal</a> · <a href="/privacidad" target="_blank" rel="noopener">ver privacidad</a>.</p>
           </section>
 
           <section class="card" aria-labelledby="web-t">
@@ -319,7 +319,7 @@ const integrations = [
               <dt>Dominios</dt>
               <dd>{domains.length === 0 ? 'Ninguno todavía' : domains.map((d, i) => <>{i > 0 && ', '}<span class="mono">{d.hostname}</span>{d.is_primary && ' (principal)'}</>)}</dd>
             </dl>
-            <p class="hint" style="margin-top:10px">Los textos, el aspecto y los dominios de la web los configura la plataforma. Las solicitudes que llegan desde ella están en <a href="/panel/solicitudes">Solicitudes web</a>.</p>
+            <p class="hint mt-m">Los textos, el aspecto y los dominios de la web los configura la plataforma. Las solicitudes que llegan desde ella están en <a href="/panel/solicitudes">Solicitudes web</a>.</p>
           </section>
 
           <section class="card" aria-labelledby="int-t">
@@ -332,7 +332,7 @@ const integrations = [
                 </li>
               ))}
             </ul>
-            <p class="hint" style="margin-top:10px">Qué avisos reciben tus clientes se decide en <a href="/panel/avisos#ajustes">Avisos</a>; los recordatorios, en <a href="/panel/recordatorios">Recordatorios</a>; cada cuánto toca cada servicio, en <a href="/panel/mantenimientos">Mantenimientos</a>.</p>
+            <p class="hint mt-m">Qué avisos reciben tus clientes se decide en <a href="/panel/avisos#ajustes">Avisos</a>; los recordatorios, en <a href="/panel/recordatorios">Recordatorios</a>; cada cuánto toca cada servicio, en <a href="/panel/mantenimientos">Mantenimientos</a>.</p>
           </section>
 
           <section class="card" aria-labelledby="consumo-t" id="consumo">
@@ -340,7 +340,7 @@ const integrations = [
             {!usage ? <p class="hint">No se ha podido cargar el consumo. Recarga la página.</p> : (
               <>
                 <p class="hint">Avisos por WhatsApp y consultas por matrícula de {MONTH}. Cuestan dinero a la plataforma, así que van a cargo del taller (IVA incluido). Los avisos en el portal, el correo y las notificaciones en el móvil no cuentan.</p>
-                  <table class="data-table" style="margin-top:10px">
+                  <table class="data-table mt-m">
                     <caption class="sr-only">Consumo de extras de {MONTH}</caption>
                     <thead><tr><th scope="col">Extra</th><th scope="col" class="num-col">Usados</th><th scope="col" class="num-col">Importe</th></tr></thead>
                     <tbody>
@@ -349,7 +349,7 @@ const integrations = [
                       <tr><th scope="row">Total</th><td></td><td class="num-col"><strong>{formatCents(usage.whatsapp_cents + usage.matriculas_cents)}</strong></td></tr>
                     </tbody>
                   </table>
-                <p class="hint" style="margin-top:8px">Precio en tu plan ({PLAN_LABELS[usage.plan] ?? usage.plan}): WhatsApp, {tariff(usage.whatsapp_unit_cents, usage.whatsapp_discounted_cents, usage.whatsapp_limit, 'aviso')}; matrícula, {tariff(usage.matricula_unit_cents, usage.matricula_discounted_cents, usage.matricula_limit, 'consulta')}. Repetir una matrícula en 24 h o una consulta fallida no cuenta.</p>
+                <p class="hint mt-s">Precio en tu plan ({PLAN_LABELS[usage.plan] ?? usage.plan}): WhatsApp, {tariff(usage.whatsapp_unit_cents, usage.whatsapp_discounted_cents, usage.whatsapp_limit, 'aviso')}; matrícula, {tariff(usage.matricula_unit_cents, usage.matricula_discounted_cents, usage.matricula_limit, 'consulta')}. Repetir una matrícula en 24 h o una consulta fallida no cuenta.</p>
               </>
             )}
           </section>
@@ -357,7 +357,7 @@ const integrations = [
           <section class="card" aria-labelledby="copia-t">
             <h2 id="copia-t" class="card-title"><Icon name="shield" />Copia de seguridad</h2>
             <p class="hint">Descarga todos los datos de tu taller (copia completa o tablas para Excel) cuando quieras.</p>
-            <p style="margin-top:12px"><a class="btn btn-sm" href="/panel/copia">Ir a la copia de seguridad</a></p>
+            <p class="mt-m"><a class="btn btn-sm" href="/panel/copia">Ir a la copia de seguridad</a></p>
           </section>
         </div>
       </div>

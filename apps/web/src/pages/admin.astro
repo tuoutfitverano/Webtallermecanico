@@ -114,7 +114,7 @@ const KIND: Record<string, string> = {
     <section class="panel liquid-glass" aria-labelledby="mfa-t">
       <h2 id="mfa-t" class="panel-title heading">Falta la verificación en dos pasos</h2>
       <p>La administración de la plataforma solo funciona si has entrado con la verificación en dos pasos.</p>
-      <p style="margin-top:12px"><a class="btn btn-primary" href="/cuenta/seguridad">Activar la verificación en dos pasos</a></p>
+      <p class="mt-m"><a class="btn btn-primary" href="/cuenta/seguridad">Activar la verificación en dos pasos</a></p>
     </section>
   ) : (
     <>
@@ -123,7 +123,7 @@ const KIND: Record<string, string> = {
         {supportOpen ? (
           <>
             <div class="alert alert-warn" role="status"><Icon name="shield" /><span>Abierta hasta las {formatDateTime(status.support_until)} · motivo: «{status.support_reason}». Mientras está abierta puedes leer datos de los talleres para resolver la incidencia.</span></div>
-            <form method="post" style="margin-top:12px" data-busy="Cerrando…">
+            <form class="mt-m" method="post" data-busy="Cerrando…">
               <input type="hidden" name="action" value="cerrar" />
               <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Cerrar la sesión de soporte</span></button>
             </form>
@@ -165,8 +165,8 @@ const KIND: Record<string, string> = {
             <button class="btn" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Consultar</span></button>
           </form>
           {diagnosis && (
-            diagnosis.length === 0 || !diagnosis[0]!.account_exists ? <p style="margin-top:12px">No hay ninguna cuenta con ese correo.</p> : (
-              <ul class="plain-list" style="margin-top:12px" aria-label="Resultado del diagnóstico">
+            diagnosis.length === 0 || !diagnosis[0]!.account_exists ? <p class="mt-m">No hay ninguna cuenta con ese correo.</p> : (
+              <ul class="plain-list mt-m" aria-label="Resultado del diagnóstico">
                 <li>Cuenta: existe · correo {diagnosis[0]!.email_confirmed ? 'confirmado' : 'SIN confirmar'}</li>
                 {diagnosis.map(d => <li>{d.workshop_name ?? '—'} · {LINK[d.link_status ?? ''] ?? d.link_status}{d.since && ` · desde ${formatDateTime(d.since)}`}</li>)}
               </ul>

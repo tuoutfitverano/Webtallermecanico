@@ -179,3 +179,8 @@
   [data-area='app'] .auth-top:has(.auth-top-user) .brand-name { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   [data-area='app'] .auth-top-user { gap: 8px; }
 }
+
+/* Separación vertical dentro de una tarjeta: tres medidas, siempre las mismas. */
+.mt-s { margin-top: 8px; }
+.mt-m { margin-top: 12px; }
+.mt-l { margin-top: 20px; }

@@ -59,7 +59,7 @@ Migración `20261109090100_cambio_titular.sql`, pruebas `31_cambio_titular.test.
 
 Migración `20261110090000_agenda.sql`, pruebas `32_agenda.test.sql` y `e2e/agenda.spec.ts`; reglas en `packages/core/src/agenda.ts`.
 
-- Cada persona del taller (mecánico, recepción, administración, propietario) tiene su agenda, con vistas de **día** (por horas), **semana** y **mes**.
+- Cada persona del taller (mecánico, recepción, administración, propietario) tiene su agenda, con vistas de **día** (por horas), **semana** (rejilla de lunes a domingo con las horas: cada apunte ocupa su hora y lo que dura; en el móvil, lista de días) y **mes**.
 - **Apuntes:** tarea, cita, reunión, ausencia u otro, con día, hora de inicio y de fin, notas y, si se quiere, la orden de reparación relacionada. Se marcan como **hechos** (la hora la pone el servidor), se editan y se borran en dos pasos.
 - **Lo que ha hecho:** los apuntes hechos y el **tiempo fichado** en las órdenes (`repair_order_work_logs`) salen en su día y hora. Las órdenes planificadas para ese día (`scheduled_on`) también aparecen.
 - **Quién ve qué** (en la base de datos, RLS):

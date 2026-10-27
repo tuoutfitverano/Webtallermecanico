@@ -182,7 +182,7 @@ const span = (x: Item) => sameDay(x) ? `${localTime(x.starts_at)}–${localTime(
 const DOW = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const DOW_SHORT = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const MONTH = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
-const heading = view === 'dia' ? `${DOW[weekday(date)]}, ${formatDay(date)}` : view === 'semana' ? `Semana del ${formatDay(days[0])} al ${formatDay(days[6])}` : MONTH.charAt(0).toUpperCase() + MONTH.slice(1);
+const heading = view === 'dia' ? `${DOW[weekday(date)]}, ${formatDay(date)}` : view === 'semana' ? `Semana del ${formatDay(days[0]).replace(/ \d{4}$/, '')} al ${formatDay(days[6])}` : MONTH.charAt(0).toUpperCase() + MONTH.slice(1);
 const personLabel = person === 'todos' ? 'Todo el equipo' : person === me ? 'Mi agenda' : `Agenda de ${name(person)}`;
 // Día: horas con algo, y como mínimo de 8 a 20.
 const hours = (() => {
@@ -190,6 +190,41 @@ const hours = (() => {
   const from = Math.min(8, ...hs), to = Math.max(20, ...hs);
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
 })();
+// ---- Semana: rejilla de horas (cada apunte en su hora y con su duración) ----
+const hourOf = (iso: string) => { const t = localTime(iso); return Number(t.slice(0, 2)) + Number(t.slice(3, 5)) / 60; };
+const nowHour = hourOf(new Date().toISOString());
+interface Block { s: number; e: number; lane: number; lanes: number; item?: Item; log?: (typeof logs)[number] }
+/** Lo de un día como bloques (desde/hasta en horas) repartidos en carriles si se solapan. */
+function blocksOn(d: string): Block[] {
+  const bs: Block[] = [
+    ...itemsOn(d).map(x => ({ s: localDay(x.starts_at) < d ? 0 : hourOf(x.starts_at), e: localDay(x.ends_at) > d ? 24 : hourOf(x.ends_at), lane: 0, lanes: 1, item: x })),
+    ...logsOn(d).map(l => {
+      const s = hourOf(l.started_at);
+      const e = l.ended_at ? (localDay(l.ended_at) > d ? 24 : hourOf(l.ended_at)) : d === today ? nowHour : s;
+      return { s, e, lane: 0, lanes: 1, log: l };
+    }),
+  ].map(b => ({ ...b, e: Math.max(b.e, b.s + 0.5) })).sort((a, b) => a.s - b.s || b.e - a.e);
+  // Grupos de bloques que se pisan: cada uno en el primer carril libre.
+  let group: Block[] = [], groupEnd = -1;
+  const ends: number[] = [];
+  const close = () => { for (const b of group) b.lanes = ends.length; group = []; ends.length = 0; };
+  for (const b of bs) {
+    if (b.s >= groupEnd) { close(); groupEnd = -1; }
+    let lane = ends.findIndex(end => end <= b.s);
+    if (lane < 0) { lane = ends.length; ends.push(b.e); } else ends[lane] = b.e;
+    b.lane = lane; group.push(b); groupEnd = Math.max(groupEnd, b.e);
+  }
+  close();
+  return bs;
+}
+const weekBlocks = view === 'semana' ? new Map(days.map(d => [d, blocksOn(d)])) : new Map<string, Block[]>();
+const allBlocks = [...weekBlocks.values()].flat();
+const gridFrom = Math.max(0, Math.min(8, ...allBlocks.map(b => Math.floor(b.s))));
+const gridTo = Math.min(24, Math.max(20, ...allBlocks.map(b => Math.ceil(b.e))));
+const gridHours = Array.from({ length: gridTo - gridFrom }, (_, i) => gridFrom + i);
+const clip = (h: number) => Math.min(gridTo, Math.max(gridFrom, h));
+const blockStyle = (b: Block) => `--s:${clip(b.s).toFixed(3)};--e:${clip(b.e).toFixed(3)};--lane:${b.lane};--lanes:${b.lanes}`;
+const DOW_ABBR = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const startsInHour = (h: number) => itemsOn(date).filter(x => (localDay(x.starts_at) === date ? Number(localTime(x.starts_at).slice(0, 2)) : 0) === h);
 const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.started_at).slice(0, 2)) === h);
 ---
@@ -204,29 +239,31 @@ const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.st
     <>
       <Flash kind={flash.kind} text={flash.text} />
       {loadError && <Flash kind="bad" text="No hemos podido cargar la agenda. Recarga la página." />}
-      <nav class="pnl-actions agenda-views" aria-label="Vista">
-        {VIEWS.map(v => <a class:list={['btn btn-sm', { 'btn-primary': v === view }]} href={href({ vista: v })} aria-current={v === view ? 'page' : undefined}>{v === 'dia' ? 'Día' : v === 'semana' ? 'Semana' : 'Mes'}</a>)}
-      </nav>
-      <div class="agenda-bar">
-        <nav class="pnl-actions" aria-label="Fechas">
-          <a class="btn btn-sm" href={href({ fecha: prevDate })}>← Anterior</a>
-          <a class="btn btn-sm" href={href({ fecha: today })}>Hoy</a>
-          <a class="btn btn-sm" href={href({ fecha: nextDate })}>Siguiente →</a>
-        </nav>
-        {panel.isManager && (
-          <form method="get" class="filters" action="/panel/agenda">
-            <input type="hidden" name="vista" value={view} /><input type="hidden" name="fecha" value={date} />
-            <div class="field"><label for="persona">Persona</label>
+      <div class="agenda-head">
+        <h2 class="agenda-title">{heading}<span class="agenda-who">{personLabel}</span></h2>
+        <div class="agenda-controls">
+          <nav class="agenda-seg" aria-label="Vista">
+            {VIEWS.map(v => <a href={href({ vista: v })} aria-current={v === view ? 'page' : undefined}>{v === 'dia' ? 'Día' : v === 'semana' ? 'Semana' : 'Mes'}</a>)}
+          </nav>
+          <nav class="agenda-seg" aria-label="Fechas">
+            <a href={href({ fecha: prevDate })}>← Anterior</a>
+            <a href={href({ fecha: today })} aria-current={days.includes(today) ? 'date' : undefined}>Hoy</a>
+            <a href={href({ fecha: nextDate })}>Siguiente →</a>
+          </nav>
+          {panel.isManager && (
+            <form method="get" class="agenda-person" action="/panel/agenda">
+              <input type="hidden" name="vista" value={view} /><input type="hidden" name="fecha" value={date} />
+              <label for="persona">Persona</label>
               <select class="select" id="persona" name="persona">
                 <option value="">Mi agenda</option>
                 <option value="todos" selected={person === 'todos'}>Todo el equipo</option>
                 {activeTeam.filter(m => m.user_id !== me).map(m => <option value={m.user_id} selected={m.user_id === person}>{m.full_name ?? m.email ?? 'Sin nombre'}</option>)}
-              </select></div>
-            <button class="btn" type="submit">Ver</button>
-          </form>
-        )}
+              </select>
+              <button class="btn btn-sm" type="submit">Ver</button>
+            </form>
+          )}
+        </div>
       </div>
-      <h2 class="agenda-title">{heading} <span class="muted">· {personLabel}</span></h2>
 
       {view === 'dia' && (
         <section class="card" aria-label={`Horas del ${formatDay(date)}`}>
@@ -274,25 +311,51 @@ const logsInHour = (h: number) => logsOn(date).filter(x => Number(localTime(x.st
       )}
 
       {view === 'semana' && (
-        <div class="week agenda-week">
-          {days.map(d => (
-            <section class:list={['board-col', { 'is-today': d === today }]} aria-labelledby={`d-${d}`}>
-              <h3 id={`d-${d}`} class="card-title"><a href={href({ vista: 'dia', fecha: d })}>{DOW[weekday(d)]} {formatDay(d)}</a></h3>
-              {plannedOn(d).map(o => <p class="row-meta"><Icon name="wrench" /><a href={`/panel/ordenes/${o.id}`}>{orderLabel(o.number)}</a>{o.vehicles && ` ${formatPlate(o.vehicles.plate)}`}{person === 'todos' && ` · ${name(o.assigned_to)}`}</p>)}
-              {itemsOn(d).length === 0 && logsOn(d).length === 0 && plannedOn(d).length === 0 ? <p class="hint">Nada apuntado.</p> : (
-                <ul class="plain-list">
-                  {itemsOn(d).map(x => (
-                    <li class:list={['agenda-item', `is-${x.kind}`, { 'is-done': x.done_at }]}>
-                      <a href={`${href({ editar: x.id })}#apunte`}><span class="agenda-time">{span(x)}</span> {x.title}</a>
-                      <span class="row-meta">{AGENDA_KIND_LABELS[x.kind]}{x.done_at ? ' · hecho' : ''}{person === 'todos' ? ` · ${name(x.user_id)}` : ''}</span>
-                    </li>
-                  ))}
-                  {logsOn(d).map(l => <li class="agenda-log"><Icon name="clock" />{localTime(l.started_at)}–{l.ended_at ? localTime(l.ended_at) : 'en curso'} trabajado en {l.repair_orders ? orderLabel(l.repair_orders.number) : 'una orden'}{person === 'todos' && ` · ${name(l.user_id)}`}</li>)}
-                </ul>
-              )}
-            </section>
-          ))}
-        </div>
+        <section class="card agenda-cal" aria-label={heading}>
+          <div class:list={['cal', { 'no-allday': planned.length === 0 }]} style={`--from:${gridFrom};--hours:${gridTo - gridFrom}`}>
+            <div class="cal-axis" aria-hidden="true">
+              <span class="cal-corner"></span>
+              <span class="cal-axis-allday">En taller</span>
+              <span class="cal-axis-hours">{gridHours.map(h => <span>{String(h).padStart(2, '0')}:00</span>)}</span>
+            </div>
+            {days.map(d => {
+              const bs = weekBlocks.get(d) ?? [];
+              const pl = plannedOn(d);
+              return (
+                <section class:list={['cal-day', { 'is-today': d === today, 'is-empty': bs.length === 0 && pl.length === 0 }]} aria-labelledby={`d-${d}`}>
+                  <h3 class="cal-head" id={`d-${d}`}>
+                    <a href={href({ vista: 'dia', fecha: d })}><span class="cal-dow">{DOW_ABBR[weekday(d)]}</span><span class="cal-num">{Number(d.slice(8))}</span><span class="sr-only"> {DOW[weekday(d)]} {formatDay(d)}</span></a>
+                  </h3>
+                  <ul class="cal-allday" aria-label={pl.length ? 'Órdenes planificadas' : undefined}>
+                    {pl.map(o => <li><a href={`/panel/ordenes/${o.id}`}><Icon name="wrench" />{orderLabel(o.number)}{o.vehicles && <span class="mono"> {formatPlate(o.vehicles.plate)}</span>}</a>{person === 'todos' && <span class="cal-who">{name(o.assigned_to)}</span>}</li>)}
+                  </ul>
+                  <div class="cal-body">
+                    {bs.length === 0 ? <p class="cal-free">{pl.length ? 'Sin apuntes.' : 'Nada apuntado.'}</p> : (
+                      <ol class="cal-events">
+                        {bs.map(b => b.item ? (
+                          <li class:list={['cal-ev', `is-${b.item.kind}`, { 'is-done': b.item.done_at, 'is-short': b.e - b.s < 0.75 }]} style={blockStyle(b)}>
+                            <a href={`${href({ editar: b.item.id })}#apunte`} title={`${span(b.item)} ${b.item.title}`}><span class="agenda-time">{span(b.item)}</span> <span class="cal-ev-title">{b.item.title}</span></a>
+                            <span class="cal-ev-meta">{AGENDA_KIND_LABELS[b.item.kind]}{b.item.done_at ? ' · hecho' : ''}{person === 'todos' ? ` · ${name(b.item.user_id)}` : ''}</span>
+                          </li>
+                        ) : b.log && (
+                          <li class:list={['cal-ev', 'is-log', { 'is-short': b.e - b.s < 0.75 }]} style={blockStyle(b)}>
+                            <a href={`/panel/ordenes/${b.log.order_id}`}><span class="agenda-time">{localTime(b.log.started_at)}–{b.log.ended_at ? localTime(b.log.ended_at) : 'en curso'}</span> <span class="cal-ev-title">Trabajado en {b.log.repair_orders ? orderLabel(b.log.repair_orders.number) : 'una orden'}</span></a>
+                            {person === 'todos' && <span class="cal-ev-meta">{name(b.log.user_id)}</span>}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    {d === today && nowHour >= gridFrom && nowHour <= gridTo && <span class="cal-now" style={`--s:${nowHour.toFixed(3)}`} aria-hidden="true"></span>}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+          <ul class="cal-legend" aria-label="Tipos">
+            {AGENDA_KINDS.map(k => <li class={`is-${k}`}>{AGENDA_KIND_LABELS[k]}</li>)}
+            <li class="is-log">Tiempo trabajado en órdenes</li>
+          </ul>
+        </section>
       )}
 
       {view === 'mes' && (
