@@ -294,7 +294,9 @@
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; }
 .facts dt { color: var(--p-muted); font-size: .875rem; }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
-.note-internal { background: color-mix(in srgb, var(--tone-warn) 12%, var(--p-surface)); border: 1px solid color-mix(in srgb, var(--tone-warn) 40%, transparent); border-radius: 10px; padding: 8px 12px; }
+/* Notas internas: contorno discontinuo (el fondo no cambia, así no baja el contraste en ningún color). */
+.note-internal { border: 1px dashed var(--p-line-2); border-radius: 12px; }
+.note-internal:not(.card) { padding: 8px 12px; }
 .hint { color: var(--p-muted); font-size: .8125rem; }
 .form-stack { display: grid; gap: 14px; }
 .form-stack .btn { justify-self: start; }
