@@ -231,6 +231,9 @@ test('vista previa: datos de demostración y recorrido de pantallas', async ({ p
   for (const p of plan) {
     await rest('PATCH', `/repair_orders?id=eq.${orders[p.o]!.id}`, owner.tok, { priority: p.priority, scheduled_on: p.scheduled_on, due_at: p.due_at, estimated_minutes: p.estimated_minutes, mileage_in: p.o === 7 ? 151200 : null });
   }
+  // Recepción de dos coches: combustible, daños que ya traían y comprobaciones (salen en el resguardo).
+  await rest('PATCH', `/repair_orders?id=eq.${orders[7]!.id}`, owner.tok, { fuel_level: '1/4', existing_damage: 'Rayón en la puerta trasera izquierda y faro antiniebla derecho roto.', reception_checks: ['documentacion', 'rueda_repuesto', 'testigos_encendidos'] });
+  await rest('PATCH', `/repair_orders?id=eq.${orders[3]!.id}`, owner.tok, { fuel_level: '3/4', reception_checks: ['documentacion', 'objetos_valor'] });
   // El trabajador da por terminados los neumáticos de la furgoneta (pendiente de revisión).
   await rest('POST', '/rpc/mark_order_done', worker.tok, { p_order_id: orders[9]!.id });
   // Fichaje real del trabajador en el Citroën (empezar y parar: hora del servidor).

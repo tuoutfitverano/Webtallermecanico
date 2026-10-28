@@ -14,7 +14,7 @@ import { dispatchOrderEmails } from '../../../lib/server/notify.ts';
 import { dbErrorMessage } from '../../../lib/auth/messages.ts';
 import { localInputToDb, toLocalInput } from '../../../lib/panel/format.ts';
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
-import { fieldErrors, formatPlate, orderCreateSchema } from '@talleres/core';
+import { fieldErrors, formatPlate, orderCreateSchema, parseReception, FUEL_LEVELS, FUEL_LEVEL_LABELS, RECEPTION_CHECKS, RECEPTION_CHECK_LABELS } from '@talleres/core';
 
 export const prerender = false;
 
@@ -47,19 +47,30 @@ const values: Record<string, string> = {
   received_at: toLocalInput(new Date()),
   problem_description: '',
   internal_notes: '',
+  mileage_in: '',
+  fuel_level: '',
+  existing_damage: '',
 };
+let checks: string[] = [];
 let errors: Partial<Record<string, string>> = {};
 let error = '';
 
 if (panel.form && panel.workshop && panel.isOffice) {
   for (const k of Object.keys(values)) values[k] = field(panel.form, k);
+  checks = panel.form.getAll('reception_checks').map(String);
+  // Recepción (opcional): kilómetros, combustible, daños y comprobaciones.
+  const km = values.mileage_in!.replace(/\D/g, '');
+  const reception = parseReception({ fuel: values.fuel_level!, damage: values.existing_damage!, checks });
   // Si no se elige cliente, se usa el del vehículo.
   if (!values.customer_id) values.customer_id = vehicles.find(v => v.id === values.vehicle_id)?.customer_id ?? '';
   const parsed = orderCreateSchema.safeParse({
     vehicleId: values.vehicle_id, customerId: values.customer_id, assignedTo: values.assigned_to,
     receivedAt: values.received_at, problemDescription: values.problem_description, internalNotes: values.internal_notes,
   });
-  if (!parsed.success) {
+  if (!reception.ok || (km && Number(km) > 3000000)) {
+    error = reception.ok ? 'Kilómetros no válidos.' : reception.error;
+    Astro.response.status = 422;
+  } else if (!parsed.success) {
     errors = fieldErrors(parsed.error);
     if (errors.vehicleId) errors.vehicleId = 'Elige el vehículo.';
     if (errors.customerId) errors.customerId = 'Elige el cliente (el vehículo no tiene ninguno asignado).';
@@ -75,6 +86,8 @@ if (panel.form && panel.workshop && panel.isOffice) {
       received_at: d.receivedAt ? localInputToDb(d.receivedAt) : undefined,
       problem_description: d.problemDescription,
       internal_notes: d.internalNotes,
+      mileage_in: km ? Number(km) : null,
+      ...reception.data,
     }).select('id').single();
     if (!e && data) {
       await dispatchOrderEmails(Astro, data.id);
@@ -145,6 +158,26 @@ const err = (k: string) => errors[k];
           <label for="internal_notes">Notas internas <span class="muted">(solo para el taller)</span></label>
           <textarea class="textarea" id="internal_notes" name="internal_notes" maxlength="4000" rows="3">{values.internal_notes}</textarea>
         </div>
+        <details class="reception" open={Boolean(values.mileage_in || values.fuel_level || values.existing_damage || checks.length)}>
+          <summary>Estado del vehículo al recibirlo <span class="muted">(opcional; sale en el resguardo que firma el cliente)</span></summary>
+          <div class="form-stack mt-m">
+            <div class="form-row">
+              <div class="field"><label for="mileage_in">Kilómetros a la entrada</label>
+                <input class="input" id="mileage_in" name="mileage_in" inputmode="numeric" placeholder="Ej.: 120500" value={values.mileage_in} /></div>
+              <div class="field"><label for="fuel_level">Combustible</label>
+                <select class="select" id="fuel_level" name="fuel_level">
+                  <option value="">Sin anotar</option>
+                  {FUEL_LEVELS.map(f => <option value={f} selected={values.fuel_level === f}>{FUEL_LEVEL_LABELS[f]}</option>)}
+                </select></div>
+            </div>
+            <div class="field"><label for="existing_damage">Daños que ya trae</label>
+              <textarea class="textarea" id="existing_damage" name="existing_damage" rows="2" maxlength="1000" placeholder="Ej.: rayón en la puerta trasera izquierda">{values.existing_damage}</textarea></div>
+            <fieldset class="checks">
+              <legend>Comprobado al recibirlo</legend>
+              {RECEPTION_CHECKS.map(c => <label class="check"><input type="checkbox" name="reception_checks" value={c} checked={checks.includes(c)} /><span>{RECEPTION_CHECK_LABELS[c]}</span></label>)}
+            </fieldset>
+          </div>
+        </details>
         <button class="btn btn-primary" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Crear orden</span></button>
       </form>
     </section>

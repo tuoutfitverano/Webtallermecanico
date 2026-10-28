@@ -95,3 +95,13 @@ Sin ellos, la aplicación funciona igual: avisos solo en el portal y alta manual
 4. Crear cliente, vehículo y orden. Invitar al cliente al portal y cambiar el estado: el aviso aparece en su portal (y por email si está activado).
 5. Con otra cuenta de otro taller, comprobar que no se ve nada del primero.
 6. Revisar las cabeceras con las herramientas del navegador: `content-security-policy`, `strict-transport-security`, `x-content-type-options`.
+7. `https://<tu-dominio>/api/salud` responde `{"ok":true}`.
+
+## 8. Vigilancia (gratis)
+
+- **Disponibilidad:** un comprobador gratuito (por ejemplo, el de Cloudflare o cualquier servicio de «uptime» con plan gratis) que pida `GET /api/salud` cada pocos minutos y avise si no responde 200. Sin credenciales solo devuelve `{ ok }`.
+- **Colas atascadas:** con `Authorization: Bearer <NOTIFICATIONS_CRON_SECRET>` la misma dirección devuelve también `database`, `stuckNotifications`, `stuckPush` y `alert` (solo recuentos, ningún dato personal). `alert: true` = hay avisos de email/WhatsApp (de canales configurados) o al móvil esperando más de 30 minutos. Ese secreto solo debe estar en el comprobador, nunca en una web pública.
+- **Errores:** los registros del Worker (Cloudflare → Workers → Logs) son líneas JSON con `level`. Basta un filtro `level = "error"` para ver lo que falla; cada línea lleva el evento (`cron_part_error`, `unhandled_error`, `health_error`…) y, en fallos de página, el `rid` que también ve la persona («avisa indicando este código»).
+- **Tarea programada:** si una de sus partes falla (email, WhatsApp, móvil o mantenimiento), responde 500 y lo registra (`cron_part_error`); las demás partes se hacen igual.
+
+Nada de esto está probado contra Cloudflare real: no hay entorno de producción todavía. Se ha probado en local (pruebas `avisos.spec.ts` y unitarias de `log.test.ts`).

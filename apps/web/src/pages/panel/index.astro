@@ -11,7 +11,7 @@ import Flash from '../../components/panel/Flash.astro';
 import { loadTeam, memberName, panelPage } from '../../lib/server/panel.ts';
 import { logAuth } from '../../lib/server/auth.ts';
 import { formatDateTime, todayMadrid } from '../../lib/panel/format.ts';
-import { formatPlate, orderLabel, type RepairStatus } from '@talleres/core';
+import { formatPlate, orderLabel, ORDER_PRIORITY_LABELS, type OrderPriority, type RepairStatus } from '@talleres/core';
 import { LEGAL_VERSION } from '../../lib/legal/platform.ts';
 
 export const prerender = false;
@@ -33,10 +33,14 @@ let late = 0;
 let toReview = 0;
 let freeOrders: number | null = null;
 let termsPending = false;
+interface Upcoming { id: string; number: number; status: RepairStatus; due_at: string; priority: OrderPriority; vehicles: { plate: string; make: string; model: string } | null }
+let upcoming: Upcoming[] = [];
 if (panel.workshop) {
   const id = panel.workshop.id;
   const today = todayMadrid();
-  const [s, r, t, w, st] = await Promise.all([
+  // Próximas entregas: fecha prevista en los próximos 2 días o ya pasada (sin entregar). El mecánico ve las suyas (RLS).
+  const soon = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  const [s, r, t, w, st, up] = await Promise.all([
     panel.supabase.rpc('workshop_dashboard', { p_workshop_id: id }),
     panel.supabase.rpc('search_repair_orders', { p_workshop_id: id, p_query: '', p_limit: 8 }),
     loadTeam(panel),
@@ -48,7 +52,11 @@ if (panel.workshop) {
     panel.isOffice
       ? panel.supabase.rpc('workshop_stats', { p_workshop_id: id, p_from: today, p_to: today })
       : Promise.resolve({ data: null, error: null }),
+    panel.supabase.from('repair_orders').select('id, number, status, due_at, priority, vehicles(plate, make, model)')
+      .eq('workshop_id', id).neq('status', 'entregado').not('due_at', 'is', null).lte('due_at', soon).order('due_at').limit(6),
   ]);
+  if (up.error) logAuth('panel_dashboard_upcoming_error', up.error.code);
+  upcoming = (up.data ?? []) as unknown as Upcoming[];
   // Revisión de trabajos terminados (propietario y administrador) y órdenes libres (mecánicos).
   if (panel.isManager) {
     const { count } = await panel.supabase.from('repair_orders').select('id', { count: 'exact', head: true }).eq('workshop_id', id).not('review_requested_at', 'is', null);
@@ -130,6 +138,32 @@ const kpis = summary ? [
           </section>
         );
       })()}
+
+      {upcoming.length > 0 && (
+        <section class="card" aria-labelledby="entregas">
+          <h2 id="entregas" class="card-title"><Icon name="calendar" />Próximas entregas</h2>
+          <ul class="list">
+            {upcoming.map(o => {
+              const overdue = Date.parse(o.due_at) < Date.now();
+              return (
+                <li>
+                  <a class="row" href={`/panel/ordenes/${o.id}`}>
+                    <span class="row-main">
+                      <span class="row-title"><span class="num">{orderLabel(o.number)}</span>{o.vehicles && <><span class="plate">{formatPlate(o.vehicles.plate)}</span>{o.vehicles.make} {o.vehicles.model}</>}</span>
+                      <span class="row-meta">{overdue ? 'Debía estar el ' : 'Prevista el '}{formatDateTime(o.due_at)}</span>
+                    </span>
+                    <span class="row-side">
+                      {overdue && <span class="pill pill-bad">Retrasada</span>}
+                      {o.priority === 'urgente' && <span class="pill pill-warn">{ORDER_PRIORITY_LABELS.urgente}</span>}
+                      <StatusBadge status={o.status} />
+                    </span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {panel.isOffice && (
         <section class="card" aria-labelledby="atajos">

@@ -182,3 +182,39 @@ export function fieldErrors(error: z.ZodError): Partial<Record<string, string>> 
   for (const issue of error.issues) out[issue.path.join('.') || '_'] ??= issue.message;
   return out;
 }
+
+// ---------------------------------------------------------------- recepción del vehículo
+
+/** Combustible al recibir el vehículo (mismos valores que la base de datos). */
+export const FUEL_LEVELS = ['reserva', '1/4', '1/2', '3/4', 'lleno'] as const;
+export type FuelLevel = (typeof FUEL_LEVELS)[number];
+export const FUEL_LEVEL_LABELS: Readonly<Record<FuelLevel, string>> = {
+  reserva: 'En reserva', '1/4': '1/4', '1/2': '1/2', '3/4': '3/4', lleno: 'Lleno',
+};
+
+/** Comprobaciones de la recepción (lista cerrada, igual que en la base de datos). */
+export const RECEPTION_CHECKS = ['documentacion', 'rueda_repuesto', 'herramientas', 'llave_antirrobo', 'objetos_valor', 'testigos_encendidos'] as const;
+export type ReceptionCheck = (typeof RECEPTION_CHECKS)[number];
+export const RECEPTION_CHECK_LABELS: Readonly<Record<ReceptionCheck, string>> = {
+  documentacion: 'Deja la documentación del vehículo',
+  rueda_repuesto: 'Lleva rueda de repuesto o kit antipinchazos',
+  herramientas: 'Lleva gato y herramientas',
+  llave_antirrobo: 'Deja la llave de los tornillos antirrobo',
+  objetos_valor: 'Hay objetos de valor dentro (avisado al cliente)',
+  testigos_encendidos: 'Llega con testigos encendidos en el cuadro',
+};
+
+export interface Reception { fuel_level: FuelLevel | null; existing_damage: string | null; reception_checks: ReceptionCheck[] }
+
+/** Lee y valida la recepción de un formulario (campos fuel_level, existing_damage y reception_checks repetido). */
+export function parseReception(input: { fuel: string; damage: string; checks: string[] }):
+  { ok: true; data: Reception } | { ok: false; error: string } {
+  const fuel = input.fuel.trim();
+  if (fuel && !(FUEL_LEVELS as readonly string[]).includes(fuel)) return { ok: false, error: 'Nivel de combustible no válido.' };
+  const damage = input.damage.trim();
+  if (damage.length > 1000) return { ok: false, error: 'La descripción de los daños es demasiado larga (máximo 1000 caracteres).' };
+  const unknown = input.checks.find(c => !(RECEPTION_CHECKS as readonly string[]).includes(c));
+  if (unknown !== undefined) return { ok: false, error: 'Comprobación de recepción no válida.' };
+  const checks = RECEPTION_CHECKS.filter(c => input.checks.includes(c));
+  return { ok: true, data: { fuel_level: (fuel || null) as FuelLevel | null, existing_damage: damage || null, reception_checks: checks } };
+}

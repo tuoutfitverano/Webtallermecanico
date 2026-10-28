@@ -48,7 +48,7 @@ if (portal.records.length > 0) {
 const linkLabel = (n: Notice) => {
   const p = n.link_path ?? '';
   if (p.startsWith('/portal/presupuestos')) return 'Ver el presupuesto';
-  if (p.startsWith('/portal/facturas')) return 'Ver la factura';
+  if (p.startsWith('/portal/facturas')) return 'Ver el resumen de servicios';
   if (p.startsWith('/portal/vehiculos')) return 'Ver el vehículo';
   if (p.startsWith('/portal/datos')) return 'Ir a Mis datos';
   return 'Ver la reparación';

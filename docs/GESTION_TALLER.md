@@ -112,3 +112,16 @@ Los genera la base de datos una vez al día en el mantenimiento programado (`/ap
 
 - Base de datos: `supabase/tests/15_gestion_taller.test.sql`, `16_facturacion_recordatorios.test.sql` y `18_mantenimientos.test.sql`.
 - Navegador: `apps/web/e2e/gestion.spec.ts` (incluye la cuenta de recepción `recepcion@e2e.test`).
+
+## Recepción del vehículo
+
+Migración `20261113090000_recepcion_vehiculo.sql`, pruebas `33_recepcion.test.sql` y `e2e/gestion.spec.ts` («recepción del vehículo»).
+
+- Al crear la orden (desplegable «Estado del vehículo al recibirlo») o después, en la ficha de la orden: kilómetros, combustible, daños que ya trae y una lista de comprobación (documentación, rueda de repuesto, herramientas, llave antirrobo, objetos de valor, testigos encendidos).
+- Solo la oficina (propiedad, administración y recepción) lo anota o cambia; el mecánico lo ve. Lo impone la base de datos.
+- Sale en el **resguardo de depósito** que firma el cliente: así queda constancia de cómo llegó el coche.
+- **Fotos:** no están. Necesitan almacenar archivos (Supabase Storage); antes hay que decidir cuánto espacio y si cabe en el plan gratuito. Es la primera de las mejoras propuestas.
+
+## Inicio: próximas entregas
+
+En el inicio del panel, «Próximas entregas» lista las órdenes sin entregar con la fecha prevista en los próximos 2 días o ya pasada. Las pasadas salen como **Retrasada** y las urgentes, marcadas. El mecánico ve solo las suyas.

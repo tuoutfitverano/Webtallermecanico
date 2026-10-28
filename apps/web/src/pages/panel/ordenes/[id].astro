@@ -26,8 +26,8 @@ import { LINE_SELECT, lineColumns, readLine, type LineRow } from '../../../lib/p
 import { ROLE_LABELS } from '../../../lib/auth/validate.ts';
 import {
   fieldErrors, formatCents, formatPlate, INVOICE_STATUS_LABELS, isOrderPriority, isRepairStatus, ORDER_PRIORITIES, ORDER_PRIORITY_LABELS, orderLabel,
-  orderUpdateSchema, QUOTE_STATUS_LABELS, describeServiceInterval, quoteLabel, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES, whatsappLink,
-  type OrderPriority, type QuoteStatus, type RepairStatus,
+  orderUpdateSchema, parseReception, QUOTE_STATUS_LABELS, FUEL_LEVELS, FUEL_LEVEL_LABELS, RECEPTION_CHECKS, RECEPTION_CHECK_LABELS, describeServiceInterval, quoteLabel, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES, whatsappLink,
+  type FuelLevel, type OrderPriority, type QuoteStatus, type ReceptionCheck, type RepairStatus,
 } from '@talleres/core';
 
 export const prerender = false;
@@ -40,7 +40,8 @@ interface Order {
   id: string; number: number; status: RepairStatus; received_at: string; problem_description: string; diagnosis: string | null;
   work_done: string | null; internal_notes: string | null; assigned_to: string | null; created_at: string; updated_at: string;
   delivered_at: string | null; created_by: string | null; customer_notes: string | null; show_details_to_customer: boolean;
-  mileage_in: number | null; priority: OrderPriority; scheduled_on: string | null; due_at: string | null; estimated_minutes: number | null;
+  mileage_in: number | null; fuel_level: FuelLevel | null; existing_damage: string | null; reception_checks: ReceptionCheck[];
+  priority: OrderPriority; scheduled_on: string | null; due_at: string | null; estimated_minutes: number | null;
   approved_quote_id: string | null; approved_at: string | null;
   review_requested_at: string | null; review_requested_by: string | null; review_note: string | null;
   vehicles: { id: string; plate: string; make: string; model: string } | null;
@@ -55,7 +56,7 @@ let flash: { kind: 'ok' | 'bad'; text: string } = { kind: 'ok', text: Astro.url.
 let errors: Partial<Record<string, string>> = {};
 let draft: Record<string, string> | null = null;
 
-const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, mileage_in, priority, scheduled_on, due_at, estimated_minutes, approved_quote_id, approved_at, review_requested_at, review_requested_by, review_note, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
+const SELECT = 'id, number, status, received_at, problem_description, diagnosis, work_done, internal_notes, assigned_to, created_at, updated_at, delivered_at, created_by, customer_notes, show_details_to_customer, mileage_in, fuel_level, existing_damage, reception_checks, priority, scheduled_on, due_at, estimated_minutes, approved_quote_id, approved_at, review_requested_at, review_requested_by, review_note, vehicles(id, plate, make, model), customers(id, full_name, phone, email, user_id)';
 const ctx = panel;
 async function loadOrder() {
   if (!ctx.workshop || !isUuid(id)) return null;
@@ -134,6 +135,12 @@ if (panel.form && panel.workshop && order) {
     const km = field(panel.form, 'mileage_in').trim().replace(/\D/g, '');
     if (km && Number(km) > 3000000) flash = { kind: 'bad', text: 'Kilómetros no válidos.' };
     else update = { mileage_in: km ? Number(km) : null };
+  } else if (action === 'recepcion') {
+    // Solo la oficina (lo vuelve a comprobar la base de datos).
+    const r = parseReception({ fuel: field(panel.form, 'fuel_level'), damage: field(panel.form, 'existing_damage'), checks: panel.form.getAll('reception_checks').map(String) });
+    if (!panel.isOffice) flash = { kind: 'bad', text: 'Solo la oficina del taller anota la recepción.' };
+    else if (!r.ok) { flash = { kind: 'bad', text: r.error }; Astro.response.status = 422; }
+    else update = r.data as unknown as Record<string, unknown>;
   } else if (action === 'linea-anadir' || action === 'linea-quitar') {
     if (action === 'linea-anadir') {
       const r = readLine(panel.form, { taxRate: settings.default_tax_rate, labourRateCents: settings.labour_rate_cents });
@@ -200,7 +207,7 @@ if (panel.form && panel.workshop && order) {
       };
       Astro.response.status = 400;
     } else {
-      flash = { kind: 'ok', text: action === 'estado' ? 'Estado actualizado.' : action === 'planificar' ? 'Planificación guardada.' : action === 'km' ? 'Kilómetros guardados.' : 'Cambios guardados.' };
+      flash = { kind: 'ok', text: action === 'estado' ? 'Estado actualizado.' : action === 'planificar' ? 'Planificación guardada.' : action === 'km' ? 'Kilómetros guardados.' : action === 'recepcion' ? 'Recepción guardada.' : 'Cambios guardados.' };
       draft = null;
       await dispatchOrderEmails(Astro, order.id);
       order = await loadOrder();
@@ -466,14 +473,38 @@ const activeTeam = team.filter(m => m.active || m.user_id === order?.assigned_to
             <p class="hint" style="margin-top:8px">Las horas las pone el servidor al pulsar; no se pueden escribir a mano.</p>
           </section>
           <section class="card" aria-labelledby="km-t">
-            <h2 id="km-t" class="card-title"><Icon name="gauge" />Kilómetros a la entrada</h2>
+            <h2 id="km-t" class="card-title"><Icon name="gauge" />Recepción del vehículo</h2>
             <form method="post" class="copy-row" data-busy="Guardando…">
               <input type="hidden" name="action" value="km" />
               <label class="sr-only" for="mileage_in">Kilómetros a la entrada</label>
               <input class="input" id="mileage_in" name="mileage_in" inputmode="numeric" placeholder="Ej.: 120500" value={order.mileage_in ?? ''} />
               <button class="btn btn-sm" type="submit">Guardar</button>
             </form>
-            <p class="hint" style="margin-top:6px">Actualizan el kilometraje del vehículo y quedan en su historial.</p>
+            <p class="hint mt-s">Los kilómetros actualizan los del vehículo y quedan en su historial.</p>
+            {panel.isOffice ? (
+              <form method="post" class="form-stack mt-l" data-busy="Guardando…" aria-label="Estado al recibirlo">
+                <input type="hidden" name="action" value="recepcion" />
+                <div class="field"><label for="fuel_level">Combustible</label>
+                  <select class="select" id="fuel_level" name="fuel_level">
+                    <option value="">Sin anotar</option>
+                    {FUEL_LEVELS.map(f => <option value={f} selected={order.fuel_level === f}>{FUEL_LEVEL_LABELS[f]}</option>)}
+                  </select></div>
+                <div class="field"><label for="existing_damage">Daños que ya trae <span class="muted">(opcional)</span></label>
+                  <textarea class="textarea" id="existing_damage" name="existing_damage" rows="2" maxlength="1000" placeholder="Ej.: rayón en la puerta trasera izquierda, retrovisor derecho roto">{order.existing_damage ?? ''}</textarea></div>
+                <fieldset class="checks">
+                  <legend>Comprobado al recibirlo</legend>
+                  {RECEPTION_CHECKS.map(c => <label class="check"><input type="checkbox" name="reception_checks" value={c} checked={order.reception_checks.includes(c)} /><span>{RECEPTION_CHECK_LABELS[c]}</span></label>)}
+                </fieldset>
+                <p class="hint">Sale en el resguardo de depósito que firma el cliente.</p>
+                <button class="btn btn-sm" type="submit"><span class="spinner" aria-hidden="true"></span><span data-label>Guardar recepción</span></button>
+              </form>
+            ) : (
+              <dl class="facts mt-m">
+                <dt>Combustible</dt><dd>{order.fuel_level ? FUEL_LEVEL_LABELS[order.fuel_level] : 'Sin anotar'}</dd>
+                <dt>Daños que ya trae</dt><dd>{order.existing_damage ?? 'Ninguno anotado'}</dd>
+                {order.reception_checks.length > 0 && <><dt>Comprobado</dt><dd>{order.reception_checks.map(c => RECEPTION_CHECK_LABELS[c]).join(' · ')}</dd></>}
+              </dl>
+            )}
           </section>
           <section class="card" aria-labelledby="mant-t">
             <h2 id="mant-t" class="card-title"><Icon name="wrench" />Mantenimientos hechos</h2>

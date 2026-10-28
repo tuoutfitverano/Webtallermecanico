@@ -95,6 +95,8 @@ select tests.eq((select count(*) from public.notifications where event = 'cambio
                    and ((customer_id = 'c1000000-0000-0000-0000-00000000000a' and title = 'Tu vehículo ha cambiado de titular')
                      or (customer_id = 'c2000000-0000-0000-0000-00000000000a' and title = 'Ya tienes tu vehículo en tu portal'))), 2::bigint,
   'se avisa a los dos');
+select tests.eq((select bool_and(body not ilike '%factura%') from public.notifications where event = 'cambio_titular'), true,
+  'los avisos no hablan de facturas (el programa no las emite)');
 
 select tests.login('00000000-0000-0000-0000-0000000000c2');
 set local role authenticated;

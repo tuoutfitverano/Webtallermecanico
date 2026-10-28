@@ -8,7 +8,7 @@
 import '@fontsource-variable/archivo/standard.css';
 import { isUuid, panelPage } from '../../../../lib/server/panel.ts';
 import { formatDateTime } from '../../../../lib/panel/format.ts';
-import { formatPlate, orderLabel } from '@talleres/core';
+import { formatPlate, orderLabel, FUEL_LEVEL_LABELS, RECEPTION_CHECK_LABELS, type FuelLevel, type ReceptionCheck } from '@talleres/core';
 
 export const prerender = false;
 
@@ -20,12 +20,13 @@ if (!panel.workshop || !panel.isOffice || !isUuid(id)) return Astro.redirect('/p
 
 const [o, w] = await Promise.all([
   panel.supabase.from('repair_orders')
-    .select('number, received_at, mileage_in, problem_description, vehicles(plate, make, model), customers(full_name, phone, tax_id)')
+    .select('number, received_at, mileage_in, fuel_level, existing_damage, reception_checks, problem_description, vehicles(plate, make, model), customers(full_name, phone, tax_id)')
     .eq('id', id).eq('workshop_id', panel.workshop.id).maybeSingle(),
   panel.supabase.from('workshops').select('name, legal_name, tax_id, address_line, postal_code, city, province, contact_phone').eq('id', panel.workshop.id).maybeSingle(),
 ]);
 const order = o.data as unknown as {
   number: number; received_at: string; mileage_in: number | null; problem_description: string;
+  fuel_level: FuelLevel | null; existing_damage: string | null; reception_checks: ReceptionCheck[] | null;
   vehicles: { plate: string; make: string; model: string } | null; customers: { full_name: string; phone: string | null; tax_id: string | null } | null;
 } | null;
 const ws = w.data as { name: string; legal_name: string | null; tax_id: string | null; address_line: string | null; postal_code: string | null; city: string | null; province: string | null; contact_phone: string | null } | null;
@@ -75,7 +76,14 @@ const title = `Resguardo de depósito ${orderLabel(order.number)}`;
           <p class="lbl">Vehículo</p>
           {order.vehicles ? <p><strong>{formatPlate(order.vehicles.plate)}</strong> · {order.vehicles.make} {order.vehicles.model}</p> : <p>—</p>}
           <p>Kilómetros a la entrada: {order.mileage_in !== null ? order.mileage_in.toLocaleString('es-ES') : '____________'}</p>
+          <p>Combustible: {order.fuel_level ? FUEL_LEVEL_LABELS[order.fuel_level] : '____________'}</p>
         </div>
+      </section>
+
+      <section>
+        <p class="lbl">Estado al recibirlo</p>
+        <p class="box">{order.existing_damage ?? 'Sin daños anotados.'}</p>
+        {(order.reception_checks ?? []).length > 0 && <p>{(order.reception_checks ?? []).map(c => `☑ ${RECEPTION_CHECK_LABELS[c]}`).join('   ')}</p>}
       </section>
 
       <section>

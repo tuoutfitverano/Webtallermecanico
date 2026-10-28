@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billingSettingsSchema, customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, orderLabel, orderUpdateSchema, workshopProfileSchema, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES } from './workshop.ts';
+import { billingSettingsSchema, FUEL_LEVELS, parseReception, RECEPTION_CHECKS, customerInputSchema, fieldErrors, isRepairStatus, orderCreateSchema, orderLabel, orderUpdateSchema, workshopProfileSchema, REPAIR_STATUS_CUSTOMER_TEXT, REPAIR_STATUS_LABELS, REPAIR_STATUSES } from './workshop.ts';
 
 describe('clientes', () => {
   it('acepta un cliente con solo nombre y normaliza el correo', () => {
@@ -93,5 +93,22 @@ describe('datos del taller', () => {
     const r = workshopProfileSchema.safeParse({ name: ' ', contactEmail: 'no', contactPhone: '12', logoUrl: 'http://x.es/logo.png' });
     expect(r.success).toBe(false);
     if (!r.success) expect(Object.keys(fieldErrors(r.error)).sort()).toEqual(['contactEmail', 'contactPhone', 'logoUrl', 'name']);
+  });
+});
+
+describe('recepción del vehículo', () => {
+  it('acepta lo válido, sin repetidos y en el orden de la lista', () => {
+    expect(parseReception({ fuel: '1/4', damage: '  Rayón puerta  ', checks: ['objetos_valor', 'documentacion', 'objetos_valor'] }))
+      .toEqual({ ok: true, data: { fuel_level: '1/4', existing_damage: 'Rayón puerta', reception_checks: ['documentacion', 'objetos_valor'] } });
+    expect(parseReception({ fuel: '', damage: '', checks: [] })).toEqual({ ok: true, data: { fuel_level: null, existing_damage: null, reception_checks: [] } });
+  });
+  it('rechaza valores fuera de la lista o demasiado largos', () => {
+    expect(parseReception({ fuel: 'medio', damage: '', checks: [] }).ok).toBe(false);
+    expect(parseReception({ fuel: '', damage: '', checks: ['inventado'] }).ok).toBe(false);
+    expect(parseReception({ fuel: '', damage: 'x'.repeat(1001), checks: [] }).ok).toBe(false);
+  });
+  it('mismos valores que la base de datos', () => {
+    expect(FUEL_LEVELS).toEqual(['reserva', '1/4', '1/2', '3/4', 'lleno']);
+    expect(RECEPTION_CHECKS).toHaveLength(6);
   });
 });

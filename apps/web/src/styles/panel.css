@@ -616,3 +616,9 @@ details.danger-zone[open] > summary { margin-bottom: 10px; }
   .agenda-chip { display: none; }
 }
 @media (pointer: coarse) { .agenda-num { min-height: 44px; min-width: 44px; } }
+
+/* Orden nueva: estado del vehículo al recibirlo (desplegable, opcional). */
+details.reception { border: 1px dashed var(--p-line-2); border-radius: 12px; padding: 12px 14px; }
+details.reception > summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+details.reception > summary .muted { font-weight: 400; font-size: .8125rem; }
+@media (pointer: coarse) { details.reception > summary { min-height: 44px; } }

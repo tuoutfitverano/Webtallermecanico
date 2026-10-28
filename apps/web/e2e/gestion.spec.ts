@@ -320,3 +320,43 @@ test.describe('Gestión · copia de seguridad del taller', () => {
     await expect(page.getByRole('button', { name: /Descargar/ })).toHaveCount(0);
   });
 });
+
+test.describe('Gestión · recepción del vehículo', () => {
+  test('la oficina anota combustible, daños y comprobaciones; salen en el resguardo', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test');
+    const job = await createJob(page);
+    await page.goto(job.orderUrl);
+    const card = page.getByRole('form', { name: 'Estado al recibirlo' });
+    await card.getByLabel('Combustible').selectOption('3/4');
+    await card.getByLabel(/Daños que ya trae/).fill('Rayón en la puerta trasera izquierda');
+    await card.getByLabel('Deja la documentación del vehículo').check();
+    await card.getByRole('button', { name: 'Guardar recepción' }).click();
+    await expect(page.getByRole('status')).toContainText('Recepción guardada.');
+    await expect(page.getByRole('form', { name: 'Estado al recibirlo' }).getByLabel('Combustible')).toHaveValue('3/4');
+    await expect(page.getByRole('form', { name: 'Estado al recibirlo' }).getByLabel('Deja la documentación del vehículo')).toBeChecked();
+
+    await page.getByRole('link', { name: 'Resguardo de depósito' }).click();
+    await expect(page.locator('body')).toContainText('Combustible: 3/4');
+    await expect(page.locator('body')).toContainText('Rayón en la puerta trasera izquierda');
+    await expect(page.locator('body')).toContainText('Deja la documentación del vehículo');
+  });
+});
+
+test.describe('Gestión · inicio con próximas entregas', () => {
+  test('una orden con entrega prevista ya pasada sale en el inicio como retrasada', async ({ page }) => {
+    await login(page, 'propietaria@e2e.test');
+    const job = await createJob(page);
+    await page.goto(job.orderUrl);
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const local = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' }).format(yesterday);
+    await page.getByLabel(/Entrega prevista/).fill(`${local}T10:00`);
+    await page.getByLabel('Prioridad').selectOption('urgente');
+    await page.getByRole('button', { name: 'Guardar planificación' }).click();
+    await expect(page.getByRole('status')).toContainText('Planificación guardada.');
+    await page.goto('/panel');
+    const card = page.getByRole('region', { name: 'Próximas entregas' });
+    const row = card.getByRole('link', { name: job.plate.display });
+    await expect(row).toContainText('Retrasada');
+    await expect(row).toContainText('Urgente');
+  });
+});
