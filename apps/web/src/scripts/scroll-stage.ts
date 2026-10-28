@@ -43,8 +43,11 @@ function start(stage: HTMLElement) {
   const zoomGap = stage.querySelector<HTMLElement>('.stage-gap-zoom');
   const ctx = canvas?.getContext('2d');
   // Pantallas grandes (más de 2000 px reales de ancho): versión 4K si el taller la tiene.
-  const big = innerWidth * Math.min(devicePixelRatio || 1, 2) > 2000;
-  const src = (big && stage.dataset.srcHd) || stage.dataset.src || '';
+  // Móviles (hasta 1100 px reales): versión ligera si la tiene; el resto, la normal.
+  const realWidth = innerWidth * Math.min(devicePixelRatio || 1, 2);
+  const big = realWidth > 2000;
+  const small = realWidth <= 1100;
+  const src = (big && stage.dataset.srcHd) || (small && stage.dataset.srcSm) || stage.dataset.src || '';
   const count = Number(stage.dataset.count);
   const fx = Number(stage.dataset.focusX ?? 0.5);
   const fy = Number(stage.dataset.focusY ?? 0.5);

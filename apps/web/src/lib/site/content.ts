@@ -69,6 +69,8 @@ export const scrollFramesSchema = z.object({
   frameTop: z.number().min(0).max(1).default(0),
   /** Versiones 4K opcionales (mismos encuadres) para pantallas de más de 2000 px reales. */
   srcHd: assetUrl.refine(v => v.includes('{n}')).nullable().default(null),
+  /** Versión ligera para móviles (hasta 1100 px reales de ancho); mismos fotogramas a menor tamaño. */
+  srcSm: assetUrl.refine(v => v.includes('{n}')).nullable().default(null),
   backdropHd: assetUrl.nullable().default(null),
   /**
    * Ritmo: parte de la secuencia que se reproduce (1 = vuelta completa, 0.5 = media
