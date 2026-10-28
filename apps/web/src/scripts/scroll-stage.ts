@@ -147,6 +147,32 @@ function start(stage: HTMLElement) {
     queue();
   };
 
+  // ---- Fundido entre dos fotogramas seguidos (en un lienzo aparte, sumando los dos con su peso:
+  // así el coche no se vuelve translúcido a mitad de camino ni deja un borde fantasma).
+  const mix = document.createElement('canvas');
+  const mixCtx = mix.getContext('2d');
+  const blend = (a: HTMLImageElement, b: HTMLImageElement, t: number): CanvasImageSource => {
+    if (!mixCtx) return t < 0.5 ? a : b;
+    const w = a.naturalWidth, h = a.naturalHeight;
+    if (mix.width !== w || mix.height !== h) { mix.width = w; mix.height = h; }
+    mixCtx.globalCompositeOperation = 'source-over';
+    mixCtx.clearRect(0, 0, w, h);
+    mixCtx.globalCompositeOperation = 'lighter';
+    mixCtx.globalAlpha = 1 - t;
+    mixCtx.drawImage(a, 0, 0, w, h);
+    mixCtx.globalAlpha = t;
+    mixCtx.drawImage(b, 0, 0, w, h);
+    mixCtx.globalAlpha = 1;
+    mixCtx.globalCompositeOperation = 'source-over';
+    return mix;
+  };
+
+  // ---- Seguimiento suave: el fotograma que se ve alcanza al del scroll deslizándose
+  // (en vez de saltar varios de golpe con cada golpe de rueda).
+  const FOLLOW_MS = 110;
+  let shown = -1;
+  let lastTime = 0;
+
   // ---- Dibujo según el scroll
   let last = '';
   let pending = false;
@@ -190,11 +216,23 @@ function start(stage: HTMLElement) {
       shade = Math.max(down, up);
     }
 
-    const index = !openFrom ? Math.round(turn * steps)
-      : open > 0 ? openFrom + Math.round(open * (steps - openFrom)) : Math.round(turn * openFrom);
-    const img = nearest(index);
+    const target = !openFrom ? turn * steps
+      : open > 0 ? openFrom + open * (steps - openFrom) : turn * openFrom;
+    const now = performance.now();
+    if (shown < 0 || Math.abs(target - shown) > steps * 0.5) shown = target; // al abrir o con un salto enorme, directo
+    else {
+      const dt = Math.min(64, now - (lastTime || now));
+      shown += (target - shown) * (1 - Math.exp(-dt / FOLLOW_MS));
+      if (Math.abs(target - shown) < 0.01) shown = target;
+    }
+    lastTime = now;
+    if (shown !== target) queue(); // sigue deslizándose en los próximos cuadros
+    const i0 = Math.floor(shown);
+    const t = shown - i0;
+    const img = nearest(i0);
+    const nextImg = t > 0.02 && i0 + 1 <= steps ? frames[i0 + 1] : null;
     // El fotograma dibujado forma parte de la clave: al terminar de cargarse, se redibuja.
-    const key = `${img ? frames.indexOf(img) : -1}|${backdrop ? 1 : 0}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;
+    const key = `${img ? frames.indexOf(img) : -1}|${nextImg ? t.toFixed(2) : 0}|${backdrop ? 1 : 0}|${zoom.toFixed(4)}|${shade.toFixed(3)}|${vw}x${vh}`;
     if (key === last) return;
     last = key;
     dim!.style.opacity = shade.toFixed(3);
@@ -219,7 +257,7 @@ function start(stage: HTMLElement) {
     const py = lerp((vh - sh * base) / 2 + focusY * base, vh / 2, k);
     const ox = px - focusX * scale, oy = py - focusY * scale;
     if (backdrop) ctx!.drawImage(backdrop, ox, oy, sw * scale, sh * scale);
-    ctx!.drawImage(img, ox, oy + fTop * scale, sw * scale, fH * scale);
+    ctx!.drawImage(nextImg && nextImg.naturalWidth === img.naturalWidth ? blend(img, nextImg, t) : img, ox, oy + fTop * scale, sw * scale, fH * scale);
 
     // Cuando cada píxel de la foto ya ocupa más de ~1,5 píxeles de pantalla, el cristal
     // dibujado la va tapando (a los ~3 px la cubre del todo): sin granulado.
