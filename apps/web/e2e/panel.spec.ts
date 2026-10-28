@@ -419,9 +419,7 @@ test.describe('Panel · móvil y usuarios sin taller', () => {
 test.describe('Web pública', () => {
   test('el coche gira hasta la trasera, abre el maletero y se acerca a él antes del software', async ({ page }) => {
     const frames: string[] = [];
-    // Móvil: versión ligera (maletero-sm); ordenador: la normal.
-    const folder = test.info().project.name === 'movil' ? 'maletero-sm' : 'maletero';
-    page.on('request', r => { if (/\/demo\/autovalue\/maletero(-sm)?\//.test(r.url())) frames.push(r.url()); });
+    page.on('request', r => { if (r.url().includes('/demo/autovalue/maletero/')) frames.push(r.url()); });
     await page.goto('/');
     await expect(page.locator('html')).toHaveClass(/stage-on/);
     // Sin bajar no se descarga ningún fotograma (solo la imagen fija); al empezar a bajar, sí.
@@ -443,8 +441,7 @@ test.describe('Web pública', () => {
     await page.evaluate(() => { const g = document.querySelector('.stage-gap-zoom')!; scrollTo(0, g.getBoundingClientRect().top + scrollY + g.clientHeight - innerHeight); });
     await expect.poll(dim).toBeGreaterThan(0.95);
     // Giro + maletero: se descargan los 62 fotogramas, ni uno más.
-    expect(frames.every(f => f.includes(`/${folder}/`))).toBe(true);
-    const used = [...new Set(frames.map(f => Number(/maletero(?:-sm)?\/(\d+)\.webp/.exec(f)![1])))].sort((a, b) => a - b);
+    const used = [...new Set(frames.map(f => Number(/maletero\/(\d+)\.webp/.exec(f)![1])))].sort((a, b) => a - b);
     expect(used).toEqual(Array.from({ length: 62 }, (_, i) => i));
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);

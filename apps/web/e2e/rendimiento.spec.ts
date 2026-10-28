@@ -10,22 +10,18 @@ import { expect, test, type Page } from '@playwright/test';
 const PROXY = process.env.E2E_PROXY_URL ?? '';
 test.skip(!PROXY, 'Lanza estas pruebas con scripts/test-e2e.sh');
 
-const FRAME = /\/demo\/autovalue\/(giro|giro-4k|maletero|maletero-sm)\//;
+const FRAME = /\/demo\/autovalue\/(giro|giro-4k|maletero)\//;
 // Código pesado de los formularios: el módulo de envío y las reglas compartidas (zod).
 const FORM_CODE = /request-forms-submit|\/packages\/core\/|\/zod\//;
 
 function track(page: Page) {
   const urls: string[] = [];
-  let bytes = 0, frameBytes = 0;
+  let bytes = 0;
   page.on('requestfinished', async r => {
     urls.push(r.url());
-    try {
-      const size = (await r.sizes()).responseBodySize;
-      bytes += size;
-      if (FRAME.test(r.url())) frameBytes += size;
-    } catch { /* petición cancelada */ }
+    try { bytes += (await r.sizes()).responseBodySize; } catch { /* petición cancelada */ }
   });
-  return { urls, bytes: () => bytes, frameBytes: () => frameBytes };
+  return { urls, bytes: () => bytes };
 }
 
 test('portada: sin scroll no descarga los fotogramas ni la validación de formularios', async ({ page }) => {
@@ -46,14 +42,6 @@ test('portada: sin scroll no descarga los fotogramas ni la validación de formul
   await page.evaluate(() => scrollBy(0, 400));
   await expect(page.locator('.stage')).toHaveClass(/is-live/);
   await expect.poll(() => net.urls.filter(u => FRAME.test(u)).length).toBeGreaterThan(20);
-  // Todos los fotogramas descargados (se piden de una vez al activarse): cuánto pesan en este dispositivo.
-  await expect.poll(() => net.urls.filter(u => FRAME.test(u)).length, { timeout: 20_000 }).toBeGreaterThanOrEqual(62);
-  await page.waitForTimeout(500);
-  const frameUrls = net.urls.filter(u => FRAME.test(u));
-  // Móvil: versión ligera (1280 px); ordenador: la normal (1920 px).
-  const folder = test.info().project.name === 'movil' ? 'maletero-sm' : 'maletero';
-  expect(frameUrls.every(u => u.includes(`/${folder}/`))).toBe(true);
-  console.info(`RENDIMIENTO fotogramas del coche (${test.info().project.name}): ${frameUrls.length} archivos, ${Math.round(net.frameBytes() / 1024)} KB, carpeta ${[...new Set(frameUrls.map(u => u.split('/').slice(-2, -1)[0]))].join(', ')}`);
 
   // Al usar un formulario llega su validación (antes de enviar).
   await page.locator('[data-req-form] [name="name"]').first().focus();

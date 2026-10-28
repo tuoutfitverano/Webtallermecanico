@@ -48,7 +48,6 @@ values (
     "backdrop": "/demo/autovalue/garaje.webp",
     "frameTop": 0.359375,
     "srcHd": null,
-    "srcSm": "/demo/autovalue/maletero-sm/{n}.webp",
     "backdropHd": "/demo/autovalue/garaje-4k.webp",
     "openFrom": 29,
     "turnGap": 0.35,

@@ -13,7 +13,7 @@
 | A1 | **Medio** (seguridad) | Notificaciones en el móvil: un cliente podía guardar como «dispositivo» cualquier dirección `https://…`, y el servidor la llamaba con la firma de la plataforma (SSRF limitado: llamar a sitios ajenos). | `lib/notifications/webpush.ts`, `20261107090000_notificaciones_movil.sql` | **Corregido** |
 | A2 | **Medio** (fiabilidad) | La tarea programada lanzaba email, WhatsApp, móvil y mantenimiento juntos con `Promise.all`. Si una parte fallaba, la respuesta entera era un error y no se sabía cuál. | `api/notificaciones/procesar.ts` | **Corregido** |
 | A3 | **Medio** (observabilidad) | Los registros no tenían hora, nivel ni identificador de petición. No había señal de salud para un monitor externo. Un fallo no previsto devolvía la página de error por defecto, sin un código de referencia. | `lib/server/config.ts`, `auth.ts`, `middleware.ts` | **Corregido** |
-| A4 | **Medio** (rendimiento) | Los móviles descargaban los mismos fotogramas del coche que un PC: 5286 KB. | `scripts/scroll-stage.ts`, `talleres/autovalue.json` | **Corregido** (−34 % en móvil) |
+| A4 | **Medio** (rendimiento) | Los móviles descargan los mismos fotogramas del coche que un PC: 5286 KB. | `scripts/scroll-stage.ts`, `talleres/autovalue.json` | **Retirado a petición del propietario**: la versión ligera (−34 %) y un fundido posterior se veían peor; la animación vuelve a la original, con la máxima calidad en todos los dispositivos. |
 | A5 | **Medio** (función) | La recepción solo guardaba los kilómetros. No había nivel de combustible, daños previos ni lista de comprobación: es lo que evita discusiones al entregar el coche. | `repair_orders`, ficha y alta de orden, resguardo | **Corregido** (sin fotos; ver G) |
 | A6 | **Bajo** (coherencia legal) | En el portal, el enlace de un aviso decía «Ver la factura», y el aviso del cambio de titular hablaba de «facturas». El programa no emite facturas. | `portal/avisos.astro`, `private.do_vehicle_transfer` | **Corregido** |
 | A7 | **Bajo** (UX) | El inicio no mostraba las entregas previstas ni las retrasadas, solo un recuento. | `panel/index.astro` | **Corregido** |
@@ -38,7 +38,6 @@
 | Middleware: `x-request-id` y página 500 sin detalles con el código | Corrige A3 | Si algo falla, la persona da un código y se encuentra en los registros. |
 | `Promise.allSettled` en la tarea programada y 500 si falla alguna parte | Corrige A2 | Las demás partes se hacen igual. El fallo se ve y queda registrado (`cron_part_error`). |
 | `GET /api/salud` | Corrige A3 | Público: solo `{ok}`. Con el secreto: base de datos y avisos atascados de canales configurados (solo recuentos). |
-| `scrollFrames.srcSm` + `maletero-sm/` (1280 px) | Corrige A4 | Móvil: de 5286 a 3509 KB. PC sin cambios. Comprobado a ojo que en el móvil se ve igual. |
 | Recepción del vehículo (migración `20261113090000`, guardia, core `parseReception`, pantallas, resguardo) | Corrige A5 | Anota combustible, daños y comprobaciones. Solo la oficina la cambia, y sale en el papel que firma el cliente. |
 | «Próximas entregas» en el inicio | Corrige A7 | Muestra lo que vence en 2 días y lo retrasado, con las urgentes marcadas. El mecánico ve las suyas. |
 | Textos «resumen de servicios» (migración que solo cambia ese texto) | Corrige A6 | Lo que se ve en pantalla coincide con lo que el sistema genera de verdad. |
@@ -61,7 +60,7 @@
 | Portada sin bajar (todo lo descargado) | 905 KB, 30 peticiones, 0 fotogramas | igual |
 | LCP local (ordenador / móvil Pixel 7) | 300 / 180 ms | 196 / 288 ms (variación entre ejecuciones; local, sin red real) |
 | Fotogramas del coche al bajar, ordenador | 5286 KB | 5286 KB |
-| Fotogramas del coche al bajar, móvil | 5286 KB | **3509 KB (−34 %)** |
+| Fotogramas del coche al bajar, móvil | 5286 KB | 5286 KB (se retiró la versión ligera a petición del propietario) |
 
 INP y CLS no se han medido con usuarios reales. Las cifras son de un navegador local, sin red de móvil.
 
