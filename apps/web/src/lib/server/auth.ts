@@ -12,6 +12,7 @@ import { createServerClient, parseCookieHeader } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AstroCookies } from 'astro';
 import { appOrigin, authEnv, isDev } from './config.ts';
+import { logEvent } from './log.ts';
 
 export interface AuthRequestContext {
   request: Request;
@@ -134,5 +135,5 @@ export function setPrivateHeaders(headers: Headers) {
 
 /** Registro técnico: solo códigos, nunca correos ni contraseñas. */
 export function logAuth(event: string, code?: string) {
-  console.info(JSON.stringify({ event, ...(code ? { code } : {}) }));
+  logEvent(event, code ? { code } : {});
 }

@@ -67,12 +67,30 @@ export async function vapidAuthorization(endpoint: string, keys: VapidKeys, now 
 }
 
 /**
+ * Servicios de notificaciones de los navegadores. Solo a ellos se envían los
+ * «toques»: una dirección cualquiera (https://otra-web/…) haría que el servidor
+ * llamara, firmado, a sitios ajenos. En pruebas, el servicio simulado escucha
+ * en 127.0.0.1 (http), inalcanzable desde Cloudflare.
+ */
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/,
+  /^web\.push\.apple\.com$/, /^[a-z0-9-]+\.push\.apple\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/];
+export function isKnownPushService(endpoint: string): boolean {
+  let url: URL;
+  try { url = new URL(endpoint); } catch { return false; }
+  if (url.username || url.password) return false;
+  if (url.protocol === 'http:') return url.hostname === '127.0.0.1' || url.hostname === 'localhost';
+  return url.protocol === 'https:' && (url.port === '' || url.port === '443') && PUSH_HOSTS.some(h => h.test(url.hostname));
+}
+
+/**
  * Envía el «toque» a un dispositivo. Devuelve el código HTTP del servicio del
  * navegador (201 = aceptado; 404/410 = el dispositivo ya no existe) o 0 si no
  * hubo respuesta.
  */
 export async function sendPush(endpoint: string, keys: VapidKeys, opts: { timeoutMs?: number; fetch?: typeof fetch } = {}): Promise<number> {
   const doFetch = opts.fetch ?? fetch;
+  // Dirección que no es de un servicio de notificaciones: no se llama y se da por desaparecida (se borra).
+  if (!isKnownPushService(endpoint)) return 410;
   try {
     const res = await doFetch(endpoint, {
       method: 'POST',

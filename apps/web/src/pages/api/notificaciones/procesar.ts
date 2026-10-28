@@ -10,6 +10,7 @@
 import type { APIRoute } from 'astro';
 import { dispatchPendingEmails, dispatchPendingPush, dispatchPendingWhatsapp, notificationsCronSecret, runMaintenance } from '../../../lib/server/config.ts';
 import { bearerMatches } from '../../../lib/notifications/auth.ts';
+import { logEvent } from '../../../lib/server/log.ts';
 
 export const prerender = false;
 
@@ -20,13 +21,21 @@ export const POST: APIRoute = async ({ request }) => {
   const secret = notificationsCronSecret();
   if (!secret) return json(404, { ok: false });
   if (!bearerMatches(request.headers.get('authorization'), secret)) return json(401, { ok: false });
-  const [summary, whatsapp, push, maintenance] = await Promise.all([
+  // Cada parte va por su cuenta: si una falla (p. ej. el proveedor de correo no responde), las demás se hacen igual.
+  const started = Date.now();
+  const [email, whatsapp, push, maintenance] = await Promise.allSettled([
     dispatchPendingEmails({ limit: 50 }),
     dispatchPendingWhatsapp({ limit: 50 }),
     dispatchPendingPush({ limit: 100 }),
     runMaintenance(),
   ]);
-  return json(200, { ok: true, ...summary, whatsapp, push, maintenance });
+  const parts = { email, whatsapp, push, maintenance };
+  const failed = Object.entries(parts).filter(([, r]) => r.status === 'rejected').map(([name]) => name);
+  for (const name of failed) logEvent('cron_part_error', { part: name });
+  logEvent('cron_run', { ms: Date.now() - started, failed: failed.length });
+  const value = <T>(r: PromiseSettledResult<T>) => (r.status === 'fulfilled' ? r.value : null);
+  // Con alguna parte fallida, 500: la tarea programada y cualquier monitor lo ven como fallo.
+  return json(failed.length ? 500 : 200, { ...(value(email) ?? {}), ok: failed.length === 0, failedParts: failed, whatsapp: value(whatsapp), push: value(push), maintenance: value(maintenance) });
 };
 
 export const ALL: APIRoute = () => json(405, { ok: false });

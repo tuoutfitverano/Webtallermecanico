@@ -20,6 +20,7 @@ import { appOrigin } from './lib/server/config.ts';
 import { setPrivateHeaders } from './lib/server/auth.ts';
 import { contentSecurityPolicy } from './lib/server/csp.ts';
 import { MAX_POST_BYTES, declaredTooLarge } from './lib/server/body.ts';
+import { logEvent, requestId, safePath } from './lib/server/log.ts';
 
 // /presupuesto/<código>: enlace público con un código secreto: sin caché y sin enviar la dirección a otros sitios.
 const PRIVATE_PATHS = /^\/(acceso|registro|recuperar|salir|cuenta|invitacion|auth|panel|portal|mi-area|acceso-denegado|presupuesto|admin)(\/|$)/;
@@ -63,9 +64,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
-  const response = await next();
+  // Un fallo no previsto: página de error sencilla (sin detalles) y una línea en el registro con el identificador de la petición.
+  const rid = requestId(context.request);
+  let response: Response;
+  try {
+    response = await next();
+  } catch (error) {
+    logEvent('unhandled_error', { rid, method: context.request.method, path: safePath(context.url.pathname), name: error instanceof Error ? error.name : 'desconocido' });
+    response = new Response('Algo ha fallado. Inténtalo de nuevo en un momento; si se repite, avisa indicando este código: ' + rid,
+      { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+  }
   return withHeaders(response, h => {
     if (isPrivate) setPrivateHeaders(h);
     setSecurityHeaders(h, https, csp);
+    h.set('x-request-id', rid);
   });
 });

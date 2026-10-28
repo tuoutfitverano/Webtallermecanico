@@ -1,6 +1,6 @@
 import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { fromB64url, sendPush, validVapidKeys, vapidAuthorization, type VapidKeys } from './webpush.ts';
+import { fromB64url, isKnownPushService, sendPush, validVapidKeys, vapidAuthorization, type VapidKeys } from './webpush.ts';
 
 function newKeys(): VapidKeys {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
@@ -38,7 +38,7 @@ describe('notificaciones en el móvil (Web Push)', () => {
   it('el «toque» va vacío, con caducidad y la firma; devuelve el código del servicio', async () => {
     const keys = newKeys();
     let seen: RequestInit | undefined;
-    const status = await sendPush('https://push.example/abc', keys, {
+    const status = await sendPush('https://fcm.googleapis.com/fcm/send/abc', keys, {
       fetch: (async (_url: string, init?: RequestInit) => { seen = init; return new Response(null, { status: 201 }); }) as typeof fetch,
     });
     expect(status).toBe(201);
@@ -46,7 +46,22 @@ describe('notificaciones en el móvil (Web Push)', () => {
     expect(seen?.body).toBeUndefined();
     expect((seen?.headers as Record<string, string>).ttl).toBe('86400');
     expect((seen?.headers as Record<string, string>).authorization).toMatch(/^vapid t=/);
-    const failed = await sendPush('https://push.example/abc', keys, { fetch: (async () => { throw new Error('red'); }) as typeof fetch });
+    const failed = await sendPush('https://fcm.googleapis.com/fcm/send/abc', keys, { fetch: (async () => { throw new Error('red'); }) as typeof fetch });
     expect(failed).toBe(0);
+  });
+
+  it('solo se llama a los servicios de notificaciones de los navegadores (nada de direcciones ajenas)', async () => {
+    for (const ok of ['https://fcm.googleapis.com/fcm/send/x', 'https://updates.push.services.mozilla.com/wpush/v2/x',
+      'https://web.push.apple.com/QX', 'https://db5p.notify.windows.com/w/?token=x', 'http://127.0.0.1:9999/push/x']) {
+      expect(isKnownPushService(ok), ok).toBe(true);
+    }
+    for (const bad of ['https://evil.example/x', 'https://fcm.googleapis.com.evil.example/x', 'https://fcm.googleapis.com:8443/x',
+      'https://user:pw@fcm.googleapis.com/x', 'http://fcm.googleapis.com/x', 'http://169.254.169.254/latest', 'javascript:alert(1)', 'no es una url']) {
+      expect(isKnownPushService(bad), bad).toBe(false);
+    }
+    let called = false;
+    const status = await sendPush('https://evil.example/hook', newKeys(), { fetch: (async () => { called = true; return new Response(null, { status: 201 }); }) as typeof fetch });
+    expect(called).toBe(false);
+    expect(status).toBe(410);
   });
 });

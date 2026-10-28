@@ -235,7 +235,18 @@ test.describe('Avisos · de un cambio de estado al cliente', () => {
     expect((await cron('Bearer otro')).status).toBe(401);
     const ok = await cron(`Bearer ${CRON_SECRET}`);
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toMatchObject({ ok: true, configured: true });
+    expect(await ok.json()).toMatchObject({ ok: true, configured: true, failedParts: [] });
+    expect(ok.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/);
+
+    // Salud para un monitor: sin secreto solo «ok»; con él, base de datos y colas (solo recuentos).
+    const health = (auth?: string) => fetch(`${WEB}/api/salud`, { headers: { host: HOST, ...(auth ? { authorization: auth } : {}) } });
+    const open = await health();
+    expect(open.status).toBe(200);
+    expect(await open.json()).toEqual({ ok: true });
+    const detail = await (await health(`Bearer ${CRON_SECRET}`)).json() as Record<string, unknown>;
+    expect(detail).toMatchObject({ ok: true, database: 'ok' });
+    expect(typeof detail.stuckNotifications).toBe('number');
+    expect(JSON.stringify(detail)).not.toMatch(/@|\+34|token/i);
   });
 });
 

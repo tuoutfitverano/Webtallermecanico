@@ -20,6 +20,7 @@ import { renderInvitationEmail, type ClaimedNotification } from '../notification
 import type { ChannelSender } from '../notifications/types.ts';
 import { createMetaWhatsappSender, dispatchWhatsapp, type ClaimedWhatsapp, type WhatsappSender } from '../notifications/whatsapp.ts';
 import { sendPush, validVapidKeys, type VapidKeys } from '../notifications/webpush.ts';
+import { logEvent } from './log.ts';
 
 export const isDev = import.meta.env.DEV;
 
@@ -92,7 +93,7 @@ function madridToday(): string {
 
 /** Registro técnico: solo eventos y códigos, nunca datos del formulario. */
 function log(event: string, meta: Record<string, string | number | boolean> = {}) {
-  console.info(JSON.stringify({ event, ...meta }));
+  logEvent(event, meta);
 }
 
 export function submissionDeps(): SubmissionDeps {
@@ -424,4 +425,43 @@ export async function dispatchPendingPush(opts: { limit?: number } = {}): Promis
   // Solo recuentos: ni direcciones de dispositivos ni contenidos.
   log('push_dispatch', { ...summary });
   return summary;
+}
+
+// ---------------------------------------------------------------- salud (monitorización)
+
+export interface HealthReport {
+  database: 'ok' | 'error' | 'sin_configurar';
+  /** Avisos pendientes desde hace más de 30 minutos (email/WhatsApp atascados). */
+  stuckNotifications: number | null;
+  /** Toques al móvil pendientes desde hace más de 30 minutos. */
+  stuckPush: number | null;
+  ms: number;
+}
+
+/** Comprueba la base de datos y las colas de envío. Solo recuentos: nada de datos. */
+export async function healthCheck(): Promise<HealthReport> {
+  const started = Date.now();
+  const service = getServiceClient();
+  if (!service) return { database: 'sin_configurar', stuckNotifications: null, stuckPush: null, ms: 0 };
+  const cutoff = new Date(Date.now() - 30 * 60_000).toISOString();
+  // Sin proveedor configurado, los emails/WhatsApp se quedan «pendiente» a propósito: no cuentan como atasco.
+  const channels = [...(emailAvailable() ? ['email'] : []), ...(whatsappAvailable() ? ['whatsapp'] : [])];
+  const withTimeout = <T>(p: PromiseLike<T>) => Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))]);
+  try {
+    const [ping, stuck, push] = await Promise.all([
+      withTimeout(service.from('workshops').select('id', { head: true, count: 'exact' }).limit(1)),
+      channels.length
+        ? withTimeout(service.from('notifications').select('id', { head: true, count: 'exact' }).eq('status', 'pendiente').in('channel', channels).lt('created_at', cutoff))
+        : Promise.resolve({ count: 0, error: null }),
+      withTimeout(service.from('push_outbox').select('id', { head: true, count: 'exact' }).is('sent_at', null).lt('created_at', cutoff)),
+    ]);
+    if (ping.error) {
+      log('health_error', { code: ping.error.code ?? 'desconocido' });
+      return { database: 'error', stuckNotifications: null, stuckPush: null, ms: Date.now() - started };
+    }
+    return { database: 'ok', stuckNotifications: stuck.error ? null : stuck.count ?? 0, stuckPush: push.error ? null : push.count ?? 0, ms: Date.now() - started };
+  } catch {
+    log('health_error', { code: 'timeout' });
+    return { database: 'error', stuckNotifications: null, stuckPush: null, ms: Date.now() - started };
+  }
 }
