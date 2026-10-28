@@ -87,7 +87,7 @@ INP y CLS no se han medido con usuarios reales. Las cifras son de un navegador l
 | `npm run test:db` (permisos, aislamiento, reglas) | **1075** comprobaciones pasan. Antes de esta auditoría eran 1064: hay 11 nuevas. |
 | `npm run test:concurrencia` | 8 sesiones simultáneas: pasan |
 | `npm audit` | 0 vulnerabilidades |
-| `npm run test:e2e` (navegador completo) | VER_RESULTADO_E2E |
+| `npm run test:e2e` (navegador completo, ordenador y móvil) | **215 pasan, 1 falló, 76 omitidas** (flujos que solo se prueban en ordenador o necesitan otro entorno). La que falló esperaba que el móvil usara `maletero/`, y ahora usa a propósito `maletero-sm/`. Se adaptó para comprobar la carpeta de cada dispositivo (sigue exigiendo los 62 fotogramas) y se volvió a ejecutar: **2 de 2 pasan**. |
 
 **Problemas abiertos:** los de `PENDIENTE_ANTES_DE_VENDER.md` que dependen del propietario siguen igual:
 - Datos legales del titular de la plataforma.
